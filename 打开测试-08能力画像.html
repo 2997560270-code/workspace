@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Product Drill 能力画像测试入口</title>
+    <style>
+      body {
+        margin: 0;
+        background: #f5f6f8;
+        color: #111827;
+        font-family: Arial, "Microsoft YaHei", sans-serif;
+      }
+
+      main {
+        max-width: 840px;
+        margin: 48px auto;
+        padding: 32px;
+        background: #fff;
+        border: 1px solid #dfe3e8;
+        border-radius: 8px;
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: 24px;
+      }
+
+      a {
+        display: inline-block;
+        margin: 20px 0;
+        padding: 12px 18px;
+        border-radius: 6px;
+        background: #111827;
+        color: #fff;
+        text-decoration: none;
+      }
+
+      li {
+        margin: 10px 0;
+        line-height: 1.7;
+      }
+
+      code {
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: #eef1f4;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Product Drill 测试入口：08 能力画像</h1>
+      <p>本轮测试重点是能力画像模块，确认训练完成后可以看到统计卡片、趋势、能力维度、高频短板和下一步推荐训练。</p>
+      <a href="http://127.0.0.1:3000">打开本地测试应用</a>
+      <ol>
+        <li>先确认本地服务已启动。如果打不开，请告诉我，我来重新启动。</li>
+        <li>进入应用后点击“进入工作台”。</li>
+        <li>完成至少两轮训练：每轮输入回答，点击“提交方案”，生成评分。</li>
+        <li>点击左侧“能力画像”。</li>
+        <li>检查顶部是否显示 <code>平均分</code>、<code>完成训练</code>、<code>最高分</code>、<code>综合进步</code>。</li>
+        <li>检查“最近训练表现趋势”是否出现可视化柱状趋势。</li>
+        <li>检查“能力维度表现”是否替代原来的分项能力模块，并展示 7 个能力维度。</li>
+        <li>检查“高频短板”下方是否出现“下一步推荐训练”。</li>
+      </ol>
+      <p>预期结果：完成训练次数会随提交次数增加，趋势图和维度分数会基于当前训练评分更新。</p>
+    </main>
+  </body>
+</html>

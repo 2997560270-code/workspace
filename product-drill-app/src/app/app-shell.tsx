@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type KeyboardEvent } from "react";
+import { buildAbilityProfile } from "../lib/ability-profile";
 import { generateEvaluation, type Evaluation } from "../lib/evaluation";
 import { NAV_ITEMS, ViewId, getViewMeta } from "../lib/navigation";
 import { analyzeProduct, type ProductAnalysis, type ProductProfile } from "../lib/product-analysis";
@@ -265,21 +266,65 @@ function ProductPanel() {
   );
 }
 
-function StaticPanel({ view }: { view: Exclude<ViewId, "workbench" | "history"> }) {
-  const panels: Record<Exclude<ViewId, "workbench" | "history">, React.ReactNode> = {
-  product: <ProductPanel />,
-  profile: (
+function ProfilePanel({ records }: { records: TrainingHistoryRecord[] }) {
+  const profile = buildAbilityProfile(records);
+  const maxTrend = Math.max(...profile.trend.map((item) => item.score), 100);
+
+  return (
     <section className="panel">
       <h2>能力画像</h2>
       <div className="metrics">
-        <div><span>平均分</span><strong>78.6</strong></div>
-        <div><span>完成训练</span><strong>24</strong></div>
-        <div><span>最高分</span><strong>92</strong></div>
-        <div><span>综合进步</span><strong>+12.3</strong></div>
+        <div><span>平均分</span><strong>{profile.averageScore}</strong></div>
+        <div><span>完成训练</span><strong>{profile.completedCount} 次</strong></div>
+        <div><span>最高分</span><strong>{profile.bestScore}</strong></div>
+        <div><span>综合进步</span><strong>{profile.progress >= 0 ? "+" : ""}{profile.progress}</strong></div>
       </div>
-      <div className="notice">下一轮建议选择“B2B / 客户咨询 / 严格”，集中训练价值论证和异议应对。</div>
+
+      <div className="profile-grid">
+        <section>
+          <h3>最近训练表现趋势</h3>
+          <div className="trend-chart">
+            {profile.trend.length ? profile.trend.map((item) => (
+              <div className="trend-point" key={item.label}>
+                <span style={{ height: `${Math.max(8, (item.score / maxTrend) * 120)}px` }} />
+                <small>{item.label}</small>
+                <strong>{item.score}</strong>
+              </div>
+            )) : <div className="notice">完成训练后显示趋势</div>}
+          </div>
+        </section>
+
+        <section>
+          <h3>能力维度表现</h3>
+          {profile.dimensions.map((dimension) => (
+            <div className="ability-dimension" key={dimension.name}>
+              <span>{dimension.name}</span>
+              <div><i style={{ width: `${dimension.score}%` }} /></div>
+              <strong>{dimension.score}</strong>
+            </div>
+          ))}
+        </section>
+      </div>
+
+      <div className="profile-grid">
+        <section>
+          <h3>高频短板</h3>
+          {profile.shortcomings.map((item) => (
+            <div className="issue-item" key={item}>{item}</div>
+          ))}
+        </section>
+        <section>
+          <h3>下一步推荐训练</h3>
+          <div className="notice">{profile.nextTraining}</div>
+        </section>
+      </div>
     </section>
-  ),
+  );
+}
+
+function StaticPanel({ view }: { view: Exclude<ViewId, "workbench" | "history" | "profile"> }) {
+  const panels: Record<Exclude<ViewId, "workbench" | "history" | "profile">, React.ReactNode> = {
+  product: <ProductPanel />,
   scenarios: (
     <section className="panel">
       <h2>行业场景</h2>
@@ -342,6 +387,8 @@ export function AppShell() {
             <Workbench onHistoryRecord={addHistoryRecord} onOpenHistory={() => setView("history")} />
           ) : view === "history" ? (
             <HistoryPanel records={historyRecords} />
+          ) : view === "profile" ? (
+            <ProfilePanel records={historyRecords} />
           ) : (
             <StaticPanel view={view} />
           )}

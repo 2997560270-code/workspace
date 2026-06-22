@@ -376,6 +376,57 @@ td button {
   padding-top: 16px;
 }
 
+.profile-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.trend-chart {
+  display: flex;
+  min-height: 180px;
+  align-items: end;
+  gap: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 18px;
+}
+
+.trend-point {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+}
+
+.trend-point span {
+  width: 20px;
+  border-radius: 4px 4px 0 0;
+  background: #0f172a;
+}
+
+.ability-dimension {
+  display: grid;
+  grid-template-columns: 100px 1fr 36px;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 10px 0;
+}
+
+.ability-dimension div {
+  height: 8px;
+  border-radius: 999px;
+  background: #e5e7eb;
+}
+
+.ability-dimension i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #0f172a;
+}
+
 .scenario-list {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -409,7 +460,8 @@ td button {
 
 @media (max-width: 1100px) {
   .workspace-grid,
-  .scenario-list {
+  .scenario-list,
+  .profile-grid {
     grid-template-columns: 1fr;
   }
 }
