@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Product Drill 对话历史测试入口</title>
+    <style>
+      body {
+        margin: 0;
+        background: #f5f6f8;
+        color: #0f172a;
+        font-family: Arial, "Microsoft YaHei", sans-serif;
+      }
+
+      main {
+        max-width: 760px;
+        margin: 80px auto;
+        border: 1px solid #dfe3e8;
+        border-radius: 8px;
+        background: #fff;
+        padding: 32px;
+      }
+
+      h1 {
+        margin: 0 0 10px;
+        font-size: 24px;
+      }
+
+      p,
+      li {
+        color: #475569;
+        line-height: 1.7;
+      }
+
+      a {
+        display: inline-block;
+        margin-top: 16px;
+        border-radius: 6px;
+        background: #0f172a;
+        color: #fff;
+        padding: 12px 18px;
+        text-decoration: none;
+      }
+
+      code {
+        border-radius: 4px;
+        background: #f1f5f9;
+        padding: 2px 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Product Drill 测试入口：07 对话历史</h1>
+      <p>点击下面按钮打开当前开发版。本轮重点测试“对话历史”：完成一次训练并提交方案后，历史页能查看训练记录、对话内容和综合评分。</p>
+      <ol>
+        <li>登录进入工作台。</li>
+        <li>可以不点“开始训练”，直接输入一条回答并点“发送”；系统会自动开始训练。</li>
+        <li>也可以先点“开始训练”，再输入回答并按 Enter 发送。</li>
+        <li>确认 AI 对话区右侧出现白底黑字的用户气泡，短句是小气泡，长内容会自动变宽并换行。</li>
+        <li>点击“提交方案”，确认右侧出现综合评分。</li>
+        <li>点击右上角“查看对话记录”或左侧“对话历史”，再点击“查看详情”。</li>
+        <li>检查详情里是否能看到 AI 对话、你的回答和评分。</li>
+      </ol>
+      <a href="http://127.0.0.1:3000">打开测试页面</a>
+      <p>如果页面打不开，说明本地开发服务没有启动。</p>
+      <p>本地项目目录：<code>C:\Users\A\Desktop\workspace\product-drill-app</code></p>
+    </main>
+  </body>
+</html>

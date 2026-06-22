@@ -1,0 +1,82 @@
+import { expect, test } from "@playwright/test";
+
+test("starts a training session and completes three message rounds", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "进入工作台" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "训练工作台" })).toBeVisible();
+
+  await page.getByRole("button", { name: "开始训练" }).click();
+  await expect(page.getByText("训练已开始")).toBeVisible();
+
+  const input = page.getByPlaceholder("输入你的回复，Enter 发送");
+  for (const answer of [
+    "我们需要先确认目标用户是谁。",
+    "我会追问业务目标和现有流程。",
+    "我会用数据验证方案价值。"
+  ]) {
+    await input.fill(answer);
+    await page.getByRole("button", { name: "发送" }).click();
+  }
+
+  await expect(page.locator(".bubble.user")).toHaveCount(3);
+  await expect(page.locator(".bubble.ai")).toHaveCount(4);
+  await expect(page.getByText("第 3 轮继续追问")).toBeVisible();
+});
+
+test("sends the typed answer with Enter", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "进入工作台" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "训练工作台" })).toBeVisible();
+
+  await page.getByRole("button", { name: "开始训练" }).click();
+  const input = page.getByPlaceholder("输入你的回复，Enter 发送");
+  await input.fill("这是按回车发送的用户输入。");
+  await input.press("Enter");
+
+  await expect(page.locator(".bubble.user", { hasText: "这是按回车发送的用户输入。" })).toHaveCount(1);
+  await expect(input).toHaveValue("");
+});
+
+test("auto-starts training when sending an answer first", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "进入工作台" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "训练工作台" })).toBeVisible();
+
+  const input = page.getByPlaceholder("输入你的回复，Enter 发送");
+  await input.fill("我没有先点开始训练，但这句话也应该显示。");
+  await page.getByRole("button", { name: "发送" }).click();
+
+  await expect(page.locator(".bubble.user", { hasText: "我没有先点开始训练，但这句话也应该显示。" })).toHaveCount(1);
+  await expect(page.getByText("训练已开始")).toBeVisible();
+});
+
+test("sizes user bubbles to the answer content", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "进入工作台" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "训练工作台" })).toBeVisible();
+
+  const input = page.getByPlaceholder("输入你的回复，Enter 发送");
+  await input.fill("短句");
+  await page.getByRole("button", { name: "发送" }).click();
+
+  const shortBubble = page.locator(".bubble.user", { hasText: "短句" });
+  await expect(shortBubble).toHaveCount(1);
+
+  const longAnswer = "LONG_USER_INPUT_SHOULD_WRAP_INSIDE_THE_BUBBLE_".repeat(12);
+  await input.fill(longAnswer);
+  await page.getByRole("button", { name: "发送" }).click();
+
+  const sizes = await page.locator(".bubble.user").evaluateAll((bubbles) =>
+    bubbles.map((bubble) => ({
+      width: bubble.getBoundingClientRect().width,
+      height: bubble.getBoundingClientRect().height,
+      scrollWidth: bubble.scrollWidth,
+      clientWidth: bubble.clientWidth
+    }))
+  );
+
+  expect(sizes[0].width).toBeLessThan(120);
+  expect(sizes[1].width).toBeGreaterThan(sizes[0].width);
+  expect(sizes[1].height).toBeGreaterThan(sizes[0].height);
+  expect(sizes[1].scrollWidth).toBeLessThanOrEqual(sizes[1].clientWidth + 1);
+});

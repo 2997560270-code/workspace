@@ -1,0 +1,415 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: #f5f6f8;
+  color: #0f172a;
+  font-family: Arial, "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 226px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  border-right: 1px solid #dfe3e8;
+  background: #fafbfc;
+  padding: 24px 16px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 18px;
+}
+
+.brand strong,
+.brand span {
+  display: block;
+}
+
+.brand span,
+.muted,
+.topbar p {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.mark {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 4px;
+  background: #0f172a;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+nav {
+  display: grid;
+  gap: 8px;
+}
+
+nav button,
+.actions button,
+.panel-title button,
+.segmented button {
+  border: 1px solid #cfd6df;
+  border-radius: 6px;
+  background: #fff;
+  color: #0f172a;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+nav button.active,
+.segmented button.selected,
+.primary {
+  border-color: #0f172a;
+  background: #0f172a;
+  color: #fff;
+}
+
+.main {
+  min-width: 0;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #dfe3e8;
+  background: #fff;
+  padding: 18px 24px;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 4px;
+  font-size: 20px;
+}
+
+h2 {
+  font-size: 18px;
+}
+
+h3 {
+  font-size: 14px;
+}
+
+.user {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 50%;
+  background: #0f172a;
+  color: #fff;
+  font-weight: 700;
+}
+
+.content {
+  padding: 18px;
+}
+
+.workspace-grid {
+  display: grid;
+  grid-template-columns: 270px minmax(420px, 1fr) 330px;
+  gap: 12px;
+}
+
+.panel {
+  border: 1px solid #dfe3e8;
+  border-radius: 8px;
+  background: #fff;
+  padding: 18px;
+}
+
+.panel label,
+.field {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-weight: 700;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid #cfd6df;
+  border-radius: 6px;
+  background: #fff;
+  padding: 10px 12px;
+  color: #0f172a;
+}
+
+textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.segmented button {
+  border-radius: 0;
+  text-align: center;
+}
+
+.segmented button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.segmented button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.conversation {
+  display: grid;
+  min-height: 640px;
+  grid-template-rows: auto minmax(260px, 1fr) auto auto;
+}
+
+.panel-title,
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bubble {
+  display: block;
+  flex: 0 0 auto;
+  width: fit-content;
+  height: max-content;
+  gap: 6px;
+  min-width: 0;
+  max-width: min(78%, 680px);
+  margin: 8px 0;
+  border: 1px solid #dfe3e8;
+  border-radius: 8px;
+  padding: 12px 16px;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-all;
+}
+
+.message-list {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+  padding: 8px 0;
+}
+
+.history-messages {
+  max-height: 420px;
+}
+
+.bubble.ai {
+  display: grid;
+  gap: 6px;
+  background: #f1f3f6;
+}
+
+.bubble.user {
+  align-self: flex-end;
+  border-color: #dfe3e8;
+  border-radius: 18px;
+  background: #fff;
+  color: #0f172a;
+}
+
+.bubble strong {
+  font-size: 12px;
+}
+
+.bubble span {
+  display: block;
+  max-width: 100%;
+  color: #0f172a;
+  overflow-wrap: inherit;
+  word-break: inherit;
+}
+
+.score {
+  font-size: 28px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 12px 0;
+}
+
+td button {
+  border: 1px solid #cfd6df;
+  border-radius: 6px;
+  background: #fff;
+  padding: 8px 10px;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  border: 1px solid #e5e7eb;
+  background: #e5e7eb;
+}
+
+.metrics div {
+  display: grid;
+  gap: 8px;
+  background: #fff;
+  padding: 16px;
+}
+
+.metrics strong {
+  font-size: 28px;
+}
+
+.notice {
+  margin-top: 16px;
+  border: 1px solid #dfe3e8;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 14px;
+}
+
+.dimension-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 8px 0;
+}
+
+.issue-item {
+  border: 1px solid #dfe3e8;
+  border-radius: 6px;
+  background: #f8fafc;
+  margin-top: 8px;
+  padding: 10px;
+}
+
+.product-analysis {
+  border-top: 1px solid #e5e7eb;
+  margin-top: 18px;
+  padding-top: 18px;
+}
+
+.product-question,
+.product-suggestion {
+  border: 1px solid #dfe3e8;
+  border-radius: 6px;
+  background: #f8fafc;
+  margin-top: 8px;
+  padding: 10px;
+}
+
+.product-suggestion p {
+  margin-bottom: 0;
+}
+
+.history-layout {
+  display: grid;
+  gap: 18px;
+}
+
+.history-detail {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 16px;
+}
+
+.scenario-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.scenario-list article {
+  border: 1px solid #dfe3e8;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.login-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+}
+
+.login-panel {
+  width: min(420px, 100%);
+  border: 1px solid #dfe3e8;
+  border-radius: 8px;
+  background: #fff;
+  padding: 28px;
+}
+
+.login-panel h1 {
+  margin: 18px 0 8px;
+}
+
+@media (max-width: 1100px) {
+  .workspace-grid,
+  .scenario-list {
+    grid-template-columns: 1fr;
+  }
+}
