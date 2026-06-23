@@ -13,6 +13,7 @@ import { createTrainingSession, sendTrainingMessage, type TrainingSession } from
 import { DEFAULT_SCENARIO, INDUSTRY_SCENARIOS, TRAINING_MODES } from "../lib/training-config";
 
 const modeDescription = TRAINING_MODES.map((mode) => `${mode.name}：${mode.description}`).join("");
+const DIFFICULTIES = ["基础", "标准", "严格"];
 
 type WorkbenchProps = {
   initialScenario: string;
@@ -25,9 +26,11 @@ function Workbench({ initialScenario, onHistoryRecord, onOpenHistory }: Workbenc
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [reply, setReply] = useState("");
   const [scenario, setScenario] = useState(initialScenario);
+  const [mode, setMode] = useState(TRAINING_MODES[0].name);
+  const [difficulty, setDifficulty] = useState("标准");
 
   function startTraining() {
-    setSession(createTrainingSession({ scenario, mode: TRAINING_MODES[0].name }));
+    setSession(createTrainingSession({ scenario, mode, difficulty }));
     setEvaluation(null);
     setReply("");
   }
@@ -38,7 +41,7 @@ function Workbench({ initialScenario, onHistoryRecord, onOpenHistory }: Workbenc
       return;
     }
 
-    const currentSession = session ?? createTrainingSession({ scenario, mode: TRAINING_MODES[0].name });
+    const currentSession = session ?? createTrainingSession({ scenario, mode, difficulty });
     setSession(sendTrainingMessage(currentSession, trimmed));
     setReply("");
   }
@@ -53,7 +56,7 @@ function Workbench({ initialScenario, onHistoryRecord, onOpenHistory }: Workbenc
   function submitSolution() {
     const trimmed = reply.trim();
     if (session || trimmed) {
-      const currentSession = session ?? createTrainingSession({ scenario, mode: TRAINING_MODES[0].name });
+      const currentSession = session ?? createTrainingSession({ scenario, mode, difficulty });
       const finalSession = trimmed ? sendTrainingMessage(currentSession, trimmed) : currentSession;
       const nextEvaluation = generateEvaluation(finalSession);
       setSession(finalSession);
@@ -78,9 +81,15 @@ function Workbench({ initialScenario, onHistoryRecord, onOpenHistory }: Workbenc
         <div className="field">
           <span>训练模式</span>
           <div className="segmented">
-            {TRAINING_MODES.map((mode, index) => (
-              <button className={index === 0 ? "selected" : ""} key={mode.name} type="button">
-                {mode.name}
+            {TRAINING_MODES.map((item) => (
+              <button
+                aria-pressed={item.name === mode}
+                className={item.name === mode ? "selected" : ""}
+                key={item.name}
+                onClick={() => setMode(item.name)}
+                type="button"
+              >
+                {item.name}
               </button>
             ))}
           </div>
@@ -89,9 +98,17 @@ function Workbench({ initialScenario, onHistoryRecord, onOpenHistory }: Workbenc
         <div className="field">
           <span>难度级别</span>
           <div className="segmented">
-            <button type="button">基础</button>
-            <button className="selected" type="button">标准</button>
-            <button type="button">严格</button>
+            {DIFFICULTIES.map((item) => (
+              <button
+                aria-pressed={item === difficulty}
+                className={item === difficulty ? "selected" : ""}
+                key={item}
+                onClick={() => setDifficulty(item)}
+                type="button"
+              >
+                {item}
+              </button>
+            ))}
           </div>
         </div>
         <button className="primary" onClick={startTraining} type="button">开始训练</button>

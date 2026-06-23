@@ -16,6 +16,7 @@ export type TrainingSession = {
 type TrainingInput = {
   scenario: string;
   mode: string;
+  difficulty?: string;
 };
 
 let nextId = 1;
@@ -29,12 +30,14 @@ function aiMessage(content: string): TrainingMessage {
 }
 
 export function createTrainingSession(input: TrainingInput): TrainingSession {
+  const difficulty = input.difficulty ?? "标准";
+
   return {
     id: id("session"),
     scenario: input.scenario,
     mode: input.mode,
     messages: [
-      aiMessage(`训练已开始。当前场景是 ${input.scenario}，模式是 ${input.mode}。请先说出你认为最需要澄清的问题。`)
+      aiMessage(`训练已开始。当前场景是 ${input.scenario}，模式是 ${input.mode}，难度是 ${difficulty}。请先说出你认为最需要澄清的问题。`)
     ]
   };
 }
