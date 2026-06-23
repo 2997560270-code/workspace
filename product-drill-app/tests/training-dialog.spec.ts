@@ -83,3 +83,29 @@ test("sizes user bubbles to the answer content", async ({ page }) => {
   expect(sizes[1].height).toBeGreaterThan(sizes[0].height);
   expect(sizes[1].scrollWidth).toBeLessThanOrEqual(sizes[1].clientWidth + 1);
 });
+
+test("asks for the concrete business again after switching scenario", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "进入工作台" }).click();
+
+  await page.getByRole("button", { name: "开始训练" }).click();
+  const input = page.getByPlaceholder("输入你的回复，Enter 发送");
+
+  await input.fill("我的业务是AI客服。");
+  await page.getByRole("button", { name: "发送" }).click();
+  await input.fill("主要服务企业售后团队。");
+  await page.getByRole("button", { name: "发送" }).click();
+
+  await page.getByLabel("行业场景").selectOption("B2B");
+
+  await expect(page.locator(".bubble.ai").last()).toContainText("当前行业场景已经切换到B2B");
+  await expect(page.locator(".bubble.ai").last()).toContainText("您的具体业务是什么");
+
+  await input.fill("我的业务是B2B采购系统。");
+  await page.getByRole("button", { name: "发送" }).click();
+
+  await expect(page.locator(".bubble.ai").last()).toContainText("围绕 B2B 方向");
+  await expect(page.locator(".bubble.ai").last()).toContainText("B2B采购系统");
+  await expect(page.locator(".bubble.ai").last()).not.toContainText("第 3 轮继续追问");
+  await expect(page.locator(".bubble.ai").last()).not.toContainText("第 4 轮继续追问");
+});

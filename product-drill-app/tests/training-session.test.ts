@@ -44,4 +44,19 @@ describe("training session", () => {
     expect(updated.mode).toBe("客户咨询");
     expect(updated.messages.at(-1)?.content).toContain("当前行业场景已经切换到B2B，模式客户咨询，难度严格");
   });
+  it("restarts business clarification after switching scenario", () => {
+    let session = createTrainingSession({ scenario: "AI+", mode: "客户咨询", difficulty: "严格" });
+    session = sendTrainingMessage(session, "我的业务是AI客服。");
+    session = sendTrainingMessage(session, "主要服务企业售后团队。");
+
+    const switched = changeTrainingScenario(session, "B2B", "客户咨询", "严格");
+    expect(switched.messages.at(-1)?.content).toContain("当前行业场景已经切换到B2B，模式客户咨询，难度严格");
+    expect(switched.messages.at(-1)?.content).toContain("您的具体业务是什么");
+
+    const next = sendTrainingMessage(switched, "我的业务是B2B采购系统。");
+    expect(next.messages.at(-1)?.content).toContain("围绕 B2B 方向");
+    expect(next.messages.at(-1)?.content).toContain("B2B采购系统");
+    expect(next.messages.at(-1)?.content).not.toContain("第 3 轮继续追问");
+    expect(next.messages.at(-1)?.content).not.toContain("第 4 轮继续追问");
+  });
 });
