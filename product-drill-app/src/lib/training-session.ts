@@ -58,3 +58,18 @@ export function sendTrainingMessage(session: TrainingSession, content: string): 
     ]
   };
 }
+
+export function addTrainingAnswer(session: TrainingSession, content: string): TrainingSession {
+  const trimmed = content.trim();
+  if (!trimmed) {
+    return session;
+  }
+
+  return {
+    ...session,
+    messages: [
+      ...session.messages,
+      { id: id("msg"), role: "user", content: trimmed }
+    ]
+  };
+}

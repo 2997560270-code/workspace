@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createTrainingSession, sendTrainingMessage } from "../src/lib/training-session";
+import { addTrainingAnswer, createTrainingSession, sendTrainingMessage } from "../src/lib/training-session";
 
 describe("training session", () => {
   it("creates a session with an AI opening message", () => {
@@ -18,5 +18,13 @@ describe("training session", () => {
     expect(updated.messages.map((message) => message.role)).toEqual(["ai", "user", "ai"]);
     expect(updated.messages[1].content).toContain("培训完成率低");
     expect(updated.messages[2].content).toContain("继续追问");
+  });
+
+  it("adds a final answer without another AI follow-up", () => {
+    const session = createTrainingSession({ scenario: "AI+", mode: "用户需求提出" });
+    const updated = addTrainingAnswer(session, "这是最终方案。");
+
+    expect(updated.messages.map((message) => message.role)).toEqual(["ai", "user"]);
+    expect(updated.messages[1].content).toContain("最终方案");
   });
 });

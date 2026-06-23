@@ -16,3 +16,15 @@ test("submits a solution and shows a structured evaluation", async ({ page }) =>
   await expect(page.getByText("表达与沟通")).toBeVisible();
   await expect(page.locator(".issue-item")).toHaveCount(3);
 });
+
+test("submitting a drafted solution does not ask another AI question", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "进入工作台" }).click();
+
+  await page.getByRole("button", { name: "开始训练" }).click();
+  await page.getByPlaceholder("输入你的回复，Enter 发送").fill("直接提交时只生成评估，不需要继续追问。");
+  await page.getByRole("button", { name: "提交方案" }).click();
+
+  await expect(page.getByText("综合评分")).toBeVisible();
+  await expect(page.getByText("第 1 轮继续追问")).toHaveCount(0);
+});

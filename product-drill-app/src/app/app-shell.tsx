@@ -9,7 +9,7 @@ import {
   createTrainingHistoryRecord,
   type TrainingHistoryRecord
 } from "../lib/training-history";
-import { createTrainingSession, sendTrainingMessage, type TrainingSession } from "../lib/training-session";
+import { addTrainingAnswer, createTrainingSession, sendTrainingMessage, type TrainingSession } from "../lib/training-session";
 import { DEFAULT_SCENARIO, INDUSTRY_SCENARIOS, TRAINING_MODES } from "../lib/training-config";
 
 const modeDescription = TRAINING_MODES.map((mode) => `${mode.name}：${mode.description}`).join("");
@@ -26,8 +26,15 @@ function Workbench({ initialScenario, onHistoryRecord, onOpenHistory }: Workbenc
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [reply, setReply] = useState("");
   const [scenario, setScenario] = useState(initialScenario);
+  const [scenarioNotice, setScenarioNotice] = useState("");
   const [mode, setMode] = useState(TRAINING_MODES[0].name);
   const [difficulty, setDifficulty] = useState("标准");
+
+  function changeScenario(nextScenario: string) {
+    setScenario(nextScenario);
+    setScenarioNotice(`行业场景已切换为 ${nextScenario}，可以继续在当前对话框交流。`);
+    setSession((current) => current ? { ...current, scenario: nextScenario } : current);
+  }
 
   function startTraining() {
     setSession(createTrainingSession({ scenario, mode, difficulty }));
@@ -57,7 +64,7 @@ function Workbench({ initialScenario, onHistoryRecord, onOpenHistory }: Workbenc
     const trimmed = reply.trim();
     if (session || trimmed) {
       const currentSession = session ?? createTrainingSession({ scenario, mode, difficulty });
-      const finalSession = trimmed ? sendTrainingMessage(currentSession, trimmed) : currentSession;
+      const finalSession = trimmed ? addTrainingAnswer(currentSession, trimmed) : currentSession;
       const nextEvaluation = generateEvaluation(finalSession);
       setSession(finalSession);
       setEvaluation(nextEvaluation);
@@ -72,12 +79,13 @@ function Workbench({ initialScenario, onHistoryRecord, onOpenHistory }: Workbenc
         <h2>场景设置</h2>
         <label>
           行业场景
-          <select onChange={(event) => setScenario(event.target.value)} value={scenario}>
+          <select onChange={(event) => changeScenario(event.target.value)} value={scenario}>
             {INDUSTRY_SCENARIOS.map((scenario) => (
               <option key={scenario.name}>{scenario.name}</option>
             ))}
           </select>
         </label>
+        {scenarioNotice ? <div className="notice">{scenarioNotice}</div> : null}
         <div className="field">
           <span>训练模式</span>
           <div className="segmented">
