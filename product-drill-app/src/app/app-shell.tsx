@@ -15,17 +15,19 @@ import { DEFAULT_SCENARIO, INDUSTRY_SCENARIOS, TRAINING_MODES } from "../lib/tra
 const modeDescription = TRAINING_MODES.map((mode) => `${mode.name}：${mode.description}`).join("");
 
 type WorkbenchProps = {
+  initialScenario: string;
   onHistoryRecord: (record: TrainingHistoryRecord) => void;
   onOpenHistory: () => void;
 };
 
-function Workbench({ onHistoryRecord, onOpenHistory }: WorkbenchProps) {
+function Workbench({ initialScenario, onHistoryRecord, onOpenHistory }: WorkbenchProps) {
   const [session, setSession] = useState<TrainingSession | null>(null);
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [reply, setReply] = useState("");
+  const [scenario, setScenario] = useState(initialScenario);
 
   function startTraining() {
-    setSession(createTrainingSession({ scenario: DEFAULT_SCENARIO, mode: TRAINING_MODES[0].name }));
+    setSession(createTrainingSession({ scenario, mode: TRAINING_MODES[0].name }));
     setEvaluation(null);
     setReply("");
   }
@@ -36,7 +38,7 @@ function Workbench({ onHistoryRecord, onOpenHistory }: WorkbenchProps) {
       return;
     }
 
-    const currentSession = session ?? createTrainingSession({ scenario: DEFAULT_SCENARIO, mode: TRAINING_MODES[0].name });
+    const currentSession = session ?? createTrainingSession({ scenario, mode: TRAINING_MODES[0].name });
     setSession(sendTrainingMessage(currentSession, trimmed));
     setReply("");
   }
@@ -51,7 +53,7 @@ function Workbench({ onHistoryRecord, onOpenHistory }: WorkbenchProps) {
   function submitSolution() {
     const trimmed = reply.trim();
     if (session || trimmed) {
-      const currentSession = session ?? createTrainingSession({ scenario: DEFAULT_SCENARIO, mode: TRAINING_MODES[0].name });
+      const currentSession = session ?? createTrainingSession({ scenario, mode: TRAINING_MODES[0].name });
       const finalSession = trimmed ? sendTrainingMessage(currentSession, trimmed) : currentSession;
       const nextEvaluation = generateEvaluation(finalSession);
       setSession(finalSession);
@@ -67,7 +69,7 @@ function Workbench({ onHistoryRecord, onOpenHistory }: WorkbenchProps) {
         <h2>场景设置</h2>
         <label>
           行业场景
-          <select defaultValue={DEFAULT_SCENARIO}>
+          <select onChange={(event) => setScenario(event.target.value)} value={scenario}>
             {INDUSTRY_SCENARIOS.map((scenario) => (
               <option key={scenario.name}>{scenario.name}</option>
             ))}
@@ -322,10 +324,8 @@ function ProfilePanel({ records }: { records: TrainingHistoryRecord[] }) {
   );
 }
 
-function StaticPanel({ view }: { view: Exclude<ViewId, "workbench" | "history" | "profile"> }) {
-  const panels: Record<Exclude<ViewId, "workbench" | "history" | "profile">, React.ReactNode> = {
-  product: <ProductPanel />,
-  scenarios: (
+function ScenarioPanel({ onStartScenario }: { onStartScenario: (scenario: string) => void }) {
+  return (
     <section className="panel">
       <h2>行业场景</h2>
       <div className="scenario-list">
@@ -333,18 +333,19 @@ function StaticPanel({ view }: { view: Exclude<ViewId, "workbench" | "history" |
           <article key={scenario.name}>
             <h3>{scenario.name}</h3>
             <p>{scenario.description}</p>
+            <button onClick={() => onStartScenario(scenario.name)} type="button">
+              用 {scenario.name} 开始训练
+            </button>
           </article>
         ))}
       </div>
     </section>
-  )
-};
-
-  return panels[view];
+  );
 }
 
 export function AppShell() {
   const [view, setView] = useState<ViewId>("workbench");
+  const [initialScenario, setInitialScenario] = useState(DEFAULT_SCENARIO);
   const [historyRecords, setHistoryRecords] = useState<TrainingHistoryRecord[]>([]);
   const meta = getViewMeta(view);
   function addHistoryRecord(record: TrainingHistoryRecord) {
@@ -384,13 +385,22 @@ export function AppShell() {
         </header>
         <div className="content">
           {view === "workbench" ? (
-            <Workbench onHistoryRecord={addHistoryRecord} onOpenHistory={() => setView("history")} />
+            <Workbench
+              initialScenario={initialScenario}
+              onHistoryRecord={addHistoryRecord}
+              onOpenHistory={() => setView("history")}
+            />
           ) : view === "history" ? (
             <HistoryPanel records={historyRecords} />
           ) : view === "profile" ? (
             <ProfilePanel records={historyRecords} />
+          ) : view === "product" ? (
+            <ProductPanel />
           ) : (
-            <StaticPanel view={view} />
+            <ScenarioPanel onStartScenario={(scenario) => {
+              setInitialScenario(scenario);
+              setView("workbench");
+            }} />
           )}
         </div>
       </section>
