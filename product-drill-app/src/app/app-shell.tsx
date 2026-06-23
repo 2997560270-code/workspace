@@ -9,7 +9,13 @@ import {
   createTrainingHistoryRecord,
   type TrainingHistoryRecord
 } from "../lib/training-history";
-import { addTrainingAnswer, createTrainingSession, sendTrainingMessage, type TrainingSession } from "../lib/training-session";
+import {
+  addTrainingAnswer,
+  changeTrainingScenario,
+  createTrainingSession,
+  sendTrainingMessage,
+  type TrainingSession
+} from "../lib/training-session";
 import { DEFAULT_SCENARIO, INDUSTRY_SCENARIOS, TRAINING_MODES } from "../lib/training-config";
 
 const modeDescription = TRAINING_MODES.map((mode) => `${mode.name}：${mode.description}`).join("");
@@ -33,7 +39,7 @@ function Workbench({ initialScenario, onHistoryRecord, onOpenHistory }: Workbenc
   function changeScenario(nextScenario: string) {
     setScenario(nextScenario);
     setScenarioNotice(`行业场景已切换为 ${nextScenario}，可以继续在当前对话框交流。`);
-    setSession((current) => current ? { ...current, scenario: nextScenario } : current);
+    setSession((current) => current ? changeTrainingScenario(current, nextScenario, mode, difficulty) : current);
   }
 
   function startTraining() {
@@ -47,9 +53,11 @@ function Workbench({ initialScenario, onHistoryRecord, onOpenHistory }: Workbenc
     if (!trimmed) {
       return;
     }
+    if (!session) {
+      return;
+    }
 
-    const currentSession = session ?? createTrainingSession({ scenario, mode, difficulty });
-    setSession(sendTrainingMessage(currentSession, trimmed));
+    setSession(sendTrainingMessage(session, trimmed));
     setReply("");
   }
 
@@ -62,9 +70,8 @@ function Workbench({ initialScenario, onHistoryRecord, onOpenHistory }: Workbenc
 
   function submitSolution() {
     const trimmed = reply.trim();
-    if (session || trimmed) {
-      const currentSession = session ?? createTrainingSession({ scenario, mode, difficulty });
-      const finalSession = trimmed ? addTrainingAnswer(currentSession, trimmed) : currentSession;
+    if (session) {
+      const finalSession = trimmed ? addTrainingAnswer(session, trimmed) : session;
       const nextEvaluation = generateEvaluation(finalSession);
       setSession(finalSession);
       setEvaluation(nextEvaluation);
@@ -128,9 +135,7 @@ function Workbench({ initialScenario, onHistoryRecord, onOpenHistory }: Workbenc
           <button onClick={onOpenHistory} type="button">查看对话记录</button>
         </div>
         <div className="message-list">
-          {(session?.messages ?? [
-            { id: "seed-ai", role: "ai", content: "点击开始训练后，我会根据当前场景进入追问。" }
-          ]).map((message) => (
+          {(session?.messages ?? []).map((message) => (
             <div className={`bubble ${message.role}`} key={message.id}>
               {message.role === "ai" ? (
                 <>
@@ -151,9 +156,9 @@ function Workbench({ initialScenario, onHistoryRecord, onOpenHistory }: Workbenc
         />
         <div className="actions">
           <button type="button">总结已知信息</button>
-          <button disabled={!session && !reply.trim()} onClick={submitSolution} type="button">提交方案</button>
+          <button disabled={!session} onClick={submitSolution} type="button">提交方案</button>
           <button type="button">生成评估</button>
-          <button className="primary" disabled={!reply.trim()} onClick={() => sendReply()} type="button">发送</button>
+          <button className="primary" disabled={!session || !reply.trim()} onClick={() => sendReply()} type="button">发送</button>
         </div>
       </section>
 

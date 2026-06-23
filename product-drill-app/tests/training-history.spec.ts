@@ -41,6 +41,7 @@ test("opens history from the conversation record button", async ({ page }) => {
   await page.getByRole("button", { name: "进入工作台" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "训练工作台" })).toBeVisible();
 
+  await page.getByRole("button", { name: "开始训练" }).click();
   await page.getByPlaceholder("输入你的回复，Enter 发送").fill("从对话记录按钮进入历史也要看到我。");
   await page.getByRole("button", { name: "发送" }).click();
   await page.getByRole("button", { name: "提交方案" }).click();
@@ -48,7 +49,7 @@ test("opens history from the conversation record button", async ({ page }) => {
 
   await expect(page.getByRole("heading", { level: 1, name: "对话历史" })).toBeVisible();
   await page.getByRole("button", { name: "查看详情" }).click();
-  await expect(page.getByText("从对话记录按钮进入历史也要看到我。")).toBeVisible();
+  await expect(page.locator(".bubble.user", { hasText: "从对话记录按钮进入历史也要看到我。" })).toBeVisible();
 });
 
 test("switching scenario updates the active session and history record", async ({ page }) => {
@@ -57,7 +58,9 @@ test("switching scenario updates the active session and history record", async (
 
   await page.getByRole("button", { name: "开始训练" }).click();
   await page.getByLabel("行业场景").selectOption("B2B");
-  await expect(page.getByText("行业场景已切换为 B2B，可以继续在当前对话框交流。")).toBeVisible();
+  await expect(page.locator(".bubble.ai", {
+    hasText: "当前行业场景已经切换到B2B，模式用户需求提出，难度标准"
+  })).toBeVisible();
 
   await page.getByPlaceholder("输入你的回复，Enter 发送").fill("切换场景后提交的方案应该归到 B2B。");
   await page.getByRole("button", { name: "提交方案" }).click();

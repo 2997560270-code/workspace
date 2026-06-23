@@ -4,13 +4,15 @@ test("starts a training session and completes three message rounds", async ({ pa
   await page.goto("/");
   await page.getByRole("button", { name: "进入工作台" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "训练工作台" })).toBeVisible();
+  await expect(page.locator(".bubble")).toHaveCount(0);
 
   await page.getByRole("button", { name: "开始训练" }).click();
   await expect(page.getByText("训练已开始")).toBeVisible();
+  await expect(page.getByText("您的具体业务是什么")).toBeVisible();
 
   const input = page.getByPlaceholder("输入你的回复，Enter 发送");
   for (const answer of [
-    "我们需要先确认目标用户是谁。",
+    "我的业务是AI+服务。",
     "我会追问业务目标和现有流程。",
     "我会用数据验证方案价值。"
   ]) {
@@ -20,6 +22,7 @@ test("starts a training session and completes three message rounds", async ({ pa
 
   await expect(page.locator(".bubble.user")).toHaveCount(3);
   await expect(page.locator(".bubble.ai")).toHaveCount(4);
+  await expect(page.getByText("围绕 AI+ 方向")).toBeVisible();
   await expect(page.getByText("第 3 轮继续追问")).toBeVisible();
 });
 
@@ -37,17 +40,16 @@ test("sends the typed answer with Enter", async ({ page }) => {
   await expect(input).toHaveValue("");
 });
 
-test("auto-starts training when sending an answer first", async ({ page }) => {
+test("does not output conversation before training starts", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "进入工作台" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "训练工作台" })).toBeVisible();
 
   const input = page.getByPlaceholder("输入你的回复，Enter 发送");
-  await input.fill("我没有先点开始训练，但这句话也应该显示。");
-  await page.getByRole("button", { name: "发送" }).click();
+  await input.fill("我还没有点击开始训练。");
 
-  await expect(page.locator(".bubble.user", { hasText: "我没有先点开始训练，但这句话也应该显示。" })).toHaveCount(1);
-  await expect(page.getByText("训练已开始")).toBeVisible();
+  await expect(page.getByRole("button", { name: "发送" })).toBeDisabled();
+  await expect(page.locator(".bubble")).toHaveCount(0);
 });
 
 test("sizes user bubbles to the answer content", async ({ page }) => {
@@ -55,6 +57,7 @@ test("sizes user bubbles to the answer content", async ({ page }) => {
   await page.getByRole("button", { name: "进入工作台" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "训练工作台" })).toBeVisible();
 
+  await page.getByRole("button", { name: "开始训练" }).click();
   const input = page.getByPlaceholder("输入你的回复，Enter 发送");
   await input.fill("短句");
   await page.getByRole("button", { name: "发送" }).click();

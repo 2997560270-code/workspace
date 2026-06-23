@@ -25,7 +25,7 @@ test("completes the MVP acceptance flow", async ({ page }) => {
 
   await page.getByRole("button", { name: "对话历史" }).click();
   await expect(page.getByText("历史详情")).toBeVisible();
-  await expect(page.getByText("先确认采购角色、预算周期和验证指标。")).toBeVisible();
+  await expect(page.locator(".bubble.user", { hasText: "先确认采购角色、预算周期和验证指标。" })).toBeVisible();
 
   await page.getByRole("button", { name: "能力画像" }).click();
   await expect(page.getByText("最近训练表现趋势")).toBeVisible();

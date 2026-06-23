@@ -6,6 +6,7 @@ test("shows ability profile from completed trainings", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1, name: "训练工作台" })).toBeVisible();
 
   const input = page.getByPlaceholder("输入你的回复，Enter 发送");
+  await page.getByRole("button", { name: "开始训练" }).click();
   await input.fill("先确认真实用户。");
   await page.getByRole("button", { name: "发送" }).click();
   await page.getByRole("button", { name: "提交方案" }).click();
