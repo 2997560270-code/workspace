@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Product Drill MVP 总验收测试入口</title>
+    <style>
+      body {
+        margin: 0;
+        background: #f5f6f8;
+        color: #111827;
+        font-family: Arial, "Microsoft YaHei", sans-serif;
+      }
+
+      main {
+        max-width: 860px;
+        margin: 48px auto;
+        padding: 32px;
+        background: #fff;
+        border: 1px solid #dfe3e8;
+        border-radius: 8px;
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: 24px;
+      }
+
+      a {
+        display: inline-block;
+        margin: 20px 0;
+        padding: 12px 18px;
+        border-radius: 6px;
+        background: #111827;
+        color: #fff;
+        text-decoration: none;
+      }
+
+      li {
+        margin: 10px 0;
+        line-height: 1.7;
+      }
+
+      code {
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: #eef1f4;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Product Drill 测试入口：10 MVP 总验收</h1>
+      <p>本轮测试重点是完整 MVP 主流程，确认产品分析、场景训练、方案评估、对话历史和能力画像都能串起来。</p>
+      <a href="http://127.0.0.1:3000">打开本地测试应用</a>
+      <ol>
+        <li>进入应用后点击“进入工作台”。</li>
+        <li>进入“我的产品”，填写产品名称、介绍、目标用户、核心功能、阶段和链接，点击“生成产品理解”。</li>
+        <li>确认出现“产品理解摘要”、5 条产品追问和 3 条优化建议。</li>
+        <li>进入“场景库”，选择任意场景开始训练，确认回到工作台且行业场景正确带入。</li>
+        <li>点击“开始训练”，输入一次回答并发送，再点击“提交方案”。</li>
+        <li>确认出现综合评分、维度评分和具体问题。</li>
+        <li>进入“对话历史”，确认能看到刚才的用户输入和评分复盘。</li>
+        <li>进入“能力画像”，确认能看到最近训练表现趋势、能力维度、高频短板和下一步推荐训练。</li>
+      </ol>
+      <p>预期结果：上述主流程都能完成，没有空白页、按钮无响应或记录缺失。</p>
+    </main>
+  </body>
+</html>
