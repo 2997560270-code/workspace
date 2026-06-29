@@ -1,0 +1,1558 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Product Drill Demo V3</title>
+  <style>
+    :root {
+      --bg: #fbfbfa;
+      --surface: #ffffff;
+      --surface-2: #f5f7f6;
+      --surface-3: #edf1ef;
+      --line: #e3e7e5;
+      --line-2: #cfd7d3;
+      --text: #111513;
+      --muted: #66726d;
+      --faint: #8d9893;
+      --dark: #070909;
+      --accent: #087b5d;
+      --accent-soft: #e9f5f0;
+      --danger: #8c2f2f;
+      --warning: #8a6a24;
+      --radius: 8px;
+      --radius-sm: 6px;
+      --shadow: none;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #fff;
+      color: var(--text);
+      font: 14px/1.5 "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+      letter-spacing: 0;
+    }
+
+    button, input, textarea, select { font: inherit; }
+
+    button {
+      border: 1px solid var(--line-2);
+      background: var(--surface);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 9px 15px;
+      cursor: pointer;
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+    }
+
+    button:hover { border-color: #aab4ac; }
+    button:active { transform: translateY(1px) scale(0.99); }
+
+    .primary {
+      background: var(--dark);
+      color: #fff;
+      border-color: var(--dark);
+    }
+
+    .subtle { background: transparent; }
+    .small { padding: 6px 10px; font-size: 12px; }
+
+    input, textarea, select {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #fbfcfb;
+      color: var(--text);
+      border-radius: 6px;
+      padding: 10px 12px;
+      outline: none;
+    }
+
+    textarea { min-height: 92px; resize: vertical; }
+    input:focus, textarea:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 74px minmax(0, 1fr);
+      transition: grid-template-columns 320ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .app:has(.sidebar:hover) {
+      grid-template-columns: 196px minmax(0, 1fr);
+    }
+
+    .sidebar {
+      background: #fbfbfa;
+      border-right: 1px solid var(--line);
+      width: 74px;
+      padding: 26px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+      overflow: hidden;
+      transition:
+        width 320ms cubic-bezier(0.16, 1, 0.3, 1),
+        padding 320ms cubic-bezier(0.16, 1, 0.3, 1),
+        box-shadow 320ms ease;
+      will-change: width;
+    }
+
+    .sidebar:hover {
+      width: 196px;
+      padding: 26px 12px;
+      box-shadow: 18px 0 45px rgba(17, 21, 19, 0.06);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      width: 172px;
+      padding: 0 8px 28px;
+      border-bottom: 0;
+    }
+
+    .mark {
+      width: 36px;
+      height: 36px;
+      display: grid;
+      place-items: center;
+      border-radius: 5px;
+      background: var(--dark);
+      color: #fff;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+    }
+
+    .brand div:not(.mark),
+    .nav span:not(.ico),
+    .sidebar-footer span:not(.ico) {
+      opacity: 0;
+      transform: translateX(-8px);
+      transition:
+        opacity 220ms ease,
+        transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .sidebar:hover .brand div:not(.mark),
+    .sidebar:hover .nav span:not(.ico),
+    .sidebar:hover .sidebar-footer span:not(.ico) {
+      opacity: 1;
+      transform: translateX(0);
+      transition-delay: 80ms;
+    }
+
+    .brand strong { display: block; font-size: 16px; line-height: 1.1; }
+    .brand span { color: var(--muted); font-size: 11px; white-space: nowrap; }
+
+    .nav {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .nav button {
+      width: 172px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 11px;
+      border: 0;
+      border-radius: 8px;
+      padding: 13px 14px;
+      background: transparent;
+      color: var(--muted);
+      text-align: left;
+      transform-origin: left center;
+      transition:
+        transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+        background 220ms ease,
+        color 220ms ease;
+    }
+
+    .sidebar:not(:hover) .nav button {
+      width: 52px;
+      justify-content: center;
+      padding: 13px 0;
+    }
+
+    .nav button:hover {
+      transform: scale(1.035);
+    }
+
+    .nav button.active {
+      background: linear-gradient(90deg, var(--accent-soft), rgba(255,255,255,0.35));
+      color: var(--text);
+      font-weight: 700;
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+
+    .ico {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 18px;
+      display: inline-grid;
+      place-items: center;
+      color: currentColor;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      display: grid;
+      gap: 9px;
+      padding: 18px 4px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .sidebar-footer button {
+      width: 172px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
+    }
+
+    .sidebar:not(:hover) .sidebar-footer button {
+      width: 52px;
+      justify-content: center;
+      padding-left: 0;
+      padding-right: 0;
+    }
+
+    .main {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      height: 108px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 26px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(12px);
+    }
+
+    .topbar h1 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.15;
+      letter-spacing: -0.04em;
+    }
+
+    .topbar p { margin: 5px 0 0; color: var(--muted); }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .page {
+      display: none;
+      min-height: calc(100vh - 108px);
+      padding: 0 22px 22px;
+    }
+
+    .page.active { display: block; }
+
+    .home-grid {
+      height: calc(100vh - 108px);
+      min-height: 690px;
+      display: grid;
+      grid-template-rows: 1.2fr 112px 190px;
+      gap: 0;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 0.92fr) minmax(520px, 0.8fr);
+      align-items: center;
+      gap: 72px;
+      padding: 42px 28px 34px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .hero h2 {
+      max-width: 700px;
+      margin: 0;
+      font-size: clamp(42px, 4.2vw, 58px);
+      line-height: 1.12;
+      letter-spacing: -0.055em;
+      font-weight: 780;
+    }
+
+    .hero p {
+      max-width: 580px;
+      margin: 22px 0 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.8;
+    }
+
+    .hero-actions { display: flex; gap: 10px; margin-top: 28px; }
+
+    .preview {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 22px;
+      box-shadow: none;
+    }
+
+    .preview-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--muted);
+      font-size: 12px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .dots { display: flex; gap: 5px; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: #cdd4cd; }
+    .dot.on { background: var(--accent); }
+
+    .mini-chat { display: grid; gap: 12px; padding: 18px 0; }
+
+    .bubble {
+      max-width: 78%;
+      width: fit-content;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--surface-2);
+    }
+
+    .bubble.user {
+      justify-self: end;
+      background: #fff;
+      color: var(--text);
+    }
+
+    .judgement {
+      border-top: 1px solid var(--line);
+      padding-top: 15px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .metric-strip,
+    .bottom-strip,
+    .status-strip {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 0;
+      display: grid;
+      box-shadow: none;
+    }
+
+    .metric-strip {
+      grid-template-columns: repeat(6, 1fr);
+      overflow: hidden;
+    }
+
+    .metric {
+      padding: 22px 28px;
+      border-right: 1px solid var(--line);
+    }
+
+    .metric:last-child { border-right: 0; }
+    .metric strong { display: block; font-size: 32px; line-height: 1; letter-spacing: -0.06em; font-variant-numeric: tabular-nums; }
+    .metric span { display: block; margin-top: 8px; color: var(--muted); font-size: 12px; }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0;
+      border-top: 0;
+      padding: 28px 44px 0;
+    }
+
+    .step {
+      position: relative;
+      padding: 0 16px 0 0;
+    }
+
+    .step:before {
+      content: "";
+      position: absolute;
+      left: 30px;
+      right: 16px;
+      top: 13px;
+      height: 1px;
+      background: var(--line-2);
+    }
+
+    .step:last-child:before { display: none; }
+
+    .num {
+      position: relative;
+      z-index: 1;
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: #fff;
+      background: var(--dark);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .step strong { display: block; margin-top: 10px; }
+    .step span { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+
+    .capabilities {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr 1fr;
+      gap: 34px;
+      padding: 28px 44px 0;
+    }
+
+    .capability {
+      border-top: 1px solid var(--line);
+      padding-top: 16px;
+    }
+
+    .capability strong { display: block; font-size: 16px; }
+    .capability span { display: block; margin-top: 5px; color: var(--muted); }
+
+    .workbench,
+    .product-layout,
+    .history-layout,
+    .ability-layout,
+    .add-layout {
+      height: calc(100vh - 138px);
+      min-height: 650px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .workbench { grid-template-columns: 250px minmax(0, 1fr) 318px; }
+    .product-layout { grid-template-columns: 300px minmax(0, 1fr) 330px; }
+    .history-layout { grid-template-columns: minmax(0, 1fr) 560px; grid-template-rows: minmax(0, 1fr) 106px; }
+    .ability-layout { grid-template-rows: 122px minmax(0, 1fr) 250px; }
+    .add-layout { grid-template-columns: minmax(0, 1fr) 450px; grid-template-rows: 62px minmax(0, 1fr) 88px; }
+
+    .panel {
+      min-width: 0;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: none;
+      overflow: hidden;
+    }
+
+    .open-panel {
+      min-width: 0;
+      padding: 10px 4px;
+      overflow: hidden;
+    }
+
+    .panel h2,
+    .open-panel h2 {
+      margin: 0 0 15px;
+      font-size: 18px;
+      line-height: 1.2;
+      letter-spacing: -0.03em;
+    }
+
+    .field { display: grid; gap: 7px; margin-bottom: 15px; }
+    .field label { font-size: 12px; font-weight: 700; color: var(--text); }
+    .help { color: var(--muted); font-size: 12px; }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 7px 11px;
+      color: var(--muted);
+      background: #fff;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .chip.active {
+      color: var(--accent);
+      border-color: #a8c6b9;
+      background: var(--accent-soft);
+      font-weight: 700;
+    }
+
+    .scene-list,
+    .record-list,
+    .product-list {
+      display: grid;
+      border-top: 1px solid var(--line);
+    }
+
+    .scene-row,
+    .record-row,
+    .product-row {
+      display: grid;
+      gap: 4px;
+      padding: 13px 0;
+      border-bottom: 1px solid var(--line);
+      cursor: pointer;
+    }
+
+    .product-row {
+      grid-template-columns: 38px 1fr 18px;
+      align-items: center;
+      min-height: 78px;
+      padding: 14px 12px;
+    }
+
+    .product-row:before {
+      content: "";
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+    }
+
+    .product-row:after {
+      content: ">";
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .scene-row.active,
+    .record-row.active,
+    .product-row.active {
+      color: var(--accent);
+    }
+
+    .product-row.active {
+      background: linear-gradient(90deg, var(--accent-soft), #fff);
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+
+    .scene-row strong,
+    .record-row strong,
+    .product-row strong { color: inherit; }
+    .scene-row span,
+    .record-row span,
+    .product-row span { color: var(--muted); font-size: 12px; }
+    .product-row span { display: block; margin-top: 5px; }
+
+    .conversation {
+      height: 100%;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: 14px;
+    }
+
+    .conversation-body {
+      min-height: 0;
+      overflow: auto;
+      padding: 8px 2px 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .message {
+      display: grid;
+      gap: 6px;
+      max-width: 78%;
+    }
+
+    .message.ai {
+      grid-template-columns: 48px minmax(0, 1fr);
+      max-width: 82%;
+      align-items: start;
+    }
+
+    .message .name {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .message.ai .name {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: 18px;
+      grid-row: 1 / span 2;
+    }
+
+    .message .text {
+      padding: 13px 15px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--surface-2);
+    }
+
+    .message.ai .text {
+      width: fit-content;
+      max-width: 100%;
+    }
+
+    .message.user {
+      align-self: flex-end;
+      text-align: left;
+    }
+
+    .message.user .text {
+      background: #fff;
+      color: var(--text);
+    }
+
+    .composer {
+      border-top: 1px solid var(--line);
+      padding-top: 14px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .composer textarea {
+      min-height: 58px;
+      max-height: 108px;
+    }
+
+    .composer-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .facts {
+      display: grid;
+      gap: 14px;
+    }
+
+    .fact {
+      border-top: 1px solid var(--line);
+      padding-top: 13px;
+    }
+
+    .fact strong { display: block; margin-bottom: 6px; }
+    .fact ul { margin: 0; padding-left: 18px; color: var(--muted); }
+    .fact li { margin: 4px 0; }
+
+    .score {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin: 8px 0 12px;
+    }
+
+    .score strong { font-size: 32px; letter-spacing: -0.06em; }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 80px 1fr 36px;
+      gap: 10px;
+      align-items: center;
+      margin: 9px 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .bar {
+      height: 7px;
+      border-radius: 999px;
+      background: var(--surface-3);
+      overflow: hidden;
+    }
+
+    .bar i {
+      display: block;
+      height: 100%;
+      width: var(--value);
+      border-radius: inherit;
+      background: var(--dark);
+    }
+
+    .context-row {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      align-items: center;
+      gap: 16px;
+      padding: 18px 20px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,0.72);
+    }
+
+    .context-row strong { display: block; }
+    .context-row span { color: var(--muted); font-size: 12px; }
+
+    .detail h2 {
+      font-size: 30px;
+      letter-spacing: -0.05em;
+      margin-bottom: 6px;
+    }
+
+    .meta {
+      color: var(--muted);
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 18px;
+    }
+
+    .section { border-top: 1px solid var(--line); padding-top: 18px; margin-top: 18px; }
+    .section:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+    .section h3 { margin: 0 0 10px; font-size: 15px; }
+    .section p { margin: 0; color: var(--muted); line-height: 1.8; }
+
+    .inline-chat {
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+    }
+
+    .question-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .question {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 10px;
+      align-items: start;
+      color: var(--muted);
+    }
+
+    .question b {
+      display: grid;
+      place-items: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: 12px;
+    }
+
+    .upload-grid,
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .upload-lane {
+      border: 1px dashed var(--line-2);
+      border-radius: 16px;
+      padding: 16px;
+      background: #fbfcfb;
+    }
+
+    .upload-lane strong { display: block; margin-bottom: 4px; }
+    .upload-lane span { color: var(--muted); font-size: 12px; }
+
+    .wide { grid-column: 1 / -1; }
+
+    .process {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,0.72);
+      overflow: hidden;
+    }
+
+    .process div {
+      position: relative;
+      padding: 15px 18px;
+      border-right: 1px solid var(--line);
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .process div:last-child { border-right: 0; }
+    .process .active { color: var(--accent); background: var(--accent-soft); }
+
+    .ai-card {
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+      color: var(--muted);
+      line-height: 1.75;
+    }
+
+    .timeline-tools {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .history-list-wrap {
+      overflow: auto;
+      height: calc(100% - 42px);
+      padding-right: 8px;
+    }
+
+    .record-row {
+      grid-template-columns: 118px 150px 64px 1fr 72px;
+      align-items: center;
+      padding: 15px 18px;
+    }
+
+    .record-row div { min-width: 0; }
+    .record-row p { margin: 0; color: var(--muted); font-size: 12px; }
+
+    .table-head {
+      display: grid;
+      grid-template-columns: 118px 150px 64px 1fr 72px;
+      padding: 12px 18px;
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    .tag {
+      width: fit-content;
+      border-radius: 999px;
+      padding: 4px 8px;
+      background: var(--surface-2);
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .history-summary {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,0.72);
+    }
+
+    .history-summary .metric { padding: 22px 24px; }
+
+    .ability-top {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      overflow: hidden;
+    }
+
+    .ability-main {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 18px;
+      min-height: 0;
+    }
+
+    .chart {
+      height: calc(100% - 44px);
+      min-height: 270px;
+      position: relative;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      margin-top: 12px;
+      background:
+        linear-gradient(to bottom, transparent 24%, var(--line) 25%, transparent 26%),
+        linear-gradient(to bottom, transparent 49%, var(--line) 50%, transparent 51%),
+        linear-gradient(to bottom, transparent 74%, var(--line) 75%, transparent 76%);
+    }
+
+    .chart svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .axis { position: absolute; bottom: 8px; left: 0; right: 0; display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+
+    .dimension-table {
+      display: grid;
+      gap: 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .dimension-row {
+      display: grid;
+      grid-template-columns: 120px 1fr 42px 36px;
+      gap: 14px;
+      align-items: center;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .dimension-row span { color: var(--muted); font-size: 12px; }
+
+    .ability-bottom {
+      display: grid;
+      grid-template-columns: 1fr 1.25fr;
+      gap: 18px;
+    }
+
+    .short-list { display: grid; gap: 10px; }
+    .short-list div {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+    }
+
+    .recommend {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .recommend ol { margin: 0; padding-left: 20px; color: var(--muted); }
+    .recommend li { margin: 7px 0; }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 1100px) {
+      .app { grid-template-columns: 78px minmax(0, 1fr); }
+      .brand div, .nav span, .sidebar-footer span { display: none; }
+      .sidebar { padding: 18px 10px; align-items: center; }
+      .nav button { justify-content: center; padding: 12px; }
+      .workbench, .product-layout, .history-layout, .ability-main, .ability-bottom, .add-layout, .hero {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+      .home-grid, .workbench, .product-layout, .history-layout, .ability-layout, .add-layout { min-height: auto; height: auto; }
+      .metric-strip, .ability-top { grid-template-columns: repeat(2, 1fr); }
+      .steps, .capabilities { grid-template-columns: 1fr; }
+      .context-row, .history-summary { grid-template-columns: 1fr; }
+      .topbar { height: auto; min-height: 86px; align-items: flex-start; gap: 16px; flex-direction: column; padding: 22px; }
+      .page { min-height: auto; padding: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="mark">PD</div>
+        <div>
+          <strong>Product Drill</strong>
+          <span>AI 产品思维训练平台</span>
+        </div>
+      </div>
+
+      <nav class="nav" aria-label="主导航">
+        <button class="active" data-page-target="home"><span class="ico">⌂</span><span>首页</span></button>
+        <button data-page-target="training"><span class="ico">◎</span><span>训练</span></button>
+        <button data-page-target="products"><span class="ico">□</span><span>产品</span></button>
+        <button data-page-target="history"><span class="ico">≡</span><span>历史</span></button>
+        <button data-page-target="ability"><span class="ico">▥</span><span>能力</span></button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="subtle small"><span class="ico">?</span><span>使用指南</span></button>
+        <button class="subtle small"><span class="ico">‹</span><span>收起侧栏</span></button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1 id="pageTitle">首页</h1>
+          <p id="pageSubtitle">用 AI 训练需求判断、客户洞察与产品表达。</p>
+        </div>
+        <div class="top-actions" id="topActions">
+          <span>已保存 14:32</span>
+          <button class="primary" data-page-target="training">开始训练</button>
+          <button data-page-target="addProduct">分析我的产品</button>
+        </div>
+      </header>
+
+      <section class="page active" id="page-home">
+        <div class="home-grid">
+          <div class="hero">
+            <div>
+              <h2>把模糊需求，训练成清晰判断。</h2>
+              <p>Product Drill 通过客户模拟、产品深挖和方案评估，帮助使用者理解真实用户痛点，形成可验证的产品方案。</p>
+              <div class="hero-actions">
+                <button class="primary" data-page-target="training">进入训练工作台</button>
+                <button data-page-target="products">查看我的产品</button>
+              </div>
+            </div>
+            <div class="preview">
+              <div class="preview-head">
+                <span>AI 训练预览</span>
+                <div class="dots"><i class="dot on"></i><i class="dot"></i><i class="dot"></i></div>
+              </div>
+              <div class="mini-chat">
+                <div class="bubble">先说清楚你的具体业务是什么。</div>
+                <div class="bubble user">我们在做企业 AI 培训服务。</div>
+                <div class="bubble">谁每天会使用它？他们现在最难忍受的问题是什么？</div>
+              </div>
+              <div class="judgement">
+                <div class="bar-row"><span>需求理解</span><div class="bar"><i style="--value:78%"></i></div><b>78</b></div>
+                <div class="bar-row"><span>价值论证</span><div class="bar"><i style="--value:52%"></i></div><b>52</b></div>
+                <div class="bar-row"><span>表达沟通</span><div class="bar"><i style="--value:81%"></i></div><b>81</b></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="metric-strip">
+            <div class="metric"><strong>3</strong><span>训练模式</span></div>
+            <div class="metric"><strong>5</strong><span>行业场景</span></div>
+            <div class="metric"><strong>5</strong><span>能力维度</span></div>
+            <div class="metric"><strong>24</strong><span>完成训练</span></div>
+            <div class="metric"><strong>78.6</strong><span>平均得分</span></div>
+            <div class="metric"><strong>92</strong><span>最高得分</span></div>
+          </div>
+
+          <div>
+            <div class="steps">
+              <div class="step"><div class="num">1</div><strong>选择行业场景</strong><span>先确定训练对象和业务背景</span></div>
+              <div class="step"><div class="num">2</div><strong>回答 AI 追问</strong><span>围绕真实用户和问题补全信息</span></div>
+              <div class="step"><div class="num">3</div><strong>提交解决方案</strong><span>表达你的产品方案与关键取舍</span></div>
+              <div class="step"><div class="num">4</div><strong>获得评分反馈</strong><span>从需求、价值、表达维度复盘</span></div>
+              <div class="step"><div class="num">5</div><strong>沉淀能力画像</strong><span>持续定位高频短板和训练方向</span></div>
+            </div>
+            <div class="capabilities">
+              <div class="capability"><strong>客户模拟</strong><span>从客户视角连续追问真实需求。</span></div>
+              <div class="capability"><strong>自有产品分析</strong><span>解析产品资料，识别定位与优化空间。</span></div>
+              <div class="capability"><strong>能力画像</strong><span>沉淀训练表现，定位高频短板。</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="page-training">
+        <div class="workbench">
+          <aside class="panel">
+            <h2>训练设置</h2>
+            <div class="field">
+              <label>行业场景</label>
+              <select id="industrySelect">
+                <option>AI+</option>
+                <option>B2B</option>
+                <option>企业培训</option>
+                <option>中小餐饮</option>
+                <option>SaaS</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>训练模式</label>
+              <div class="chips" id="modeChips">
+                <span class="chip active">客户咨询</span>
+                <span class="chip">用户需求提出</span>
+                <span class="chip">方案评估</span>
+              </div>
+            </div>
+            <div class="field">
+              <label>难度</label>
+              <div class="chips" id="levelChips">
+                <span class="chip">基础</span>
+                <span class="chip active">标准</span>
+                <span class="chip">严格</span>
+              </div>
+            </div>
+            <div class="field">
+              <label>训练角色</label>
+              <select>
+                <option>企业培训负责人</option>
+                <option>销售负责人</option>
+                <option>中小商家老板</option>
+              </select>
+            </div>
+            <h2 style="margin-top:22px">场景</h2>
+            <div class="scene-list">
+              <div class="scene-row active"><strong>企业员工培训</strong><span>培训完成率、转化率与业务落地</span></div>
+              <div class="scene-row"><strong>销售知识库</strong><span>新人上手、话术复用与成交效率</span></div>
+              <div class="scene-row"><strong>门店库存管理</strong><span>损耗、补货和经营数据闭环</span></div>
+            </div>
+          </aside>
+
+          <section class="panel conversation">
+            <div>
+              <h2>AI 客户模拟</h2>
+              <span class="help" id="trainingStatus">当前场景：AI+ / 客户咨询 / 标准</span>
+            </div>
+            <div class="conversation-body" id="chatBody">
+              <div class="message ai">
+                <span class="name">AI</span>
+                <div class="text">训练已开始。先说清楚你的具体业务是什么。</div>
+              </div>
+              <div class="message user">
+                <span class="name">你</span>
+                <div class="text">我们做企业 AI 培训服务。</div>
+              </div>
+              <div class="message ai">
+                <span class="name">AI</span>
+                <div class="text">谁每天会使用它？他们现在最难忍受的问题是什么？</div>
+              </div>
+            </div>
+            <div class="composer">
+              <textarea id="chatInput" placeholder="输入你的回答..."></textarea>
+              <div class="composer-actions">
+                <button class="small">总结已知</button>
+                <button class="small" id="submitPlan">提交方案</button>
+                <button class="primary" id="sendChat">发送</button>
+              </div>
+            </div>
+          </section>
+
+          <aside class="panel">
+            <h2>AI 判断</h2>
+            <div class="facts">
+              <div class="fact">
+                <strong>训练目标</strong>
+                <p class="help">理解客户在企业培训场景下的核心需求，输出可验证方案。</p>
+              </div>
+              <div class="fact">
+                <strong>已知信息</strong>
+                <ul>
+                  <li>业务方向：企业 AI 培训服务</li>
+                  <li>关注点：培训转化与复盘</li>
+                  <li>目标角色：培训负责人</li>
+                </ul>
+              </div>
+              <div class="fact">
+                <strong>待澄清问题</strong>
+                <ul>
+                  <li>具体使用者是谁？</li>
+                  <li>失败成本如何衡量？</li>
+                  <li>预算与采购路径是什么？</li>
+                </ul>
+              </div>
+              <div class="fact">
+                <strong>当前评分</strong>
+                <div class="score"><span>综合评分</span><strong>3.2 / 5</strong></div>
+                <div class="bar-row"><span>需求理解</span><div class="bar"><i style="--value:70%"></i></div><b>3.5</b></div>
+                <div class="bar-row"><span>问题澄清</span><div class="bar"><i style="--value:64%"></i></div><b>3.2</b></div>
+                <div class="bar-row"><span>价值论证</span><div class="bar"><i style="--value:52%"></i></div><b>2.6</b></div>
+              </div>
+            </div>
+          </aside>
+
+          <div class="context-row">
+            <div><strong>当前产品：企业 AI 培训助手</strong><span>产品介绍已解析，源码未上传</span></div>
+            <div><strong>当前能力短板：价值论证</strong><span>建议补充可衡量指标和替代方案对比</span></div>
+            <div style="text-align:right"><button data-page-target="ability">查看能力画像</button></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="page-products">
+        <div class="product-layout">
+          <aside class="panel">
+            <h2>产品档案</h2>
+            <div class="product-list" id="productList">
+              <div class="product-row active"><div><strong>企业 AI 培训助手</strong><span>MVP 验证中 · 今日分析</span></div></div>
+              <div class="product-row"><div><strong>门店库存管理工具</strong><span>需求验证 · 06-15</span></div></div>
+              <div class="product-row"><div><strong>销售知识库 Agent</strong><span>方案设计 · 06-12</span></div></div>
+              <div class="product-row"><div><strong>员工学习路径系统</strong><span>资料收集中 · 06-08</span></div></div>
+            </div>
+            <button class="primary" style="margin-top:18px;width:100%" data-page-target="addProduct">添加产品</button>
+          </aside>
+
+          <section class="panel detail">
+            <h2 id="productTitle">企业 AI 培训助手</h2>
+            <div class="meta" id="productMeta">阶段：MVP 验证中 | 目标用户：企业培训负责人 | 最近更新：06-16</div>
+            <div class="section">
+              <h3>AI 产品解读</h3>
+              <p id="productInsight">AI 理解这是一个帮助企业把培训内容转化为业务执行能力的工具。当前价值集中在培训复盘、知识转化和效果追踪。</p>
+              <div class="inline-chat">
+                <input id="productCorrection" placeholder="告诉 AI 哪里理解错了..." />
+                <button id="updateInsight">更新理解</button>
+              </div>
+            </div>
+            <div class="section">
+              <h3>AI 追问</h3>
+              <div class="question-list">
+                <div class="question"><b>1</b><span>最先服务的细分用户是谁？</span></div>
+                <div class="question"><b>2</b><span>用户为什么现在必须解决这个问题？</span></div>
+                <div class="question"><b>3</b><span>产品成功的衡量指标是什么？</span></div>
+              </div>
+            </div>
+          </section>
+
+          <aside class="panel">
+            <h2>成熟度评估</h2>
+            <div class="score"><span>综合成熟度</span><strong>3.6 / 5</strong></div>
+            <div class="bar-row"><span>目标用户</span><div class="bar"><i style="--value:74%"></i></div><b>74</b></div>
+            <div class="bar-row"><span>痛点强度</span><div class="bar"><i style="--value:69%"></i></div><b>69</b></div>
+            <div class="bar-row"><span>功能聚焦</span><div class="bar"><i style="--value:72%"></i></div><b>72</b></div>
+            <div class="bar-row"><span>数据验证</span><div class="bar"><i style="--value:48%"></i></div><b>48</b></div>
+            <div class="bar-row"><span>增长阻碍</span><div class="bar"><i style="--value:55%"></i></div><b>55</b></div>
+            <div class="section">
+              <h3>下一步优化</h3>
+              <div class="short-list">
+                <div><span>补充真实使用场景</span><b>短期</b></div>
+                <div><span>验证培训效果指标</span><b>中期</b></div>
+                <div><span>明确采购触发因素</span><b>长期</b></div>
+              </div>
+            </div>
+          </aside>
+
+          <div class="context-row">
+            <div><strong>产品介绍已上传</strong><span>文档解析完成</span></div>
+            <div><strong>产品链接已填写</strong><span>等待二次校验</span></div>
+            <div><strong>源码未上传</strong><span>可在添加产品页补充</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="page-addProduct">
+        <div class="add-layout">
+          <div class="process">
+            <div>1 上传资料</div>
+            <div class="active">2 AI 预理解</div>
+            <div>3 人工修正</div>
+            <div>4 追问澄清</div>
+          </div>
+
+          <section class="panel">
+            <h2>产品资料</h2>
+            <div class="upload-grid">
+              <div class="upload-lane">
+                <strong>上传产品文档</strong>
+                <span>已读取 2 个文件，可继续补充 PRD、介绍文案或调研记录。</span>
+              </div>
+              <div class="upload-lane">
+                <strong>上传源代码</strong>
+                <span>等待上传，AI 可辅助理解功能结构与当前实现范围。</span>
+              </div>
+            </div>
+            <p class="help" style="margin:14px 0 18px">AI 会根据文档和源码预填写资料，提交前可人工修改。</p>
+            <div class="form-grid">
+              <div class="field"><label>产品名称</label><input value="企业 AI 培训助手" /></div>
+              <div class="field"><label>产品链接</label><input placeholder="https://..." /></div>
+              <div class="field"><label>目标用户</label><input value="企业培训负责人、业务部门管理者" /></div>
+              <div class="field"><label>当前阶段</label><select><option>MVP 验证中</option><option>资料收集中</option><option>正式运营</option></select></div>
+              <div class="field wide"><label>核心功能</label><input value="AI 追问、培训复盘、知识转化、效果追踪" /></div>
+              <div class="field wide"><label>产品介绍</label><textarea>面向企业培训场景，帮助员工把学习内容转化为业务动作，并让培训负责人追踪转化效果。</textarea></div>
+            </div>
+          </section>
+
+          <aside class="panel">
+            <h2>AI 追问与澄清</h2>
+            <div class="ai-card">
+              <strong style="color:var(--text)">AI 初步理解</strong><br />
+              我理解这是一个面向企业培训负责人的 AI 培训服务，核心价值在于提升培训转化与复盘效率。
+            </div>
+            <div class="composer-actions" style="margin:12px 0 18px">
+              <button class="small primary">理解正确</button>
+              <button class="small">需要修正</button>
+            </div>
+            <div class="section">
+              <h3>待确认问题</h3>
+              <div class="question-list">
+                <div class="question"><b>1</b><span>最先服务的细分用户是谁？</span></div>
+                <div class="question"><b>2</b><span>用户现在为什么必须解决这个问题？</span></div>
+                <div class="question"><b>3</b><span>产品成功的衡量指标是什么？</span></div>
+              </div>
+            </div>
+            <div class="section">
+              <textarea id="clarifyInput" placeholder="回答 AI 问题或修正理解..."></textarea>
+              <button class="primary" id="clarifyBtn" style="margin-top:10px;width:100%">发送给 AI</button>
+            </div>
+          </aside>
+
+          <div class="context-row">
+            <div><strong>文档解析：完成</strong><span>2 个资料已读取</span></div>
+            <div><strong>资料完整度：72%</strong><span>仍有 3 个待澄清问题</span></div>
+            <div style="text-align:right">
+              <button data-page-target="products">取消</button>
+              <button class="primary" data-page-target="products">保存产品</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="page-history">
+        <div class="history-layout">
+          <section class="panel">
+            <h2>训练记录</h2>
+            <div class="timeline-tools">
+              <span class="chip active">全部</span>
+              <span class="chip">本周</span>
+              <span class="chip">已评估</span>
+              <span class="chip">待复盘</span>
+              <span class="chip">高价值记录</span>
+            </div>
+            <div class="history-list-wrap">
+              <div class="record-list" id="recordList">
+                <div class="table-head"><span>时间</span><span>行业 / 模式</span><span>评分</span><span>主题</span><span>状态</span></div>
+                <div class="record-row active" data-score="3.2 / 5" data-title="企业培训服务需求澄清">
+                  <span>06-16 14:32</span>
+                  <strong>AI+ / 客户咨询</strong>
+                  <span>3.2 分</span>
+                  <span>企业培训服务需求澄清</span>
+                  <span class="tag">已评估</span>
+                </div>
+                <div class="record-row" data-score="3.8 / 5" data-title="门店库存损耗方案">
+                  <span>06-15 10:18</span>
+                  <strong>B2B / 用户需求提出</strong>
+                  <span>3.8 分</span>
+                  <span>门店库存损耗方案</span>
+                  <span class="tag">已评估</span>
+                </div>
+                <div class="record-row" data-score="2.9 / 5" data-title="学习路径设计复盘">
+                  <span>06-12 16:40</span>
+                  <strong>企业培训 / 方案评估</strong>
+                  <span>2.9 分</span>
+                  <span>学习路径设计复盘</span>
+                  <span class="tag">待复盘</span>
+                </div>
+                <div class="record-row" data-score="4.1 / 5" data-title="销售知识库价值验证">
+                  <span>06-10 09:20</span>
+                  <strong>AI+ / 方案评估</strong>
+                  <span>4.1 分</span>
+                  <span>销售知识库价值验证</span>
+                  <span class="tag">已评估</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <aside class="panel">
+            <h2>记录复盘</h2>
+            <div class="facts">
+              <div class="fact">
+                <strong id="reviewTitle">企业培训服务需求澄清</strong>
+                <p class="help">场景：AI+ 企业培训 | 模式：客户咨询 | 提交方案：已提交</p>
+              </div>
+              <div class="fact">
+                <strong>综合评分</strong>
+                <div class="score"><span>本次表现</span><strong id="reviewScore">3.2 / 5</strong></div>
+              </div>
+              <div class="fact">
+                <strong>关键对话</strong>
+                <p class="help">AI 追问了真实使用者、业务损失和验证指标，用户已提交初步方案。</p>
+              </div>
+              <div class="fact">
+                <strong>AI 点评</strong>
+                <ul>
+                  <li>需求定义较清楚</li>
+                  <li>价值论证不足</li>
+                  <li>缺少可验证指标</li>
+                </ul>
+              </div>
+              <div class="composer-actions">
+                <button class="primary" data-page-target="training">重新训练此场景</button>
+                <button>生成复盘报告</button>
+              </div>
+            </div>
+          </aside>
+
+          <div class="history-summary">
+            <div class="metric"><strong>24</strong><span>完成训练</span></div>
+            <div class="metric"><strong>6</strong><span>待复盘</span></div>
+            <div class="metric"><strong>+6.4</strong><span>平均提升</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="page-ability">
+        <div class="ability-layout">
+          <div class="metric-strip ability-top">
+            <div class="metric"><strong>78.6</strong><span>平均分 · 较上期 +6.4</span></div>
+            <div class="metric"><strong>24</strong><span>完成训练 · 较上月 +8</span></div>
+            <div class="metric"><strong>92</strong><span>最高分 · CTO 对技术架构的咨询</span></div>
+            <div class="metric"><strong>+12.3</strong><span>综合进步 · 近 30 天</span></div>
+          </div>
+
+          <div class="ability-main">
+            <section class="panel">
+              <h2>最近训练表现趋势</h2>
+              <div class="chart">
+                <svg viewBox="0 0 600 280" preserveAspectRatio="none" aria-hidden="true">
+                  <polyline points="0,210 110,188 220,194 330,160 440,145 600,128" fill="none" stroke="#151917" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                  <polyline points="0,160 110,132 220,142 330,116 440,98 600,88" fill="none" stroke="#9ba59e" stroke-width="3" stroke-dasharray="6 7" stroke-linecap="round" stroke-linejoin="round" />
+                  <g fill="#151917">
+                    <circle cx="0" cy="210" r="4" /><circle cx="110" cy="188" r="4" /><circle cx="220" cy="194" r="4" /><circle cx="330" cy="160" r="4" /><circle cx="440" cy="145" r="4" /><circle cx="600" cy="128" r="4" />
+                  </g>
+                </svg>
+                <div class="axis"><span>5/18</span><span>5/25</span><span>6/1</span><span>6/8</span><span>6/16</span></div>
+              </div>
+            </section>
+
+            <section class="panel">
+              <h2>能力维度表现</h2>
+              <div class="dimension-table">
+                <div class="dimension-row"><strong>需求理解</strong><span>识别并澄清真实需求</span><div class="bar"><i style="--value:80%"></i></div><b>80</b></div>
+                <div class="dimension-row"><strong>方案设计</strong><span>结构化方案与价值主张</span><div class="bar"><i style="--value:76%"></i></div><b>76</b></div>
+                <div class="dimension-row"><strong>异议应对</strong><span>处理客户异议与推进决策</span><div class="bar"><i style="--value:68%"></i></div><b>68</b></div>
+                <div class="dimension-row"><strong>商业价值论证</strong><span>量化价值与 ROI 论证</span><div class="bar"><i style="--value:71%"></i></div><b>71</b></div>
+                <div class="dimension-row"><strong>表达与沟通</strong><span>清晰表达与影响决策</span><div class="bar"><i style="--value:81%"></i></div><b>81</b></div>
+              </div>
+            </section>
+          </div>
+
+          <div class="ability-bottom">
+            <section class="panel">
+              <h2>高频短板</h2>
+              <div class="short-list">
+                <div><span>价值论证不足</span><b>8 次</b></div>
+                <div><span>指标定义不清</span><b>6 次</b></div>
+                <div><span>目标用户描述偏泛</span><b>5 次</b></div>
+              </div>
+            </section>
+            <section class="panel recommend">
+              <div>
+                <h2>下一步推荐训练</h2>
+                <ol>
+                  <li>B2B 客户咨询 / 标准难度</li>
+                  <li>自有产品价值验证</li>
+                  <li>方案评估复盘</li>
+                </ol>
+              </div>
+              <button class="primary" data-page-target="training">开始推荐训练</button>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const titles = {
+      home: ["首页", "用 AI 训练需求判断、客户洞察与产品表达。"],
+      training: ["训练", "让 AI 以客户视角连续追问，训练需求判断与方案表达。"],
+      products: ["产品", "上传产品资料，让 AI 先理解产品，再追问真实用户、场景与价值。"],
+      addProduct: ["添加产品", "上传资料或手动填写，让 AI 先理解产品，再追问关键假设。"],
+      history: ["历史", "回看每一次训练记录，复盘关键判断与方案表达。"],
+      ability: ["能力", "从训练表现中定位高频短板，形成下一步训练路径。"]
+    };
+
+    const topActions = {
+      home: '<span>已保存 14:32</span><button class="primary" data-page-target="training">开始训练</button><button data-page-target="addProduct">分析我的产品</button>',
+      training: '<span>本轮 <b style="color:var(--accent);font-size:20px">04</b> / 07</span><button class="primary" id="topSubmitPlan">结束并评估</button>',
+      products: '<span>最后保存：14:32</span><button class="primary" data-page-target="addProduct">添加产品</button><button>导入资料</button>',
+      addProduct: '<button data-page-target="products">返回产品列表</button><button>保存草稿</button><button class="primary" data-page-target="products">保存产品</button>',
+      history: '<input style="width:340px" placeholder="搜索场景、产品或关键词" /><button>筛选</button>',
+      ability: '<select style="width:120px"><option>近 30 天</option><option>近 7 天</option></select><button>导出画像</button>'
+    };
+
+    function go(page) {
+      document.querySelectorAll(".page").forEach((el) => el.classList.remove("active"));
+      document.querySelector("#page-" + page).classList.add("active");
+      document.querySelectorAll(".nav button").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.pageTarget === page || (page === "addProduct" && btn.dataset.pageTarget === "products"));
+      });
+      document.querySelector("#pageTitle").textContent = titles[page][0];
+      document.querySelector("#pageSubtitle").textContent = titles[page][1];
+      document.querySelector("#topActions").innerHTML = topActions[page];
+    }
+
+    document.addEventListener("click", (event) => {
+      const target = event.target.closest("[data-page-target]");
+      if (target) {
+        go(target.dataset.pageTarget);
+        target.blur();
+      }
+      if (event.target.closest("#topSubmitPlan")) {
+        appendMessage("ai", "已进入方案评估。本轮不再继续追问，下面会根据你的方案生成评分和优化建议。");
+      }
+    });
+
+    function bindChoice(containerId) {
+      const container = document.querySelector(containerId);
+      if (!container) return;
+      container.addEventListener("click", (event) => {
+        const chip = event.target.closest(".chip");
+        if (!chip) return;
+        container.querySelectorAll(".chip").forEach((item) => item.classList.remove("active"));
+        chip.classList.add("active");
+        updateTrainingStatus();
+      });
+    }
+
+    function updateTrainingStatus() {
+      const industry = document.querySelector("#industrySelect").value;
+      const mode = document.querySelector("#modeChips .active").textContent;
+      const level = document.querySelector("#levelChips .active").textContent;
+      document.querySelector("#trainingStatus").textContent = `当前场景：${industry} / ${mode} / ${level}`;
+    }
+
+    bindChoice("#modeChips");
+    bindChoice("#levelChips");
+    document.querySelector("#industrySelect").addEventListener("change", updateTrainingStatus);
+
+    document.querySelectorAll(".scene-row").forEach((row) => {
+      row.addEventListener("click", () => {
+        document.querySelectorAll(".scene-row").forEach((item) => item.classList.remove("active"));
+        row.classList.add("active");
+      });
+    });
+
+    function appendMessage(role, text) {
+      const body = document.querySelector("#chatBody");
+      const el = document.createElement("div");
+      el.className = "message " + (role === "user" ? "user" : "ai");
+      el.innerHTML = `<span class="name">${role === "user" ? "你" : "AI"}</span><div class="text"></div>`;
+      el.querySelector(".text").textContent = text;
+      body.appendChild(el);
+      body.scrollTop = body.scrollHeight;
+    }
+
+    document.querySelector("#sendChat").addEventListener("click", () => {
+      const input = document.querySelector("#chatInput");
+      const text = input.value.trim();
+      if (!text) return;
+      appendMessage("user", text);
+      input.value = "";
+      setTimeout(() => appendMessage("ai", "这个回答里最需要继续验证的是：真实使用者、业务损失和可衡量指标。请先补充其中一个。"), 160);
+    });
+
+    document.querySelector("#submitPlan").addEventListener("click", () => {
+      appendMessage("ai", "已进入方案评估。本轮不再继续追问，下面会根据你的方案生成评分和优化建议。");
+    });
+
+    document.querySelector("#updateInsight").addEventListener("click", () => {
+      const value = document.querySelector("#productCorrection").value.trim();
+      if (!value) return;
+      document.querySelector("#productInsight").textContent = "已根据你的修正更新理解：" + value;
+      document.querySelector("#productCorrection").value = "";
+    });
+
+    document.querySelector("#clarifyBtn").addEventListener("click", () => {
+      const input = document.querySelector("#clarifyInput");
+      if (!input.value.trim()) return;
+      input.value = "";
+      input.placeholder = "AI 已收到修正，会更新产品理解并生成下一轮追问。";
+    });
+
+    document.querySelectorAll(".product-row").forEach((row) => {
+      row.addEventListener("click", () => {
+        document.querySelectorAll(".product-row").forEach((item) => item.classList.remove("active"));
+        row.classList.add("active");
+        const title = row.querySelector("strong").textContent;
+        document.querySelector("#productTitle").textContent = title;
+        document.querySelector("#productMeta").textContent = "阶段：资料已同步 | 目标用户：待继续澄清 | 最近更新：06-16";
+        document.querySelector("#productInsight").textContent = `AI 正在以「${title}」为对象，重新整理定位、目标用户、核心价值和风险点。`;
+      });
+    });
+
+    document.querySelectorAll(".record-row").forEach((row) => {
+      row.addEventListener("click", () => {
+        document.querySelectorAll(".record-row").forEach((item) => item.classList.remove("active"));
+        row.classList.add("active");
+        document.querySelector("#reviewTitle").textContent = row.dataset.title;
+        document.querySelector("#reviewScore").textContent = row.dataset.score;
+      });
+    });
+  </script>
+</body>
+</html>
