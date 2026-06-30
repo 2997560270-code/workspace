@@ -139,12 +139,24 @@
       pointer-events: none;
     }
 
+    .sidebar:not(:hover) .brand div:not(.mark),
+    .sidebar:not(:hover) .nav span:not(.ico),
+    .sidebar:not(:hover) .sidebar-footer span:not(.ico) {
+      width: 0;
+      max-width: 0;
+      overflow: hidden;
+      transform: translateX(0);
+    }
+
     .sidebar:hover .brand div:not(.mark),
     .sidebar:hover .nav span:not(.ico),
     .sidebar:hover .sidebar-footer span:not(.ico) {
       opacity: 1;
       transform: translateX(0);
       transition-delay: 80ms;
+      width: auto;
+      max-width: 120px;
+      overflow: visible;
     }
 
     .brand strong { display: block; font-size: 16px; line-height: 1.1; }
@@ -178,6 +190,7 @@
     .sidebar:not(:hover) .nav button {
       width: 52px;
       justify-content: center;
+      gap: 0;
       padding: 13px 0;
     }
 
@@ -199,6 +212,18 @@
       display: inline-grid;
       place-items: center;
       color: currentColor;
+      overflow: visible;
+    }
+
+    .ico svg {
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.9;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      overflow: visible;
     }
 
     .sidebar-footer {
@@ -220,6 +245,7 @@
     .sidebar:not(:hover) .sidebar-footer button {
       width: 52px;
       justify-content: center;
+      gap: 0;
       padding-left: 0;
       padding-right: 0;
     }
@@ -266,12 +292,23 @@
 
     .page.active { display: block; }
 
+    #page-home {
+      padding-bottom: 34px;
+    }
+
     .home-grid {
-      height: calc(100vh - 108px);
-      min-height: 690px;
+      box-sizing: border-box;
+      height: auto;
+      min-height: calc(100vh - 108px);
       display: grid;
-      grid-template-rows: 1.2fr 112px 190px;
+      grid-template-rows: minmax(430px, 1fr) 112px auto;
       gap: 0;
+      padding-bottom: 34px;
+    }
+
+    .home-bottom {
+      min-height: 230px;
+      padding-bottom: 28px;
     }
 
     .hero {
@@ -440,10 +477,41 @@
       gap: 18px;
     }
 
-    .workbench { grid-template-columns: 250px minmax(0, 1fr) 318px; }
+    .workbench {
+      grid-template-columns: 250px minmax(0, 1fr) 318px;
+      grid-template-rows: minmax(0, 1fr);
+      overflow: hidden;
+    }
+
+    .workbench > .panel {
+      min-height: 0;
+      overflow: auto;
+    }
+
+    .workbench > .conversation {
+      overflow: hidden;
+    }
     .product-layout { grid-template-columns: 300px minmax(0, 1fr) 330px; }
-    .history-layout { grid-template-columns: minmax(0, 1fr) 560px; grid-template-rows: minmax(0, 1fr) 106px; }
-    .ability-layout { grid-template-rows: 122px minmax(0, 1fr) 250px; }
+    .history-layout {
+      height: calc(100vh - 138px);
+      min-height: 620px;
+      grid-template-columns: minmax(0, 1fr) minmax(360px, 500px);
+      grid-template-rows: minmax(0, 1fr);
+      padding-bottom: 0;
+      overflow: hidden;
+      align-items: stretch;
+    }
+    .history-layout > .panel {
+      min-height: 0;
+      overflow: auto;
+    }
+    .ability-layout {
+      height: auto;
+      min-height: calc(100vh - 138px);
+      grid-template-rows: auto minmax(360px, auto) auto;
+      padding-bottom: 28px;
+      overflow: visible;
+    }
     .add-layout { grid-template-columns: minmax(0, 1fr) 450px; grid-template-rows: 62px minmax(0, 1fr) 88px; }
 
     .panel {
@@ -550,6 +618,30 @@
     .record-row span,
     .product-row span { color: var(--muted); font-size: 12px; }
     .product-row span { display: block; margin-top: 5px; }
+
+    .product-delete {
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .product-delete.active {
+      border-color: var(--dark);
+      background: var(--dark);
+      color: #fff;
+    }
+
+    .product-delete:focus-visible {
+      outline: 0;
+      border-color: #a8c6b9;
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    .delete-hint {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
 
     .conversation {
       height: 100%;
@@ -661,6 +753,11 @@
     }
 
     .score strong { font-size: 32px; letter-spacing: -0.06em; }
+
+    .ability-link {
+      width: 100%;
+      margin-top: 14px;
+    }
 
     .bar-row {
       display: grid;
@@ -804,19 +901,41 @@
     .timeline-tools {
       display: flex;
       gap: 8px;
-      margin-bottom: 14px;
+      margin-bottom: 0;
     }
 
     .history-list-wrap {
-      overflow: auto;
-      height: calc(100% - 42px);
-      padding-right: 8px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      min-height: 0;
+      flex: 1;
+      padding-right: 0;
+      margin-top: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .history-record-panel {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      border: 0;
+      background: transparent;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .history-record-top {
+      display: grid;
+      grid-template-columns: minmax(120px, 1fr) minmax(290px, 420px);
+      gap: 18px;
+      align-items: start;
+      margin-bottom: 14px;
     }
 
     .record-row {
       grid-template-columns: 118px 150px 64px 1fr 72px;
       align-items: center;
-      padding: 15px 18px;
+      padding: 14px 18px;
     }
 
     .record-row div { min-width: 0; }
@@ -830,6 +949,7 @@
       font-weight: 700;
       font-size: 12px;
       border-bottom: 1px solid var(--line);
+      border-top: 1px solid var(--line);
     }
     .tag {
       width: fit-content;
@@ -841,16 +961,27 @@
       white-space: nowrap;
     }
 
-    .history-summary {
-      grid-column: 1 / -1;
+    .history-inline-summary {
+      width: 100%;
+      margin: 0 0 0 auto;
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: rgba(255,255,255,0.72);
+      overflow: visible;
     }
 
-    .history-summary .metric { padding: 22px 24px; }
+    .history-inline-summary .metric {
+      min-height: 70px;
+      padding: 12px 14px;
+      border-left: 1px solid var(--line);
+    }
+
+    .history-inline-summary .metric:first-child {
+      border-left: 0;
+    }
+
+    .history-inline-summary .metric strong {
+      font-size: 24px;
+    }
 
     .ability-top {
       display: grid;
@@ -862,12 +993,18 @@
       display: grid;
       grid-template-columns: 1.05fr 0.95fr;
       gap: 18px;
-      min-height: 0;
+      min-height: 360px;
+      align-items: stretch;
+    }
+
+    .ability-main > .panel {
+      min-height: 340px;
+      overflow: hidden;
     }
 
     .chart {
-      height: calc(100% - 44px);
-      min-height: 270px;
+      height: calc(100% - 46px);
+      min-height: 280px;
       position: relative;
       border-top: 1px solid var(--line);
       border-bottom: 1px solid var(--line);
@@ -902,6 +1039,7 @@
       display: grid;
       grid-template-columns: 1fr 1.25fr;
       gap: 18px;
+      align-items: stretch;
     }
 
     .short-list { display: grid; gap: 10px; }
@@ -938,9 +1076,18 @@
       .home-grid, .workbench, .product-layout, .history-layout, .ability-layout, .add-layout { min-height: auto; height: auto; }
       .metric-strip, .ability-top { grid-template-columns: repeat(2, 1fr); }
       .steps, .capabilities { grid-template-columns: 1fr; }
-      .context-row, .history-summary { grid-template-columns: 1fr; }
+      .history-record-top { grid-template-columns: 1fr; }
+      .context-row, .history-inline-summary { grid-template-columns: 1fr; }
       .topbar { height: auto; min-height: 86px; align-items: flex-start; gap: 16px; flex-direction: column; padding: 22px; }
       .page { min-height: auto; padding: 18px; }
+    }
+
+    @media (min-width: 901px) and (max-width: 1100px) {
+      .history-layout {
+        height: calc(100vh - 138px);
+        min-height: 620px;
+        overflow: hidden;
+      }
     }
   </style>
 </head>
@@ -956,16 +1103,16 @@
       </div>
 
       <nav class="nav" aria-label="主导航">
-        <button class="active" data-page-target="home"><span class="ico">⌂</span><span>首页</span></button>
-        <button data-page-target="training"><span class="ico">◎</span><span>训练</span></button>
-        <button data-page-target="products"><span class="ico">□</span><span>产品</span></button>
-        <button data-page-target="history"><span class="ico">≡</span><span>历史</span></button>
-        <button data-page-target="ability"><span class="ico">▥</span><span>能力</span></button>
+        <button class="active" data-page-target="home"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5v8.5a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z" /></svg></span><span>首页</span></button>
+        <button data-page-target="training"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h6v6H5zM13 5h6v6h-6zM5 13h6v6H5zM13 13h6v6h-6z" /></svg></span><span>训练</span></button>
+        <button data-page-target="products"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 7.2v9.2L12 21l7.5-4.6V7.2z" /><path d="m4.8 7.4 7.2 4.2 7.2-4.2M12 11.6v9" /></svg></span><span>产品</span></button>
+        <button data-page-target="history"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v10H8l-3 4z" /><path d="M8 9h8M8 12h5" /></svg></span><span>历史</span></button>
+        <button data-page-target="ability"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V9M12 19V5M19 19v-7" /></svg></span><span>能力</span></button>
       </nav>
 
       <div class="sidebar-footer">
-        <button class="subtle small"><span class="ico">?</span><span>使用指南</span></button>
-        <button class="subtle small"><span class="ico">‹</span><span>收起侧栏</span></button>
+        <button class="subtle small"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18h.01M9.5 9a2.5 2.5 0 1 1 3.8 2.1c-.8.5-1.3 1.1-1.3 2.4" /><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" /></svg></span><span>使用指南</span></button>
+        <button class="subtle small"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18 9 12l6-6" /></svg></span><span>收起侧栏</span></button>
       </div>
     </aside>
 
@@ -1020,7 +1167,7 @@
             <div class="metric"><strong>92</strong><span>最高得分</span></div>
           </div>
 
-          <div>
+          <div class="home-bottom">
             <div class="steps">
               <div class="step"><div class="num">1</div><strong>选择行业场景</strong><span>先确定训练对象和业务背景</span></div>
               <div class="step"><div class="num">2</div><strong>回答 AI 追问</strong><span>围绕真实用户和问题补全信息</span></div>
@@ -1081,6 +1228,7 @@
               <div class="scene-row"><strong>销售知识库</strong><span>新人上手、话术复用与成交效率</span></div>
               <div class="scene-row"><strong>门店库存管理</strong><span>损耗、补货和经营数据闭环</span></div>
             </div>
+            <button class="primary" id="confirmTrainingSettings" style="margin-top:18px;width:100%">确定</button>
           </aside>
 
           <section class="panel conversation">
@@ -1091,15 +1239,7 @@
             <div class="conversation-body" id="chatBody">
               <div class="message ai">
                 <span class="name">AI</span>
-                <div class="text">训练已开始。先说清楚你的具体业务是什么。</div>
-              </div>
-              <div class="message user">
-                <span class="name">你</span>
-                <div class="text">我们做企业 AI 培训服务。</div>
-              </div>
-              <div class="message ai">
-                <span class="name">AI</span>
-                <div class="text">谁每天会使用它？他们现在最难忍受的问题是什么？</div>
+                <div class="text">请选择您的训练设置。</div>
               </div>
             </div>
             <div class="composer">
@@ -1141,15 +1281,10 @@
                 <div class="bar-row"><span>需求理解</span><div class="bar"><i style="--value:70%"></i></div><b>3.5</b></div>
                 <div class="bar-row"><span>问题澄清</span><div class="bar"><i style="--value:64%"></i></div><b>3.2</b></div>
                 <div class="bar-row"><span>价值论证</span><div class="bar"><i style="--value:52%"></i></div><b>2.6</b></div>
+                <button class="ability-link" data-test-id="training-ability-link" data-page-target="ability">查看能力画像</button>
               </div>
             </div>
           </aside>
-
-          <div class="context-row">
-            <div><strong>当前产品：企业 AI 培训助手</strong><span>产品介绍已解析，源码未上传</span></div>
-            <div><strong>当前能力短板：价值论证</strong><span>建议补充可衡量指标和替代方案对比</span></div>
-            <div style="text-align:right"><button data-page-target="ability">查看能力画像</button></div>
-          </div>
         </div>
       </section>
 
@@ -1158,12 +1293,14 @@
           <aside class="panel">
             <h2>产品档案</h2>
             <div class="product-list" id="productList">
-              <div class="product-row active"><div><strong>企业 AI 培训助手</strong><span>MVP 验证中 · 今日分析</span></div></div>
-              <div class="product-row"><div><strong>门店库存管理工具</strong><span>需求验证 · 06-15</span></div></div>
-              <div class="product-row"><div><strong>销售知识库 Agent</strong><span>方案设计 · 06-12</span></div></div>
-              <div class="product-row"><div><strong>员工学习路径系统</strong><span>资料收集中 · 06-08</span></div></div>
+              <div class="product-row active" data-product-id="training-ai" data-stage="MVP 验证中" data-users="企业培训负责人" data-description="帮助企业把培训内容转化为业务执行能力，追踪培训复盘、知识转化和效果指标。"><div><strong>企业 AI 培训助手</strong><span>MVP 验证中 · 今日分析</span></div></div>
+              <div class="product-row" data-product-id="store-inventory" data-stage="需求验证" data-users="中小餐饮门店老板和店长" data-description="围绕门店库存记录、补货提醒和损耗统计，帮助门店减少食材损耗。"><div><strong>门店库存管理工具</strong><span>需求验证 · 06-15</span></div></div>
+              <div class="product-row" data-product-id="sales-agent" data-stage="方案设计" data-users="销售负责人和一线销售" data-description="沉淀销售知识库，帮助新人快速理解话术、案例和成交路径。"><div><strong>销售知识库 Agent</strong><span>方案设计 · 06-12</span></div></div>
+              <div class="product-row" data-product-id="learning-path" data-stage="资料收集中" data-users="企业员工与学习发展负责人" data-description="根据岗位和能力差距生成学习路径，并跟踪学习复盘和转化表现。"><div><strong>员工学习路径系统</strong><span>资料收集中 · 06-08</span></div></div>
             </div>
             <button class="primary" style="margin-top:18px;width:100%" data-page-target="addProduct">添加产品</button>
+            <button class="product-delete" id="deleteProductBtn" data-delete-mode="false">删除产品</button>
+            <p class="delete-hint hidden" id="deleteProductHint">选择左侧产品后，再点击删除完成操作。</p>
           </aside>
 
           <section class="panel detail">
@@ -1236,12 +1373,12 @@
             </div>
             <p class="help" style="margin:14px 0 18px">AI 会根据文档和源码预填写资料，提交前可人工修改。</p>
             <div class="form-grid">
-              <div class="field"><label>产品名称</label><input value="企业 AI 培训助手" /></div>
-              <div class="field"><label>产品链接</label><input placeholder="https://..." /></div>
-              <div class="field"><label>目标用户</label><input value="企业培训负责人、业务部门管理者" /></div>
-              <div class="field"><label>当前阶段</label><select><option>MVP 验证中</option><option>资料收集中</option><option>正式运营</option></select></div>
-              <div class="field wide"><label>核心功能</label><input value="AI 追问、培训复盘、知识转化、效果追踪" /></div>
-              <div class="field wide"><label>产品介绍</label><textarea>面向企业培训场景，帮助员工把学习内容转化为业务动作，并让培训负责人追踪转化效果。</textarea></div>
+              <div class="field"><label>产品名称</label><input id="addProductName" value="企业 AI 培训助手" /></div>
+              <div class="field"><label>产品链接</label><input id="addProductUrl" placeholder="https://..." /></div>
+              <div class="field"><label>目标用户</label><input id="addProductUsers" value="企业培训负责人、业务部门管理者" /></div>
+              <div class="field"><label>当前阶段</label><select id="addProductStage"><option>MVP 验证中</option><option>资料收集中</option><option>正式运营</option></select></div>
+              <div class="field wide"><label>核心功能</label><input id="addProductFeatures" value="AI 追问、培训复盘、知识转化、效果追踪" /></div>
+              <div class="field wide"><label>产品介绍</label><textarea id="addProductDescription">面向企业培训场景，帮助员工把学习内容转化为业务动作，并让培训负责人追踪转化效果。</textarea></div>
             </div>
           </section>
 
@@ -1274,7 +1411,7 @@
             <div><strong>资料完整度：72%</strong><span>仍有 3 个待澄清问题</span></div>
             <div style="text-align:right">
               <button data-page-target="products">取消</button>
-              <button class="primary" data-page-target="products">保存产品</button>
+              <button class="primary" id="saveProductBtn">保存产品</button>
             </div>
           </div>
         </div>
@@ -1282,8 +1419,15 @@
 
       <section class="page" id="page-history">
         <div class="history-layout">
-          <section class="panel">
-            <h2>训练记录</h2>
+          <section class="panel history-record-panel">
+            <div class="history-record-top">
+              <h2>训练记录</h2>
+              <div class="history-inline-summary">
+                <div class="metric"><strong>24</strong><span>完成训练</span></div>
+                <div class="metric"><strong>6</strong><span>待复盘</span></div>
+                <div class="metric"><strong>+6.4</strong><span>平均提升</span></div>
+              </div>
+            </div>
             <div class="timeline-tools">
               <span class="chip active">全部</span>
               <span class="chip">本周</span>
@@ -1322,6 +1466,48 @@
                   <span>销售知识库价值验证</span>
                   <span class="tag">已评估</span>
                 </div>
+                <div class="record-row" data-score="3.6 / 5" data-title="员工学习路径需求拆解">
+                  <span>06-08 15:05</span>
+                  <strong>企业培训 / 客户咨询</strong>
+                  <span>3.6 分</span>
+                  <span>员工学习路径需求拆解</span>
+                  <span class="tag">已评估</span>
+                </div>
+                <div class="record-row" data-score="3.4 / 5" data-title="自有产品定位澄清">
+                  <span>06-07 11:28</span>
+                  <strong>自有产品 / 产品深挖</strong>
+                  <span>3.4 分</span>
+                  <span>自有产品定位澄清</span>
+                  <span class="tag">待复盘</span>
+                </div>
+                <div class="record-row" data-score="4.0 / 5" data-title="B2B 采购链路角色判断">
+                  <span>06-05 17:12</span>
+                  <strong>B2B / 用户需求提出</strong>
+                  <span>4.0 分</span>
+                  <span>B2B 采购链路角色判断</span>
+                  <span class="tag">已评估</span>
+                </div>
+                <div class="record-row" data-score="2.7 / 5" data-title="AI 服务落地风险识别">
+                  <span>06-03 13:40</span>
+                  <strong>AI+ / 客户咨询</strong>
+                  <span>2.7 分</span>
+                  <span>AI 服务落地风险识别</span>
+                  <span class="tag">待复盘</span>
+                </div>
+                <div class="record-row" data-score="3.9 / 5" data-title="培训效果指标设计">
+                  <span>06-01 19:22</span>
+                  <strong>企业培训 / 方案评估</strong>
+                  <span>3.9 分</span>
+                  <span>培训效果指标设计</span>
+                  <span class="tag">高价值</span>
+                </div>
+                <div class="record-row" data-score="3.1 / 5" data-title="门店库存工具使用场景复盘">
+                  <span>05-29 10:46</span>
+                  <strong>自有产品 / 产品深挖</strong>
+                  <span>3.1 分</span>
+                  <span>门店库存工具使用场景复盘</span>
+                  <span class="tag">已评估</span>
+                </div>
               </div>
             </div>
           </section>
@@ -1356,11 +1542,6 @@
             </div>
           </aside>
 
-          <div class="history-summary">
-            <div class="metric"><strong>24</strong><span>完成训练</span></div>
-            <div class="metric"><strong>6</strong><span>待复盘</span></div>
-            <div class="metric"><strong>+6.4</strong><span>平均提升</span></div>
-          </div>
         </div>
       </section>
 
@@ -1440,8 +1621,8 @@
       home: '<span>已保存 14:32</span><button class="primary" data-page-target="training">开始训练</button><button data-page-target="addProduct">分析我的产品</button>',
       training: '<span>本轮 <b style="color:var(--accent);font-size:20px">04</b> / 07</span><button class="primary" id="topSubmitPlan">结束并评估</button>',
       products: '<span>最后保存：14:32</span><button class="primary" data-page-target="addProduct">添加产品</button><button>导入资料</button>',
-      addProduct: '<button data-page-target="products">返回产品列表</button><button>保存草稿</button><button class="primary" data-page-target="products">保存产品</button>',
-      history: '<input style="width:340px" placeholder="搜索场景、产品或关键词" /><button>筛选</button>',
+      addProduct: '<button data-page-target="products">返回产品列表</button><button>保存草稿</button><button class="primary" id="topSaveProductBtn">保存产品</button>',
+      history: '<input id="historySearch" style="width:340px" placeholder="搜索场景、产品或关键词" /><button id="historyFilterBtn">筛选</button>',
       ability: '<select style="width:120px"><option>近 30 天</option><option>近 7 天</option></select><button>导出画像</button>'
     };
 
@@ -1462,10 +1643,86 @@
         go(target.dataset.pageTarget);
         target.blur();
       }
+      if (event.target.closest("#topSaveProductBtn") || event.target.closest("#saveProductBtn")) {
+        saveProductFromForm();
+      }
       if (event.target.closest("#topSubmitPlan")) {
+        if (!trainingSettingsConfirmed) {
+          setChatPlaceholderOnly();
+          return;
+        }
+        trainingCompleted = true;
+        trainingHasActivity = true;
         appendMessage("ai", "已进入方案评估。本轮不再继续追问，下面会根据你的方案生成评分和优化建议。");
       }
     });
+
+    let trainingSettingsConfirmed = false;
+    let trainingHasActivity = false;
+    let trainingCompleted = false;
+    let archivedTrainingCount = 0;
+    let confirmedTrainingSettings = null;
+
+    function getTrainingSettings() {
+      return {
+        industry: document.querySelector("#industrySelect").value,
+        mode: document.querySelector("#modeChips .active").textContent.trim(),
+        level: document.querySelector("#levelChips .active").textContent.trim(),
+        scene: document.querySelector(".scene-row.active strong")?.textContent.trim() || "默认场景"
+      };
+    }
+
+    function setChatPlaceholderOnly() {
+      const body = document.querySelector("#chatBody");
+      body.innerHTML = "";
+      appendMessage("ai", "请选择您的训练设置。");
+    }
+
+    function markTrainingSettingChanged() {
+      updateTrainingStatus();
+      if (!trainingSettingsConfirmed) return;
+      const button = document.querySelector("#confirmTrainingSettings");
+      button.textContent = "确定更改";
+    }
+
+    function archiveCurrentTrainingIfNeeded() {
+      if (!trainingSettingsConfirmed || !trainingHasActivity) return;
+
+      const settings = confirmedTrainingSettings || getTrainingSettings();
+      const list = document.querySelector("#recordList");
+      const row = document.createElement("div");
+      const score = trainingCompleted ? "3.2 / 5" : "待评估";
+      const title = `${settings.scene}训练记录`;
+      archivedTrainingCount += 1;
+      row.className = "record-row";
+      row.dataset.score = score;
+      row.dataset.title = title;
+      row.innerHTML = `<span></span><strong></strong><span></span><span></span><span class="tag"></span>`;
+      row.children[0].textContent = `刚刚 ${archivedTrainingCount}`;
+      row.children[1].textContent = `${settings.industry} / ${settings.mode}`;
+      row.children[2].textContent = score;
+      row.children[3].textContent = title;
+      row.querySelector(".tag").textContent = trainingCompleted ? "已评估" : "待复盘";
+      list.insertBefore(row, list.querySelector(".record-row"));
+      bindHistoryRow(row);
+    }
+
+    function startConfirmedTraining() {
+      const confirmButton = document.querySelector("#confirmTrainingSettings");
+      if (trainingSettingsConfirmed && confirmButton.textContent.trim() !== "确定更改") return;
+      archiveCurrentTrainingIfNeeded();
+      const settings = getTrainingSettings();
+      const body = document.querySelector("#chatBody");
+      body.innerHTML = "";
+      appendMessage("ai", `训练开始。当前行业场景：${settings.industry}，训练模式：${settings.mode}，难度：${settings.level}。`);
+      appendMessage("ai", "您的具体业务是什么？");
+      trainingSettingsConfirmed = true;
+      trainingHasActivity = true;
+      trainingCompleted = false;
+      confirmedTrainingSettings = settings;
+      confirmButton.textContent = "确定";
+      updateTrainingStatus();
+    }
 
     function bindChoice(containerId) {
       const container = document.querySelector(containerId);
@@ -1475,25 +1732,25 @@
         if (!chip) return;
         container.querySelectorAll(".chip").forEach((item) => item.classList.remove("active"));
         chip.classList.add("active");
-        updateTrainingStatus();
+        markTrainingSettingChanged();
       });
     }
 
     function updateTrainingStatus() {
-      const industry = document.querySelector("#industrySelect").value;
-      const mode = document.querySelector("#modeChips .active").textContent;
-      const level = document.querySelector("#levelChips .active").textContent;
-      document.querySelector("#trainingStatus").textContent = `当前场景：${industry} / ${mode} / ${level}`;
+      const settings = getTrainingSettings();
+      document.querySelector("#trainingStatus").textContent = `当前场景：${settings.industry} / ${settings.mode} / ${settings.level}`;
     }
 
     bindChoice("#modeChips");
     bindChoice("#levelChips");
-    document.querySelector("#industrySelect").addEventListener("change", updateTrainingStatus);
+    document.querySelector("#industrySelect").addEventListener("change", markTrainingSettingChanged);
+    document.querySelector("#confirmTrainingSettings").addEventListener("click", startConfirmedTraining);
 
     document.querySelectorAll(".scene-row").forEach((row) => {
       row.addEventListener("click", () => {
         document.querySelectorAll(".scene-row").forEach((item) => item.classList.remove("active"));
         row.classList.add("active");
+        markTrainingSettingChanged();
       });
     });
 
@@ -1508,15 +1765,27 @@
     }
 
     document.querySelector("#sendChat").addEventListener("click", () => {
+      if (!trainingSettingsConfirmed) {
+        setChatPlaceholderOnly();
+        return;
+      }
+      if (trainingCompleted) return;
       const input = document.querySelector("#chatInput");
       const text = input.value.trim();
       if (!text) return;
       appendMessage("user", text);
+      trainingHasActivity = true;
       input.value = "";
       setTimeout(() => appendMessage("ai", "这个回答里最需要继续验证的是：真实使用者、业务损失和可衡量指标。请先补充其中一个。"), 160);
     });
 
     document.querySelector("#submitPlan").addEventListener("click", () => {
+      if (!trainingSettingsConfirmed) {
+        setChatPlaceholderOnly();
+        return;
+      }
+      trainingCompleted = true;
+      trainingHasActivity = true;
       appendMessage("ai", "已进入方案评估。本轮不再继续追问，下面会根据你的方案生成评分和优化建议。");
     });
 
@@ -1534,25 +1803,132 @@
       input.placeholder = "AI 已收到修正，会更新产品理解并生成下一轮追问。";
     });
 
-    document.querySelectorAll(".product-row").forEach((row) => {
-      row.addEventListener("click", () => {
+    let productDeleteMode = false;
+
+    function selectProduct(row) {
+      if (!row) return;
         document.querySelectorAll(".product-row").forEach((item) => item.classList.remove("active"));
         row.classList.add("active");
         const title = row.querySelector("strong").textContent;
+        const stage = row.dataset.stage || "资料已同步";
+        const users = row.dataset.users || "待继续澄清";
+        const description = row.dataset.description || "正在补充产品介绍、目标用户和核心价值。";
         document.querySelector("#productTitle").textContent = title;
-        document.querySelector("#productMeta").textContent = "阶段：资料已同步 | 目标用户：待继续澄清 | 最近更新：06-16";
-        document.querySelector("#productInsight").textContent = `AI 正在以「${title}」为对象，重新整理定位、目标用户、核心价值和风险点。`;
+        document.querySelector("#productMeta").textContent = `阶段：${stage} | 目标用户：${users} | 最近更新：今天`;
+        document.querySelector("#productInsight").textContent = `AI 正在以「${title}」为对象重新整理：${description} 下一步会继续追问真实用户、真实场景、核心价值和风险点。`;
+    }
+
+    function saveProductFromForm() {
+      const nameInput = document.querySelector("#addProductName");
+      const usersInput = document.querySelector("#addProductUsers");
+      const stageInput = document.querySelector("#addProductStage");
+      const featuresInput = document.querySelector("#addProductFeatures");
+      const descriptionInput = document.querySelector("#addProductDescription");
+
+      if (!nameInput || !usersInput || !stageInput || !featuresInput || !descriptionInput) return;
+
+      const name = nameInput.value.trim() || "未命名产品";
+      const users = usersInput.value.trim() || "待澄清目标用户";
+      const stage = stageInput.value;
+      const description = descriptionInput.value.trim() || featuresInput.value.trim() || "待补充产品说明";
+      const id = `product-${Date.now()}`;
+      const row = document.createElement("div");
+      row.className = "product-row";
+      row.dataset.productId = id;
+      row.dataset.stage = stage;
+      row.dataset.users = users;
+      row.dataset.description = description;
+      row.innerHTML = `<div><strong></strong><span></span></div>`;
+      row.querySelector("strong").textContent = name;
+      row.querySelector("span").textContent = `${stage} · 刚刚保存`;
+
+      const list = document.querySelector("#productList");
+      list.prepend(row);
+      bindProductRow(row);
+      selectProduct(row);
+      setProductDeleteMode(false);
+      go("products");
+    }
+
+    function setProductDeleteMode(enabled) {
+      productDeleteMode = enabled;
+      const button = document.querySelector("#deleteProductBtn");
+      const hint = document.querySelector("#deleteProductHint");
+      button.dataset.deleteMode = enabled ? "true" : "false";
+      button.textContent = enabled ? "删除" : "删除产品";
+      button.classList.toggle("active", enabled);
+      hint.classList.toggle("hidden", !enabled);
+    }
+
+    function bindProductRow(row) {
+      row.addEventListener("click", () => {
+        selectProduct(row);
       });
+    }
+
+    document.querySelectorAll(".product-row").forEach(bindProductRow);
+
+    document.querySelector("#deleteProductBtn").addEventListener("click", () => {
+      const rows = Array.from(document.querySelectorAll(".product-row"));
+      if (!productDeleteMode) {
+        setProductDeleteMode(true);
+        return;
+      }
+      if (rows.length <= 1) return;
+
+      const activeRow = document.querySelector(".product-row.active") || rows[0];
+      const activeIndex = rows.indexOf(activeRow);
+      activeRow.remove();
+      const remainingRows = Array.from(document.querySelectorAll(".product-row"));
+      const nextRow = remainingRows[Math.max(0, activeIndex - 1)] || remainingRows[0];
+      selectProduct(nextRow);
+      setProductDeleteMode(false);
     });
 
-    document.querySelectorAll(".record-row").forEach((row) => {
+    function filterHistoryRows() {
+      const activeChip = document.querySelector("#page-history .timeline-tools .chip.active");
+      const keyword = (document.querySelector("#historySearch")?.value || "").trim().toLowerCase();
+      const mode = activeChip ? activeChip.textContent.trim() : "全部";
+
+      document.querySelectorAll("#recordList .record-row").forEach((row) => {
+        const rowText = row.textContent.toLowerCase();
+        const tagText = row.querySelector(".tag")?.textContent.trim() || "";
+        const matchesKeyword = !keyword || rowText.includes(keyword);
+        const matchesMode = mode === "全部" || mode === "本周" || tagText === mode || (mode === "高价值记录" && tagText.includes("高价值"));
+        row.style.display = matchesKeyword && matchesMode ? "" : "none";
+      });
+    }
+
+    document.querySelector("#page-history .timeline-tools").addEventListener("click", (event) => {
+      const chip = event.target.closest(".chip");
+      if (!chip) return;
+      document.querySelectorAll("#page-history .timeline-tools .chip").forEach((item) => item.classList.remove("active"));
+      chip.classList.add("active");
+      filterHistoryRows();
+    });
+
+    document.addEventListener("input", (event) => {
+      if (event.target && event.target.id === "historySearch") {
+        filterHistoryRows();
+      }
+    });
+
+    document.addEventListener("click", (event) => {
+      if (event.target && event.target.id === "historyFilterBtn") {
+        filterHistoryRows();
+      }
+    });
+
+    function bindHistoryRow(row) {
       row.addEventListener("click", () => {
         document.querySelectorAll(".record-row").forEach((item) => item.classList.remove("active"));
         row.classList.add("active");
         document.querySelector("#reviewTitle").textContent = row.dataset.title;
         document.querySelector("#reviewScore").textContent = row.dataset.score;
       });
-    });
+    }
+
+    document.querySelectorAll(".record-row").forEach(bindHistoryRow);
   </script>
 </body>
 </html>

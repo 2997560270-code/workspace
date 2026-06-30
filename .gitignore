@@ -5,3 +5,5 @@ playwright-report/
 .env.local
 *.log
 .tools/
+.codegraph/
+归纳总结/
