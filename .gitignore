@@ -7,3 +7,4 @@ playwright-report/
 .tools/
 .codegraph/
 归纳总结/
+.local-logs/
