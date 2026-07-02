@@ -10,3 +10,5 @@ playwright-report/
 .codex/
 .claude/
 .mcp.json
+归纳总结/
+.local-logs/
