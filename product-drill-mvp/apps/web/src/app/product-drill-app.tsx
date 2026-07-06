@@ -5,6 +5,8 @@ import { createTrainingHistoryRecord, type TrainingHistoryRecord } from "../feat
 import { generateEvaluation, type Evaluation } from "../features/training/evaluation";
 import { addTrainingAnswer, createTrainingSession, sendTrainingMessage, type TrainingSession } from "../features/training/training-session";
 import { analyzeProduct, type ProductAnalysis, type ProductProfile } from "../features/products/product-analysis";
+import { loadFromLocalStorage, PRODUCT_DRILL_STORAGE_KEYS, saveToLocalStorage } from "../features/storage/local-persistence";
+import { buildAbilityProfile } from "../features/ability-profile/ability-profile";
 
 type PageId = "home" | "training" | "products" | "addProduct" | "history" | "ability";
 
@@ -58,6 +60,46 @@ const initialProducts: SavedProduct[] = [
     })
   }
 ];
+function getBrowserStorage() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  return window.localStorage;
+}
+
+function loadSavedProducts() {
+  return loadFromLocalStorage<SavedProduct[]>(getBrowserStorage(), PRODUCT_DRILL_STORAGE_KEYS.products, initialProducts);
+}
+
+function persistProducts(products: SavedProduct[]) {
+  saveToLocalStorage(getBrowserStorage(), PRODUCT_DRILL_STORAGE_KEYS.products, products);
+}
+
+function loadHistoryRecords() {
+  return loadFromLocalStorage<TrainingHistoryRecord[]>(getBrowserStorage(), PRODUCT_DRILL_STORAGE_KEYS.historyRecords, []);
+}
+
+function persistHistoryRecords(records: TrainingHistoryRecord[]) {
+  saveToLocalStorage(getBrowserStorage(), PRODUCT_DRILL_STORAGE_KEYS.historyRecords, records);
+}
+
+function createResumedTrainingSession(record: TrainingHistoryRecord): TrainingSession {
+  const previousUserCount = record.messages.filter((message) => message.role === "user").length;
+  return {
+    id: `resume-${record.id}`,
+    scenario: record.scenario,
+    mode: record.mode,
+    scenarioUserOffset: previousUserCount,
+    messages: [
+      ...record.messages,
+      {
+        id: `resume-notice-${record.id}`,
+        role: "ai",
+        content: "已载入历史训练记录，可以在原对话基础上继续训练。"
+      }
+    ]
+  };
+}
 const trainingRows = [
   ["企业培训服务需求澄清", "AI+ / 客户咨询", "3.2 分", "已评估"],
   ["门店库存损耗方案", "B2B / 用户需求提出", "3.8 分", "已评估"],
@@ -69,17 +111,30 @@ const trainingRows = [
 
 export function ProductDrillApp() {
   const [page, setPage] = useState<PageId>("home");
-  const [historyRecords, setHistoryRecords] = useState<TrainingHistoryRecord[]>([]);
-  const [products, setProducts] = useState<SavedProduct[]>(initialProducts);
-  const [selectedProductId, setSelectedProductId] = useState(initialProducts[0]?.id ?? "");
+  const [historyRecords, setHistoryRecords] = useState<TrainingHistoryRecord[]>(loadHistoryRecords);
+  const [products, setProducts] = useState<SavedProduct[]>(loadSavedProducts);
+  const [selectedProductId, setSelectedProductId] = useState(() => loadSavedProducts()[0]?.id ?? "");
+  const [resumeTrainingRecord, setResumeTrainingRecord] = useState<TrainingHistoryRecord | null>(null);
   const copy = pageCopy[page];
 
   function go(next: PageId) {
+    if (next !== "training") {
+      setResumeTrainingRecord(null);
+    }
     setPage(next);
   }
 
+  function resumeTraining(record: TrainingHistoryRecord) {
+    setResumeTrainingRecord(record);
+    setPage("training");
+  }
+
   function addHistoryRecord(record: TrainingHistoryRecord) {
-    setHistoryRecords((current) => [record, ...current.filter((item) => item.id !== record.id)]);
+    setHistoryRecords((current) => {
+      const nextRecords = [record, ...current.filter((item) => item.id !== record.id)];
+      persistHistoryRecords(nextRecords);
+      return nextRecords;
+    });
   }
 
   function saveProduct(profile: ProductProfile) {
@@ -88,7 +143,11 @@ export function ProductDrillApp() {
       id: `product-${Date.now()}`,
       analysis: analyzeProduct(profile)
     };
-    setProducts((current) => [product, ...current]);
+    setProducts((current) => {
+      const nextProducts = [product, ...current];
+      persistProducts(nextProducts);
+      return nextProducts;
+    });
     setSelectedProductId(product.id);
     setPage("products");
   }
@@ -96,7 +155,11 @@ export function ProductDrillApp() {
   function updateProductCorrection(productId: string, correction: string) {
     const trimmed = correction.trim();
     if (!trimmed) return;
-    setProducts((current) => current.map((product) => product.id === productId ? { ...product, correction: trimmed } : product));
+    setProducts((current) => {
+      const nextProducts = current.map((product) => product.id === productId ? { ...product, correction: trimmed } : product);
+      persistProducts(nextProducts);
+      return nextProducts;
+    });
   }
 
   return (
@@ -144,11 +207,11 @@ export function ProductDrillApp() {
 
         <section className={`pd-content ${page === "training" ? "pd-content-training" : ""}`}>
           {page === "home" ? <HomePage onGo={go} /> : null}
-          {page === "training" ? <TrainingPage onHistoryRecordCreated={addHistoryRecord} /> : null}
+          {page === "training" ? <TrainingPage onHistoryRecordCreated={addHistoryRecord} resumeRecord={resumeTrainingRecord} /> : null}
           {page === "products" ? <ProductsPage onGo={go} onCorrection={updateProductCorrection} products={products} selectedProductId={selectedProductId} setSelectedProductId={setSelectedProductId} /> : null}
           {page === "addProduct" ? <AddProductPage onGo={go} onSave={saveProduct} /> : null}
-          {page === "history" ? <HistoryPage records={historyRecords} /> : null}
-          {page === "ability" ? <AbilityPage /> : null}
+          {page === "history" ? <HistoryPage onGo={go} onResumeTraining={resumeTraining} records={historyRecords} /> : null}
+          {page === "ability" ? <AbilityPage records={historyRecords} /> : null}
         </section>
       </main>
     </div>
@@ -200,9 +263,9 @@ function HomePage({ onGo }: { onGo: (page: PageId) => void }) {
   );
 }
 
-function TrainingPage({ onHistoryRecordCreated }: { onHistoryRecordCreated: (record: TrainingHistoryRecord) => void }) {
-  const [industry, setIndustry] = useState("AI+");
-  const [mode, setMode] = useState("客户咨询");
+function TrainingPage({ onHistoryRecordCreated, resumeRecord }: { onHistoryRecordCreated: (record: TrainingHistoryRecord) => void; resumeRecord: TrainingHistoryRecord | null }) {
+  const [industry, setIndustry] = useState(resumeRecord?.scenario ?? "AI+");
+  const [mode, setMode] = useState(resumeRecord?.mode ?? "客户咨询");
   const [level, setLevel] = useState("标准");
   const [role, setRole] = useState("企业培训负责人");
   const [scene, setScene] = useState("企业员工培训");
@@ -213,8 +276,8 @@ function TrainingPage({ onHistoryRecordCreated }: { onHistoryRecordCreated: (rec
     level: string;
     role: string;
     scene: string;
-  } | null>(null);
-  const [session, setSession] = useState<TrainingSession | null>(null);
+  } | null>(resumeRecord ? { industry: resumeRecord.scenario, mode: resumeRecord.mode, level: "标准", role: "企业培训负责人", scene: "历史训练复盘" } : null);
+  const [session, setSession] = useState<TrainingSession | null>(() => resumeRecord ? createResumedTrainingSession(resumeRecord) : null);
   const [draftAnswer, setDraftAnswer] = useState("");
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -284,7 +347,7 @@ function TrainingPage({ onHistoryRecordCreated }: { onHistoryRecordCreated: (rec
         <h2>训练设置</h2>
         <label className="setting-row">
           <span>行业场景</span>
-          <select onChange={(event) => updateIndustry(event.target.value)} value={industry}>
+          <select className="scenario-select selected" data-testid="training-industry-select" onChange={(event) => updateIndustry(event.target.value)} value={industry}>
             <option>AI+</option><option>B2B</option><option>企业培训</option><option>中小餐饮</option><option>SaaS</option>
           </select>
         </label>
@@ -436,34 +499,91 @@ function AddProductPage({ onGo, onSave }: { onGo: (page: PageId) => void; onSave
     </div>
   );
 }
-function HistoryPage({ records }: { records: TrainingHistoryRecord[] }) {
+function HistoryPage({ onGo, onResumeTraining, records }: { onGo: (page: PageId) => void; onResumeTraining: (record: TrainingHistoryRecord) => void; records: TrainingHistoryRecord[] }) {
+  const [selectedId, setSelectedId] = useState(records[0]?.id ?? "sample-0");
+  const [reportRecordId, setReportRecordId] = useState<string | null>(null);
+  const selectedRecord = records.find((record) => record.id === selectedId) ?? records[0];
+  const selectedIssues = selectedRecord?.evaluation.issues ?? ["需求定义较清楚", "价值论证不足", "缺少可验证指标"];
+  const selectedMessages = selectedRecord?.messages.filter((message) => message.role === "user") ?? [];
+  const selectedTitle = selectedRecord?.title ?? "企业培训服务需求澄清";
+  const selectedScenario = selectedRecord?.scenario ?? "AI+ 企业培训";
+  const selectedMode = selectedRecord?.mode ?? "客户咨询";
+  const selectedScore = selectedRecord?.totalScore ?? 3.2;
+  const reviewedCount = records.length + trainingRows.filter((row) => row[3] === "已评估").length;
+  const pendingCount = trainingRows.filter((row) => row[3] === "待复盘").length;
+
+  function selectRecord(recordId: string) {
+    setSelectedId(recordId);
+    setReportRecordId(null);
+  }
+
+  function handleResumeTraining() {
+    const recordToResume = records.find((record) => record.id === selectedId) ?? records[0];
+    if (recordToResume) {
+      onResumeTraining(recordToResume);
+      return;
+    }
+    onGo("training");
+  }
+
   return (
     <div className="history-layout">
       <section className="panel history-record-panel">
         <div className="history-record-top"><h2>训练记录</h2><div className="history-inline-summary" data-testid="history-inline-summary"><div><strong>24</strong><span>完成训练</span></div><div><strong>6</strong><span>待复盘</span></div><div><strong>+6.4</strong><span>平均提升</span></div></div></div>
         <div className="timeline-tools"><span className="active">全部</span><span>本周</span><span>已评估</span><span>待复盘</span><span>高价值记录</span></div>
-        <div className="record-list" data-testid="history-record-list"><div className="table-head"><span>时间</span><span>行业 / 模式</span><span>评分</span><span>主题</span><span>状态</span></div>{records.map((record, index) => <button className={index === 0 ? "active" : ""} key={record.id}><span>刚刚</span><strong>{record.title}</strong><span>{record.totalScore} 分</span><span>{record.scenario} 训练评估</span><em>已评估</em></button>)}{trainingRows.map((row, index) => <button className={records.length === 0 && index === 0 ? "active" : ""} key={row[0]}><span>06-{16 - index} 14:32</span><strong>{row[1]}</strong><span>{row[2]}</span><span>{row[0]}</span><em>{row[3]}</em></button>)}</div>
+        <div className="record-list" data-testid="history-record-list"><div className="table-head"><span>时间</span><span>行业 / 模式</span><span>评分</span><span>主题</span><span>状态</span></div>{records.map((record) => <button className={record.id === selectedId ? "active" : ""} key={record.id} onClick={() => selectRecord(record.id)} type="button"><span>刚刚</span><strong>{record.title}</strong><span>{record.totalScore} 分</span><span>{record.scenario} 训练评估</span><em>已评估</em></button>)}{trainingRows.map((row, index) => <button className={!selectedRecord && selectedId === `sample-${index}` ? "active" : ""} key={row[0]} onClick={() => selectRecord(`sample-${index}`)} type="button"><span>06-{16 - index} 14:32</span><strong>{row[1]}</strong><span>{row[2]}</span><span>{row[0]}</span><em>{row[3]}</em></button>)}</div>
       </section>
-      <aside className="panel"><h2>记录复盘</h2><div className="fact"><strong>企业培训服务需求澄清</strong><p>场景：AI+ 企业培训 | 模式：客户咨询 | 提交方案：已提交</p></div><div className="score"><span>本次表现</span><strong>3.2 / 5</strong></div><div className="fact"><strong>关键对话</strong><p>AI 追问了真实使用者、业务损失和验证指标。</p></div><div className="fact"><strong>AI 点评</strong><ul><li>需求定义较清楚</li><li>价值论证不足</li><li>缺少可验证指标</li></ul></div></aside>
+      <aside className="panel" data-testid="history-review-panel"><h2>记录复盘</h2><div className="fact"><strong>{selectedTitle}</strong><p>场景：{selectedScenario} | 模式：{selectedMode} | 提交方案：已提交</p></div><div className="score"><span>本次表现</span><strong>{selectedScore} / 5</strong></div><div className="fact"><strong>关键对话</strong>{selectedMessages.length ? selectedMessages.map((message) => <p key={message.id}>{message.content}</p>) : <p>AI 追问了真实使用者、业务损失和验证指标。</p>}</div><div className="fact"><strong>AI 点评</strong><ul>{selectedIssues.map((issue) => <li key={issue}>{issue}</li>)}</ul></div>{reportRecordId === selectedId ? <div className="notice">复盘报告已生成：建议围绕“{selectedIssues[0]}”重新训练，并补充可验证指标。</div> : null}<div className="review-actions"><button className="primary retrain-action" onClick={handleResumeTraining} type="button">重新训练此场景</button><button onClick={() => setReportRecordId(selectedId)} type="button">生成复盘报告</button></div></aside>
     </div>
   );
 }
 
-function AbilityPage() {
+function AbilityPage({ records }: { records: TrainingHistoryRecord[] }) {
+  const profile = buildAbilityProfile(records);
+  const progressText = profile.progress > 0 ? `+${profile.progress}` : `${profile.progress}`;
+  const trendScores = profile.trend.map((item) => item.score);
+  const minTrendScore = trendScores.length ? Math.min(...trendScores) : 0;
+  const maxTrendScore = trendScores.length ? Math.max(...trendScores) : 100;
+  const middleTrendScore = Math.round((minTrendScore + maxTrendScore) / 2);
+  const trendVariation = maxTrendScore - minTrendScore;
+  const trendScoreRange = Math.max(1, trendVariation);
+  const trendPoints = profile.trend.length > 1
+    ? profile.trend
+        .map((item, index) => {
+          const x = Math.round((index / (profile.trend.length - 1)) * 600);
+          const normalized = (item.score - minTrendScore) / trendScoreRange;
+          const y = Math.round(170 - normalized * 120);
+          return `${x},${y}`;
+        })
+        .join(" ")
+    : "0,170 600,170";
+
   return (
     <div className="ability-layout" data-testid="ability-page">
-      <section className="metric-strip"><div><strong>78.6</strong><span>平均分 · 较上期 +6.4</span></div><div><strong>24</strong><span>完成训练 · 较上月 +8</span></div><div><strong>92</strong><span>最高分</span></div><div><strong>+12.3</strong><span>综合进步 · 近 30 天</span></div></section>
-      <div className="ability-main"><section className="panel"><h2>最近训练表现趋势</h2><div className="chart"><svg viewBox="0 0 600 220" preserveAspectRatio="none"><polyline points="0,170 110,145 220,150 330,120 440,98 600,82" fill="none" stroke="#101312" strokeWidth="4" /><polyline points="0,120 110,100 220,108 330,86 440,70 600,60" fill="none" stroke="#a5ada8" strokeWidth="3" strokeDasharray="6 8" /></svg></div></section><section className="panel"><h2>能力维度表现</h2>{["需求理解", "方案设计", "异议应对", "商业价值论证", "表达与沟通"].map((item, index) => <div className="dimension-row" key={item}><strong>{item}</strong><span>识别并澄清真实需求</span><i><b style={{ width: `${80 - index * 3}%` }} /></i><em>{80 - index * 3}</em></div>)}</section></div>
-      <div className="ability-bottom"><section className="panel"><h2>高频短板</h2><div className="short-list"><div><span>价值论证不足</span><b>8 次</b></div><div><span>指标定义不清</span><b>6 次</b></div><div><span>目标用户描述偏泛</span><b>5 次</b></div></div></section><section className="panel recommend"><h2>下一步推荐训练</h2><ol><li>B2B 客户咨询 / 标准难度</li><li>自有产品价值验证</li><li>方案评估复盘</li></ol><button className="primary">开始推荐训练</button></section></div>
+      <section className="metric-strip">
+        <div><strong>{profile.averageScore}</strong><span>平均分 · 真实记录</span></div>
+        <div><strong>{profile.completedCount}</strong><span>完成训练 · 真实记录 {profile.completedCount}</span></div>
+        <div><strong>{profile.bestScore}</strong><span>最高分</span></div>
+        <div><strong>{progressText}</strong><span>综合进步 · 真实记录</span></div>
+      </section>
+      <div className="ability-main">
+        <section className="panel" data-testid="ability-trend-panel">
+          <div className="trend-panel-title"><h2>最近训练表现趋势</h2><span>变化幅度 {trendVariation} 分</span></div>
+          <div className="trend-chart-shell">
+            <div className="trend-y-axis"><strong>分数轴</strong><span>{maxTrendScore}</span><span>{middleTrendScore}</span><span>{minTrendScore}</span></div>
+            <div className="chart"><svg viewBox="0 0 600 220" preserveAspectRatio="none"><line x1="0" y1="50" x2="600" y2="50" stroke="#e3e7e5" strokeWidth="1" /><line x1="0" y1="110" x2="600" y2="110" stroke="#e3e7e5" strokeWidth="1" /><line x1="0" y1="170" x2="600" y2="170" stroke="#e3e7e5" strokeWidth="1" /><polyline data-testid="ability-trend-line" points={trendPoints} fill="none" stroke="#101312" strokeWidth="4" /><polyline points="0,120 110,100 220,108 330,86 440,70 600,60" fill="none" stroke="#a5ada8" strokeWidth="3" strokeDasharray="6 8" /></svg></div>
+          </div>
+          <div className="trend-x-axis"><strong>训练轮次</strong>{profile.trend.length ? profile.trend.map((item) => <span key={item.label}>{item.label}</span>) : <span>暂无记录</span>}</div>
+        </section>
+        <section className="panel"><h2>能力维度表现</h2>{profile.dimensions.map((item) => <div className="dimension-row" key={item.name}><strong>{item.name}</strong><span>基于真实训练记录计算</span><i><b style={{ width: `${item.score}%` }} /></i><em>{item.score}</em></div>)}</section>
+      </div>
+      <div className="ability-bottom">
+        <section className="panel"><h2>高频短板</h2><div className="short-list">{profile.shortcomings.map((item, index) => <div key={item}><span>{item}</span><b>{records.length ? `${index + 1}` : "0"} 次</b></div>)}</div></section>
+        <section className="panel recommend"><h2>下一步推荐训练</h2><ol><li>{profile.nextTraining}</li></ol><button className="primary">开始推荐训练</button></section>
+      </div>
     </div>
   );
 }
-
-
-
-
-
-
 
 
 
