@@ -18,4 +18,17 @@ describe("training history migration", () => {
     expect(record.messages.some((message) => message.role === "user")).toBe(true);
     expect(record.totalScore).toBe(evaluation.totalScore);
   });
+  it("creates a unique record id for every submitted training attempt", () => {
+    const session = sendTrainingMessage(
+      createTrainingSession({ scenario: "AI+", mode: "客户咨询", difficulty: "标准" }),
+      "我的业务是企业 AI 培训服务"
+    );
+    const evaluation = generateEvaluation(session);
+
+    const firstRecord = createTrainingHistoryRecord(session, evaluation);
+    const secondRecord = createTrainingHistoryRecord(session, evaluation);
+
+    expect(firstRecord.id).not.toBe(secondRecord.id);
+  });
 });
+

@@ -255,3 +255,256 @@ test("main content action buttons are black with white text on every page", asyn
   await page.getByTestId("nav-ability").click();
   await expectBlackActionButton("开始推荐训练");
 });
+
+test("module05 keeps saved products after browser reload", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+
+  await page.getByTestId("nav-products").click();
+  await page.getByRole("button", { name: "添加产品" }).click();
+  await page.getByLabel("产品名称").fill("刷新保留的库存产品");
+  await page.getByLabel("产品链接").fill("https://example.com/persisted-product");
+  await page.getByLabel("目标用户").fill("连锁餐饮门店店长");
+  await page.getByLabel("核心功能").fill("库存预警、补货提醒、损耗复盘");
+  await page.getByLabel("产品介绍").fill("帮助门店店长减少库存损耗并建立每日盘点流程。");
+  await page.getByRole("button", { name: "保存产品" }).click();
+
+  await expect(page.getByTestId("product-archive")).toContainText("刷新保留的库存产品");
+
+  await page.reload();
+  await page.getByTestId("nav-products").click();
+  await expect(page.getByTestId("product-archive")).toContainText("刷新保留的库存产品");
+  await expect(page.getByTestId("product-reading")).toContainText("刷新保留的库存产品");
+});
+
+test("module05 keeps training history after browser reload", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+
+  await page.getByTestId("nav-history").click();
+  await expect(page.getByTestId("history-record-list").locator("button")).toHaveCount(6);
+
+  await page.getByTestId("nav-training").click();
+  await page.getByTestId("training-confirm").click();
+  await page.getByPlaceholder("输入你的回答...").fill("我的业务是企业 AI 培训服务");
+  await page.getByRole("button", { name: "发送" }).click();
+  await page.getByPlaceholder("输入你的回答...").fill("方案是给培训负责人提供 AI 复盘和转化率追踪");
+  await page.getByRole("button", { name: "提交方案" }).click();
+
+  await page.reload();
+  await page.getByTestId("nav-history").click();
+  await expect(page.getByTestId("history-record-list").locator("button")).toHaveCount(7);
+});
+
+
+test("module05 ability profile uses real completed training count", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+
+  await page.getByTestId("nav-training").click();
+  await page.getByTestId("training-confirm").click();
+  await page.getByPlaceholder("输入你的回答...").fill("我的业务是企业 AI 培训服务");
+  await page.getByRole("button", { name: "发送" }).click();
+  await page.getByPlaceholder("输入你的回答...").fill("方案是给培训负责人提供 AI 复盘和转化率追踪");
+  await page.getByRole("button", { name: "提交方案" }).click();
+
+  await page.getByTestId("nav-ability").click();
+  await expect(page.getByTestId("ability-page")).toContainText("完成训练 · 真实记录 1");
+  await expect(page.getByTestId("ability-page")).toContainText("目标用户还不够具体");
+});
+test("module05 accumulates multiple training attempts after reload", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+
+  async function completeTraining(business: string, solution: string) {
+    await page.getByTestId("nav-training").click();
+    await page.getByTestId("training-confirm").click();
+    await page.getByPlaceholder("输入你的回答...").fill(business);
+    await page.getByRole("button", { name: "发送" }).click();
+    await page.getByPlaceholder("输入你的回答...").fill(solution);
+    await page.getByRole("button", { name: "提交方案" }).click();
+  }
+
+  await completeTraining("我的业务是企业 AI 培训服务", "方案是提供训练复盘和指标看板");
+  await page.reload();
+  await completeTraining("我的业务是门店库存管理", "方案是提供库存预警和损耗分析");
+
+  await page.getByTestId("nav-history").click();
+  await expect(page.getByTestId("history-record-list").locator("button")).toHaveCount(8);
+
+  await page.getByTestId("nav-ability").click();
+  await expect(page.getByTestId("ability-page")).toContainText("完成训练 · 真实记录 2");
+});
+test("ability trend chart amplifies close score changes", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => {
+    const dimensions = ["需求理解", "问题澄清", "方案设计", "异议应对", "商业价值论证", "数据与逻辑", "表达与沟通"];
+    const makeRecord = (id: string, totalScore: number) => ({
+      id,
+      title: "AI+ / 客户咨询",
+      scenario: "AI+",
+      mode: "客户咨询",
+      totalScore,
+      messages: [{ id: `${id}-msg`, role: "user", content: "测试记录" }],
+      evaluation: {
+        totalScore,
+        dimensions: dimensions.map((name) => ({ name, score: totalScore })),
+        issues: ["趋势测试短板"]
+      }
+    });
+    localStorage.setItem("product-drill:mvp:history-records", JSON.stringify([
+      makeRecord("history-low", 3.5),
+      makeRecord("history-high", 4.0)
+    ]));
+  });
+  await page.reload();
+  await page.getByTestId("nav-ability").click();
+
+  const points = await page.locator(".ability-main .chart polyline").first().getAttribute("points");
+  const yValues = points!.split(" ").map((point) => Number(point.split(",")[1]));
+  const verticalRange = Math.max(...yValues) - Math.min(...yValues);
+
+  expect(verticalRange).toBeGreaterThanOrEqual(90);
+});
+test("ability trend chart shows axis parameters and variation range", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => {
+    const dimensions = ["需求理解", "问题澄清", "方案设计", "异议应对", "商业价值论证", "数据与逻辑", "表达与沟通"];
+    const makeRecord = (id: string, totalScore: number) => ({
+      id,
+      title: "AI+ / 客户咨询",
+      scenario: "AI+",
+      mode: "客户咨询",
+      totalScore,
+      messages: [{ id: `${id}-msg`, role: "user", content: "测试记录" }],
+      evaluation: {
+        totalScore,
+        dimensions: dimensions.map((name) => ({ name, score: totalScore })),
+        issues: ["趋势测试短板"]
+      }
+    });
+    localStorage.setItem("product-drill:mvp:history-records", JSON.stringify([
+      makeRecord("history-1", 3.2),
+      makeRecord("history-2", 3.9),
+      makeRecord("history-3", 4.1)
+    ]));
+  });
+  await page.reload();
+  await page.getByTestId("nav-ability").click();
+
+  await expect(page.getByTestId("ability-trend-panel")).toContainText("分数轴");
+  await expect(page.getByTestId("ability-trend-panel")).toContainText("训练轮次");
+  await expect(page.getByTestId("ability-trend-panel")).toContainText("变化幅度 18 分");
+  await expect(page.getByTestId("ability-trend-panel")).toContainText("第 1 次");
+  await expect(page.getByTestId("ability-trend-panel")).toContainText("第 3 次");
+});
+test("module06 history detail follows selected record and creates review report", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => {
+    const dimensions = ["需求理解", "问题澄清", "方案设计", "异议应对", "商业价值论证", "数据与逻辑", "表达与沟通"];
+    const makeRecord = (id: string, title: string, scenario: string, mode: string, totalScore: number, userText: string, issue: string) => ({
+      id,
+      title,
+      scenario,
+      mode,
+      totalScore,
+      messages: [
+        { id: `${id}-ai`, role: "ai", content: `AI 针对 ${scenario} 进行追问` },
+        { id: `${id}-user`, role: "user", content: userText }
+      ],
+      evaluation: {
+        totalScore,
+        dimensions: dimensions.map((name) => ({ name, score: totalScore })),
+        issues: [issue]
+      }
+    });
+    localStorage.setItem("product-drill:mvp:history-records", JSON.stringify([
+      makeRecord("history-review-1", "AI+ / 客户咨询", "AI+", "客户咨询", 3.2, "第一条用户输入", "第一条问题"),
+      makeRecord("history-review-2", "制造业 CRM / 方案评估", "B2B", "方案评估", 4.1, "第二条用户输入", "第二条问题")
+    ]));
+  });
+  await page.reload();
+
+  await page.getByTestId("nav-history").click();
+  await page.getByRole("button", { name: /制造业 CRM \/ 方案评估/ }).click();
+
+  await expect(page.getByTestId("history-review-panel")).toContainText("制造业 CRM / 方案评估");
+  await expect(page.getByTestId("history-review-panel")).toContainText("场景：B2B | 模式：方案评估");
+  await expect(page.getByTestId("history-review-panel")).toContainText("4.1 / 5");
+  await expect(page.getByTestId("history-review-panel")).toContainText("第二条用户输入");
+  await expect(page.getByTestId("history-review-panel")).toContainText("第二条问题");
+
+  await page.getByRole("button", { name: "生成复盘报告" }).click();
+  await expect(page.getByTestId("history-review-panel")).toContainText("复盘报告已生成");
+
+  await page.getByRole("button", { name: "重新训练此场景" }).click();
+  await expect(page.getByRole("heading", { name: "训练", exact: true })).toBeVisible();
+});
+test("retraining from history restores previous chat and shows a black primary action", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => {
+    const dimensions = ["需求理解", "问题澄清", "方案设计", "异议应对", "商业价值论证", "数据与逻辑", "表达与沟通"];
+    localStorage.setItem("product-drill:mvp:history-records", JSON.stringify([
+      {
+        id: "history-resume-1",
+        title: "B2B / 客户咨询",
+        scenario: "B2B",
+        mode: "客户咨询",
+        totalScore: 3.6,
+        messages: [
+          { id: "resume-ai-1", role: "ai", content: "AI 原始追问：你的业务场景是什么？" },
+          { id: "resume-user-1", role: "user", content: "历史用户回答：我的业务是采购协同系统" },
+          { id: "resume-ai-2", role: "ai", content: "AI 原始追问：谁每天使用这个系统？" }
+        ],
+        evaluation: {
+          totalScore: 3.6,
+          dimensions: dimensions.map((name) => ({ name, score: 3.6 })),
+          issues: ["历史问题：目标用户仍需收窄"]
+        }
+      }
+    ]));
+  });
+  await page.reload();
+  await page.getByTestId("nav-history").click();
+
+  const retrainButton = page.getByRole("button", { name: "重新训练此场景" });
+  await expect(retrainButton).toBeVisible();
+  await expect(retrainButton).toHaveCSS("background-color", "rgb(5, 7, 12)");
+  await expect(retrainButton).toHaveCSS("color", "rgb(255, 255, 255)");
+
+  await retrainButton.click();
+  await expect(page.getByRole("heading", { name: "训练", exact: true })).toBeVisible();
+  await expect(page.getByTestId("training-chat")).toContainText("历史用户回答：我的业务是采购协同系统");
+  await expect(page.getByTestId("training-chat")).toContainText("AI 原始追问：谁每天使用这个系统？");
+  await expect(page.getByTestId("training-chat")).toContainText("已载入历史训练记录，可以在原对话基础上继续训练。");
+});
+test("training industry select shows selected feedback after switching scenario", async ({ page }) => {
+  await page.goto("/");
+  await page.getByTestId("nav-training").click();
+
+  const industrySelect = page.getByTestId("training-industry-select");
+  await industrySelect.selectOption("B2B");
+
+  await expect(industrySelect).toHaveValue("B2B");
+  await expect(industrySelect).toHaveClass(/selected/);
+  await expect(industrySelect).toHaveCSS("background-color", "rgb(231, 244, 239)");
+  await expect(industrySelect).toHaveCSS("border-color", "rgb(167, 210, 194)");
+});
+
+
+test("training scene list shows selected feedback after switching scene", async ({ page }) => {
+  await page.goto("/");
+  await page.getByTestId("nav-training").click();
+
+  const sceneList = page.getByTestId("training-scene-list");
+  const salesScene = sceneList.getByRole("button", { name: /销售知识库/ });
+  await salesScene.click();
+
+  await expect(salesScene).toHaveClass(/active/);
+  await expect(salesScene).toHaveCSS("background-color", "rgb(231, 244, 239)");
+  await expect(salesScene).toHaveCSS("border-color", "rgb(167, 210, 194)");
+});
