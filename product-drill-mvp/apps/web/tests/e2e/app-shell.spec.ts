@@ -508,3 +508,198 @@ test("training scene list shows selected feedback after switching scene", async 
   await expect(salesScene).toHaveCSS("background-color", "rgb(231, 244, 239)");
   await expect(salesScene).toHaveCSS("border-color", "rgb(167, 210, 194)");
 });
+
+test("module07 product archive deletes selected product and persists deletion", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+
+  async function addProduct(name: string, targetUsers: string) {
+    await page.getByTestId("nav-products").click();
+    await page.getByRole("button", { name: "添加产品" }).click();
+    await page.getByLabel("产品名称").fill(name);
+    await page.getByLabel("产品链接").fill(`https://example.com/${name}`);
+    await page.getByLabel("目标用户").fill(targetUsers);
+    await page.getByLabel("核心功能").fill("库存预警、损耗分析、补货建议");
+    await page.getByLabel("产品介绍").fill(`${name} 用于验证产品删除流程。`);
+    await page.getByRole("button", { name: "保存产品" }).click();
+    await expect(page.getByRole("heading", { name: "产品", exact: true })).toBeVisible();
+  }
+
+  await addProduct("待删除库存产品", "中小餐饮店长");
+  await addProduct("保留培训产品", "企业培训负责人");
+
+  await expect(page.getByTestId("product-archive")).toContainText("待删除库存产品");
+  await expect(page.getByTestId("product-archive")).toContainText("保留培训产品");
+
+  await page.getByRole("button", { name: "删除产品", exact: true }).click();
+  await expect(page.getByRole("button", { name: "删除", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /待删除库存产品/ }).click();
+  await page.getByRole("button", { name: "删除", exact: true }).click();
+
+  await expect(page.getByTestId("product-archive")).not.toContainText("待删除库存产品");
+  await expect(page.getByTestId("product-archive")).toContainText("保留培训产品");
+  await expect(page.getByTestId("product-reading")).toContainText("保留培训产品");
+
+  await page.reload();
+  await page.getByTestId("nav-products").click();
+  await expect(page.getByTestId("product-archive")).not.toContainText("待删除库存产品");
+  await expect(page.getByTestId("product-reading")).toContainText("保留培训产品");
+});
+
+test("module07 product archive supports multi-select deletion", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+
+  async function addProduct(name: string) {
+    await page.getByTestId("nav-products").click();
+    await page.getByRole("button", { name: "添加产品" }).click();
+    await page.getByLabel("产品名称").fill(name);
+    await page.getByLabel("产品链接").fill(`https://example.com/${name}`);
+    await page.getByLabel("目标用户").fill("企业培训负责人");
+    await page.getByLabel("核心功能").fill("AI 解读、追问澄清、成熟度评估");
+    await page.getByLabel("产品介绍").fill(`${name} 用于验证多选删除流程。`);
+    await page.getByRole("button", { name: "保存产品" }).click();
+    await expect(page.getByRole("heading", { name: "产品", exact: true })).toBeVisible();
+  }
+
+  await addProduct("多选删除产品A");
+  await addProduct("多选删除产品B");
+  await addProduct("多选保留产品C");
+
+  await page.getByRole("button", { name: "删除产品", exact: true }).click();
+  await page.getByRole("button", { name: /多选删除产品A/ }).click();
+  await page.getByRole("button", { name: /多选删除产品B/ }).click();
+
+  await expect(page.getByRole("button", { name: /多选删除产品A/ })).toHaveClass(/delete-selected/);
+  await expect(page.getByRole("button", { name: /多选删除产品B/ })).toHaveClass(/delete-selected/);
+
+  await page.getByRole("button", { name: "删除", exact: true }).click();
+
+  await expect(page.getByTestId("product-archive")).not.toContainText("多选删除产品A");
+  await expect(page.getByTestId("product-archive")).not.toContainText("多选删除产品B");
+  await expect(page.getByTestId("product-archive")).toContainText("多选保留产品C");
+  await expect(page.getByTestId("product-reading")).toContainText("多选保留产品C");
+
+  await page.reload();
+  await page.getByTestId("nav-products").click();
+  await expect(page.getByTestId("product-archive")).not.toContainText("多选删除产品A");
+  await expect(page.getByTestId("product-archive")).not.toContainText("多选删除产品B");
+  await expect(page.getByTestId("product-reading")).toContainText("多选保留产品C");
+});
+
+
+test("product archive keeps horizontal layout after entering delete mode", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+
+  await page.getByTestId("nav-products").click();
+  await page.getByRole("button", { name: "添加产品" }).click();
+  await page.getByLabel("产品名称").fill("企业 AI 培训助手");
+  await page.getByLabel("产品链接").fill("https://example.com/layout-product");
+  await page.getByLabel("目标用户").fill("企业培训负责人");
+  await page.getByLabel("核心功能").fill("AI 解读、追问澄清、成熟度评估");
+  await page.getByLabel("产品介绍").fill("用于验证删除模式下产品档案排版不变形。");
+  await page.getByRole("button", { name: "保存产品" }).click();
+
+  const productButton = page.getByRole("button", { name: /企业 AI 培训助手/ }).first();
+  const productName = productButton.locator("strong");
+  const beforeBox = await productName.boundingBox();
+  expect(beforeBox).not.toBeNull();
+
+  await page.getByRole("button", { name: "删除产品", exact: true }).click();
+  const afterBox = await productName.boundingBox();
+  expect(afterBox).not.toBeNull();
+  expect(afterBox!.width).toBeGreaterThan(100);
+  expect(afterBox!.height).toBeLessThan(36);
+});
+
+test("module08 product uploads prefill add product form from document and source text", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+
+  await page.getByTestId("nav-products").click();
+  await page.getByRole("button", { name: "添加产品" }).click();
+
+  await page.getByLabel("上传产品文档").setInputFiles({
+    name: "prd.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("产品名称：餐饮门店库存助手\n目标用户：中小餐饮门店店长\n产品介绍：帮助门店记录库存、识别损耗并提醒补货。", "utf-8")
+  });
+  await page.getByLabel("上传源代码").setInputFiles({
+    name: "features.ts",
+    mimeType: "text/plain",
+    buffer: Buffer.from("核心功能：库存预警、损耗分析、补货建议、经营数据复盘", "utf-8")
+  });
+
+  await expect(page.getByLabel("产品名称")).toHaveValue("餐饮门店库存助手");
+  await expect(page.getByLabel("目标用户")).toHaveValue("中小餐饮门店店长");
+  await expect(page.getByLabel("核心功能")).toHaveValue(/库存预警/);
+  await expect(page.getByLabel("产品介绍")).toHaveValue(/识别损耗/);
+  await expect(page.getByTestId("add-product-ai-clarification")).toContainText("已读取产品文档：prd.txt");
+  await expect(page.getByTestId("add-product-ai-clarification")).toContainText("已读取源代码：features.ts");
+
+  await page.getByRole("button", { name: "保存产品" }).click();
+  await expect(page.getByTestId("product-archive")).toContainText("餐饮门店库存助手");
+  await expect(page.getByTestId("product-reading")).toContainText("餐饮门店库存助手");
+});
+
+test("module09 product profile can be edited and regenerates AI reading", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+
+  await page.getByTestId("nav-products").click();
+  await page.getByRole("button", { name: "添加产品" }).click();
+  await page.getByLabel("产品名称").fill("原始库存产品");
+  await page.getByLabel("产品链接").fill("https://example.com/original-inventory");
+  await page.getByLabel("目标用户").fill("餐饮店长");
+  await page.getByLabel("核心功能").fill("库存记录");
+  await page.getByLabel("产品介绍").fill("帮助门店记录库存。");
+  await page.getByRole("button", { name: "保存产品" }).click();
+
+  await page.getByRole("button", { name: "编辑产品资料" }).click();
+  await page.getByLabel("产品名称").fill("编辑后的库存产品");
+  await page.getByLabel("目标用户").fill("中小餐饮门店店长");
+  await page.getByLabel("核心功能").fill("库存预警、损耗分析、补货建议");
+  await page.getByLabel("产品介绍").fill("帮助店长减少库存损耗并提升补货效率。");
+  await page.getByRole("button", { name: "保存修改" }).click();
+
+  await expect(page.getByTestId("product-archive")).toContainText("编辑后的库存产品");
+  await expect(page.getByTestId("product-archive")).not.toContainText("原始库存产品");
+  await expect(page.getByTestId("product-reading")).toContainText("编辑后的库存产品");
+  await expect(page.getByTestId("product-reading")).toContainText("中小餐饮门店店长");
+  await expect(page.getByTestId("product-reading")).toContainText("库存预警、损耗分析、补货建议");
+
+  await page.reload();
+  await page.getByTestId("nav-products").click();
+  await expect(page.getByTestId("product-archive")).toContainText("编辑后的库存产品");
+  await expect(page.getByTestId("product-reading")).toContainText("帮助店长减少库存损耗并提升补货效率");
+});
+
+
+test("product detail meta uses Chinese colons instead of question marks", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+
+  await page.getByTestId("nav-products").click();
+  await page.getByRole("button", { name: "添加产品" }).click();
+  await page.getByLabel("产品名称").fill("格式校验产品");
+  await page.getByLabel("产品链接").fill("https://example.com/meta-format");
+  await page.getByLabel("目标用户").fill("企业培训负责人");
+  await page.getByLabel("核心功能").fill("AI 解读、追问澄清");
+  await page.getByLabel("产品介绍").fill("用于校验产品详情元信息格式。");
+  await page.getByRole("button", { name: "保存产品" }).click();
+
+  const meta = page.getByTestId("product-reading").locator(".meta").first();
+  await expect(meta).toContainText("阶段：MVP 验证中");
+  await expect(meta).toContainText("目标用户：企业培训负责人");
+  await expect(meta).toContainText("链接：https://example.com/meta-format");
+  await expect(meta).not.toContainText("阶段?");
+  await expect(meta).not.toContainText("目标用户?");
+  await expect(meta).not.toContainText("链接?");
+});
