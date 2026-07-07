@@ -152,12 +152,39 @@ export function ProductDrillApp() {
     setPage("products");
   }
 
+  function updateProduct(productId: string, profile: ProductProfile) {
+    setProducts((current) => {
+      const nextProducts = current.map((product) => product.id === productId
+        ? { ...product, ...profile, analysis: analyzeProduct(profile) }
+        : product
+      );
+      persistProducts(nextProducts);
+      return nextProducts;
+    });
+    setSelectedProductId(productId);
+  }
+
   function updateProductCorrection(productId: string, correction: string) {
     const trimmed = correction.trim();
     if (!trimmed) return;
     setProducts((current) => {
       const nextProducts = current.map((product) => product.id === productId ? { ...product, correction: trimmed } : product);
       persistProducts(nextProducts);
+      return nextProducts;
+    });
+  }
+
+  function deleteProducts(productIds: string[]) {
+    const deleteIdSet = new Set(productIds);
+    setProducts((current) => {
+      const nextProducts = current.filter((product) => !deleteIdSet.has(product.id));
+      persistProducts(nextProducts);
+      setSelectedProductId((currentSelectedId) => {
+        if (!deleteIdSet.has(currentSelectedId) && nextProducts.some((product) => product.id === currentSelectedId)) {
+          return currentSelectedId;
+        }
+        return nextProducts[0]?.id ?? "";
+      });
       return nextProducts;
     });
   }
@@ -208,7 +235,7 @@ export function ProductDrillApp() {
         <section className={`pd-content ${page === "training" ? "pd-content-training" : ""}`}>
           {page === "home" ? <HomePage onGo={go} /> : null}
           {page === "training" ? <TrainingPage onHistoryRecordCreated={addHistoryRecord} resumeRecord={resumeTrainingRecord} /> : null}
-          {page === "products" ? <ProductsPage onGo={go} onCorrection={updateProductCorrection} products={products} selectedProductId={selectedProductId} setSelectedProductId={setSelectedProductId} /> : null}
+          {page === "products" ? <ProductsPage onDelete={deleteProducts} onGo={go} onCorrection={updateProductCorrection} onUpdate={updateProduct} products={products} selectedProductId={selectedProductId} setSelectedProductId={setSelectedProductId} /> : null}
           {page === "addProduct" ? <AddProductPage onGo={go} onSave={saveProduct} /> : null}
           {page === "history" ? <HistoryPage onGo={go} onResumeTraining={resumeTraining} records={historyRecords} /> : null}
           {page === "ability" ? <AbilityPage records={historyRecords} /> : null}
@@ -422,24 +449,89 @@ function TrainingPage({ onHistoryRecordCreated, resumeRecord }: { onHistoryRecor
 }
 function ProductsPage({
   onCorrection,
+  onDelete,
   onGo,
+  onUpdate,
   products,
   selectedProductId,
   setSelectedProductId
 }: {
   onCorrection: (productId: string, correction: string) => void;
+  onDelete: (productIds: string[]) => void;
   onGo: (page: PageId) => void;
+  onUpdate: (productId: string, profile: ProductProfile) => void;
   products: SavedProduct[];
   selectedProductId: string;
   setSelectedProductId: (productId: string) => void;
 }) {
   const [correctionDraft, setCorrectionDraft] = useState("");
+  const [deleteMode, setDeleteMode] = useState(false);
+  const [selectedDeleteIds, setSelectedDeleteIds] = useState<string[]>([]);
+  const [editingProductId, setEditingProductId] = useState("");
+  const [editProfile, setEditProfile] = useState<ProductProfile | null>(null);
   const selectedProduct = products.find((product) => product.id === selectedProductId) ?? products[0];
 
   function updateUnderstanding() {
     if (!selectedProduct) return;
     onCorrection(selectedProduct.id, correctionDraft);
     setCorrectionDraft("");
+  }
+
+  function startEditingProduct() {
+    if (!selectedProduct) return;
+    setEditingProductId(selectedProduct.id);
+    setEditProfile({
+      productName: selectedProduct.productName,
+      productDescription: selectedProduct.productDescription,
+      targetUsers: selectedProduct.targetUsers,
+      coreFeatures: selectedProduct.coreFeatures,
+      productStage: selectedProduct.productStage,
+      productUrl: selectedProduct.productUrl
+    });
+  }
+
+  function updateEditProfile(field: keyof ProductProfile, value: string) {
+    setEditProfile((current) => current ? { ...current, [field]: value } : current);
+  }
+
+  function saveEditedProduct() {
+    if (!selectedProduct || !editProfile) return;
+    onUpdate(selectedProduct.id, editProfile);
+    setEditingProductId("");
+    setEditProfile(null);
+    setCorrectionDraft("");
+  }
+
+  function cancelEditingProduct() {
+    setEditingProductId("");
+    setEditProfile(null);
+  }
+
+  function handleProductSelect(productId: string) {
+    setSelectedProductId(productId);
+    setEditingProductId("");
+    setEditProfile(null);
+    if (!deleteMode) return;
+    setSelectedDeleteIds((current) => current.includes(productId)
+      ? current.filter((id) => id !== productId)
+      : [...current, productId]
+    );
+  }
+
+  function handleDeleteProduct() {
+    if (!selectedProduct) return;
+    if (!deleteMode) {
+      setDeleteMode(true);
+      setSelectedDeleteIds([]);
+      return;
+    }
+    if (selectedDeleteIds.length === 0) return;
+    onDelete(selectedDeleteIds);
+    setCorrectionDraft("");
+    setEditingProductId("");
+    setEditProfile(null);
+    setSelectedDeleteIds([]);
+    setDeleteMode(false);
   }
 
   if (!selectedProduct) {
@@ -456,15 +548,35 @@ function ProductsPage({
     <div className="product-layout">
       <aside className="panel product-archive" data-testid="product-archive">
         <h2>产品档案</h2>
-        {products.map((product) => <button className={product.id === selectedProduct.id ? "active" : ""} key={product.id} onClick={() => setSelectedProductId(product.id)} type="button"><span /><strong>{product.productName}</strong><small>{product.productStage} · AI 解读</small></button>)}
+        {products.map((product) => {
+          const isActiveProduct = product.id === selectedProduct.id;
+          const isSelectedForDeletion = selectedDeleteIds.includes(product.id);
+          return <button className={`${isActiveProduct ? "active" : ""} ${isSelectedForDeletion ? "delete-selected" : ""}`.trim()} key={product.id} onClick={() => handleProductSelect(product.id)} type="button"><span className={deleteMode ? "delete-marker" : ""}>{deleteMode && isSelectedForDeletion ? "✓" : ""}</span><strong>{product.productName}</strong><small>{product.productStage} · AI 解读</small></button>;
+        })}
         <button className="primary full" onClick={() => onGo("addProduct")} type="button">添加产品</button>
-        <button className="danger full" type="button">删除产品</button>
+        <button className="danger full" onClick={handleDeleteProduct} type="button">{deleteMode ? "删除" : "删除产品"}</button>
       </aside>
       <section className="panel product-reading" data-testid="product-reading">
-        <h2>{selectedProduct.productName}</h2>
-        <p className="meta">阶段：{selectedProduct.productStage} | 目标用户：{selectedProduct.targetUsers} | 链接：{selectedProduct.productUrl || "未填写"}</p>
-        <div className="section"><h3>AI 产品解读</h3><p>{selectedProduct.analysis.summary}</p>{selectedProduct.correction ? <p className="ai-correction">用户修正：{selectedProduct.correction}</p> : null}<div className="inline-chat"><input onChange={(event) => setCorrectionDraft(event.target.value)} placeholder="告诉 AI 哪里理解错了..." value={correctionDraft} /><button onClick={updateUnderstanding} type="button">更新理解</button></div></div>
-        <div className="section"><h3>AI 追问</h3><ol>{selectedProduct.analysis.questions.slice(0, 3).map((question) => <li key={question}>{question}</li>)}</ol></div>
+        {editingProductId === selectedProduct.id && editProfile ? (
+          <div className="product-edit-form" data-testid="product-edit-form">
+            <div className="product-edit-head"><h2>编辑产品资料</h2><p className="meta">修改后会重新生成 AI 产品解读和追问。</p></div>
+            <div className="form-grid">
+              <label>产品名称<input onChange={(event) => updateEditProfile("productName", event.target.value)} value={editProfile.productName} /></label>
+              <label>产品链接<input onChange={(event) => updateEditProfile("productUrl", event.target.value)} placeholder="https://..." value={editProfile.productUrl} /></label>
+              <label>目标用户<input onChange={(event) => updateEditProfile("targetUsers", event.target.value)} value={editProfile.targetUsers} /></label>
+              <label>当前阶段<select onChange={(event) => updateEditProfile("productStage", event.target.value)} value={editProfile.productStage}><option>MVP 验证中</option><option>资料收集中</option><option>需求验证</option><option>方案设计</option></select></label>
+              <label className="wide">核心功能<input onChange={(event) => updateEditProfile("coreFeatures", event.target.value)} value={editProfile.coreFeatures} /></label>
+              <label className="wide">产品介绍<textarea onChange={(event) => updateEditProfile("productDescription", event.target.value)} value={editProfile.productDescription} /></label>
+            </div>
+            <div className="product-edit-actions"><button className="primary" onClick={saveEditedProduct} type="button">保存修改</button><button className="primary" onClick={cancelEditingProduct} type="button">取消修改</button></div>
+          </div>
+        ) : (
+          <>
+            <div className="product-reading-head"><div><h2>{selectedProduct.productName}</h2><p className="meta">阶段：{selectedProduct.productStage} | 目标用户：{selectedProduct.targetUsers} | 链接：{selectedProduct.productUrl || "未填写"}</p></div><button className="primary" onClick={startEditingProduct} type="button">编辑产品资料</button></div>
+            <div className="section"><h3>AI 产品解读</h3><p>{selectedProduct.analysis.summary}</p>{selectedProduct.correction ? <p className="ai-correction">用户修正：{selectedProduct.correction}</p> : null}<div className="inline-chat"><input onChange={(event) => setCorrectionDraft(event.target.value)} placeholder="告诉 AI 哪里理解错了..." value={correctionDraft} /><button onClick={updateUnderstanding} type="button">更新理解</button></div></div>
+            <div className="section"><h3>AI 追问</h3><ol>{selectedProduct.analysis.questions.slice(0, 3).map((question) => <li key={question}>{question}</li>)}</ol></div>
+          </>
+        )}
       </section>
       <aside className="panel product-maturity" data-testid="product-maturity">
         <h2>成熟度评估</h2><div className="score"><span>综合成熟度</span><strong>3.6 / 5</strong></div>
@@ -483,9 +595,55 @@ function AddProductPage({ onGo, onSave }: { onGo: (page: PageId) => void; onSave
     productStage: "MVP 验证中",
     productUrl: ""
   });
+  const [documentFileName, setDocumentFileName] = useState("");
+  const [sourceFileName, setSourceFileName] = useState("");
 
   function updateProfile(field: keyof ProductProfile, value: string) {
     setProfile((current) => ({ ...current, [field]: value }));
+  }
+
+  function extractLabeledValue(content: string, labels: string[]) {
+    for (const label of labels) {
+      const pattern = new RegExp(`${label}[：:]\\s*([^\\n]+)`);
+      const match = content.match(pattern);
+      if (match?.[1]?.trim()) {
+        return match[1].trim();
+      }
+    }
+    return "";
+  }
+
+  async function readUploadedText(file: File | undefined) {
+    if (!file) {
+      return "";
+    }
+    return file.text();
+  }
+
+  async function handleProductDocumentUpload(file: File | undefined) {
+    const content = await readUploadedText(file);
+    if (!file || !content.trim()) {
+      return;
+    }
+    setDocumentFileName(file.name);
+    setProfile((current) => ({
+      ...current,
+      productName: extractLabeledValue(content, ["产品名称", "名称"]) || current.productName,
+      targetUsers: extractLabeledValue(content, ["目标用户", "用户"]) || current.targetUsers,
+      productDescription: extractLabeledValue(content, ["产品介绍", "介绍", "产品描述"]) || content.trim().slice(0, 220)
+    }));
+  }
+
+  async function handleSourceUpload(file: File | undefined) {
+    const content = await readUploadedText(file);
+    if (!file || !content.trim()) {
+      return;
+    }
+    setSourceFileName(file.name);
+    setProfile((current) => ({
+      ...current,
+      coreFeatures: extractLabeledValue(content, ["核心功能", "功能模块", "功能"]) || current.coreFeatures
+    }));
   }
 
   function save() {
@@ -494,8 +652,51 @@ function AddProductPage({ onGo, onSave }: { onGo: (page: PageId) => void; onSave
 
   return (
     <div className="add-layout">
-      <section className="panel"><h2>产品资料</h2><div className="upload-grid"><div><strong>上传产品文档</strong><span>已读取 2 个文件，可继续补充 PRD、介绍文案或调研记录。</span></div><div><strong>上传源代码</strong><span>等待上传，AI 可辅助理解功能结构与当前实现范围。</span></div></div><div className="form-grid"><label>产品名称<input onChange={(event) => updateProfile("productName", event.target.value)} value={profile.productName} /></label><label>产品链接<input onChange={(event) => updateProfile("productUrl", event.target.value)} placeholder="https://..." value={profile.productUrl} /></label><label>目标用户<input onChange={(event) => updateProfile("targetUsers", event.target.value)} value={profile.targetUsers} /></label><label>当前阶段<select onChange={(event) => updateProfile("productStage", event.target.value)} value={profile.productStage}><option>MVP 验证中</option><option>资料收集中</option><option>需求验证</option><option>方案设计</option></select></label><label className="wide">核心功能<input onChange={(event) => updateProfile("coreFeatures", event.target.value)} value={profile.coreFeatures} /></label><label className="wide">产品介绍<textarea onChange={(event) => updateProfile("productDescription", event.target.value)} value={profile.productDescription} /></label></div></section>
-      <aside className="panel"><h2>AI 追问与澄清</h2><div className="ai-card">我会先根据你填写的产品资料生成产品理解摘要，再追问真实用户、场景、价值和验证指标。</div><ol><li>最先服务的细分用户是谁？</li><li>用户现在为什么必须解决这个问题？</li><li>产品成功的衡量指标是什么？</li></ol><textarea placeholder="回答 AI 问题或修正理解..." /><button className="primary full" onClick={save} type="button">保存产品</button><button className="full" onClick={() => onGo("products")} type="button">取消</button></aside>
+      <section className="panel">
+        <h2>产品资料</h2>
+        <div className="upload-grid">
+          <label className="upload-card">
+            <strong>上传产品文档</strong>
+            <span>{documentFileName ? `已读取：${documentFileName}` : "支持 txt / md 文本资料，AI 会先预填写产品信息。"}</span>
+            <input
+              aria-label="上传产品文档"
+              accept=".txt,.md,.markdown,.json,.ts,.tsx,.js,.jsx"
+              onChange={(event) => handleProductDocumentUpload(event.target.files?.[0])}
+              type="file"
+            />
+          </label>
+          <label className="upload-card">
+            <strong>上传源代码</strong>
+            <span>{sourceFileName ? `已读取：${sourceFileName}` : "支持源代码文本，AI 会辅助理解核心功能结构。"}</span>
+            <input
+              aria-label="上传源代码"
+              accept=".txt,.md,.json,.ts,.tsx,.js,.jsx,.py,.java,.go,.rs"
+              onChange={(event) => handleSourceUpload(event.target.files?.[0])}
+              type="file"
+            />
+          </label>
+        </div>
+        <div className="form-grid">
+          <label>产品名称<input onChange={(event) => updateProfile("productName", event.target.value)} value={profile.productName} /></label>
+          <label>产品链接<input onChange={(event) => updateProfile("productUrl", event.target.value)} placeholder="https://..." value={profile.productUrl} /></label>
+          <label>目标用户<input onChange={(event) => updateProfile("targetUsers", event.target.value)} value={profile.targetUsers} /></label>
+          <label>当前阶段<select onChange={(event) => updateProfile("productStage", event.target.value)} value={profile.productStage}><option>MVP 验证中</option><option>资料收集中</option><option>需求验证</option><option>方案设计</option></select></label>
+          <label className="wide">核心功能<input onChange={(event) => updateProfile("coreFeatures", event.target.value)} value={profile.coreFeatures} /></label>
+          <label className="wide">产品介绍<textarea onChange={(event) => updateProfile("productDescription", event.target.value)} value={profile.productDescription} /></label>
+        </div>
+      </section>
+      <aside className="panel" data-testid="add-product-ai-clarification">
+        <h2>AI 追问与澄清</h2>
+        <div className="ai-card">
+          我会先根据你填写的产品资料生成产品理解摘要，再追问真实用户、场景、价值和验证指标。
+          {documentFileName ? <p>已读取产品文档：{documentFileName}</p> : null}
+          {sourceFileName ? <p>已读取源代码：{sourceFileName}</p> : null}
+        </div>
+        <ol><li>最先服务的细分用户是谁？</li><li>用户现在为什么必须解决这个问题？</li><li>产品成功的衡量指标是什么？</li></ol>
+        <textarea placeholder="回答 AI 问题或修正理解..." />
+        <button className="primary full" onClick={save} type="button">保存产品</button>
+        <button className="full" onClick={() => onGo("products")} type="button">取消</button>
+      </aside>
     </div>
   );
 }
@@ -584,6 +785,10 @@ function AbilityPage({ records }: { records: TrainingHistoryRecord[] }) {
     </div>
   );
 }
+
+
+
+
 
 
 
