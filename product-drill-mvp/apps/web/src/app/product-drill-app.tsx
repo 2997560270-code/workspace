@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createTrainingHistoryRecord, type TrainingHistoryRecord } from "../features/history/training-history";
 import { generateEvaluation, type Evaluation } from "../features/training/evaluation";
 import { addTrainingAnswer, createTrainingSession, sendTrainingMessage, type TrainingSession } from "../features/training/training-session";
@@ -115,12 +115,40 @@ export function ProductDrillApp() {
   const [products, setProducts] = useState<SavedProduct[]>(loadSavedProducts);
   const [selectedProductId, setSelectedProductId] = useState(() => loadSavedProducts()[0]?.id ?? "");
   const [resumeTrainingRecord, setResumeTrainingRecord] = useState<TrainingHistoryRecord | null>(null);
+  const [historySearch, setHistorySearch] = useState("");
+  const [showUsageGuide, setShowUsageGuide] = useState(false);
+  const usageGuideCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const copy = pageCopy[page];
+
+
+  function openUsageGuide() {
+    if (usageGuideCloseTimer.current) {
+      clearTimeout(usageGuideCloseTimer.current);
+      usageGuideCloseTimer.current = null;
+    }
+    setShowUsageGuide(true);
+  }
+
+  function closeUsageGuideSoon() {
+    if (usageGuideCloseTimer.current) {
+      clearTimeout(usageGuideCloseTimer.current);
+    }
+    usageGuideCloseTimer.current = setTimeout(() => setShowUsageGuide(false), 160);
+  }
+
+  function closeUsageGuide() {
+    if (usageGuideCloseTimer.current) {
+      clearTimeout(usageGuideCloseTimer.current);
+      usageGuideCloseTimer.current = null;
+    }
+    setShowUsageGuide(false);
+  }
 
   function go(next: PageId) {
     if (next !== "training") {
       setResumeTrainingRecord(null);
     }
+    closeUsageGuide();
     setPage(next);
   }
 
@@ -190,7 +218,7 @@ export function ProductDrillApp() {
   }
 
   return (
-    <div className="pd-shell" data-testid="app-shell">
+    <div className={`pd-shell ${showUsageGuide ? "usage-guide-open" : ""}`} data-testid="app-shell">
       <aside className="pd-sidebar" data-testid="side-nav" aria-label="Product Drill 主导航">
         <div className="pd-brand">
           <div className="pd-mark">PD</div>
@@ -214,8 +242,8 @@ export function ProductDrillApp() {
           ))}
         </nav>
         <div className="pd-sidebar-footer">
-          <button type="button"><span className="pd-nav-icon">?</span><span className="pd-nav-label">使用指南</span></button>
-          <button type="button"><span className="pd-nav-icon">‹</span><span className="pd-nav-label">收起提示</span></button>
+          <button onMouseEnter={openUsageGuide} onMouseLeave={closeUsageGuideSoon} type="button"><span className="pd-nav-icon">?</span><span className="pd-nav-label">使用指南</span></button>
+          <button onClick={closeUsageGuide} type="button"><span className="pd-nav-icon">‹</span><span className="pd-nav-label">收起提示</span></button>
         </div>
       </aside>
 
@@ -228,7 +256,7 @@ export function ProductDrillApp() {
           <div className="pd-top-actions" data-testid="top-actions">
             {page === "home" ? <span>已保存 14:32</span> : null}
             {page === "training" ? <><span>本轮 <b>04</b> / 07</span><button className="primary" type="button">结束并评估</button></> : null}
-            {page === "history" ? <input aria-label="搜索历史" placeholder="搜索场景、产品或关键词" /> : null}
+            {page === "history" ? <input aria-label="搜索历史" onChange={(event) => setHistorySearch(event.target.value)} placeholder="搜索场景、产品或关键词" value={historySearch} /> : null}
           </div>
         </header>
 
@@ -237,9 +265,25 @@ export function ProductDrillApp() {
           {page === "training" ? <TrainingPage onHistoryRecordCreated={addHistoryRecord} resumeRecord={resumeTrainingRecord} /> : null}
           {page === "products" ? <ProductsPage onDelete={deleteProducts} onGo={go} onCorrection={updateProductCorrection} onUpdate={updateProduct} products={products} selectedProductId={selectedProductId} setSelectedProductId={setSelectedProductId} /> : null}
           {page === "addProduct" ? <AddProductPage onGo={go} onSave={saveProduct} /> : null}
-          {page === "history" ? <HistoryPage onGo={go} onResumeTraining={resumeTraining} records={historyRecords} /> : null}
+          {page === "history" ? <HistoryPage onGo={go} onResumeTraining={resumeTraining} records={historyRecords} searchQuery={historySearch} /> : null}
           {page === "ability" ? <AbilityPage records={historyRecords} /> : null}
         </section>
+
+        {showUsageGuide ? (
+          <aside className="usage-guide-panel" data-testid="usage-guide-panel" aria-label="使用指南提示" onMouseEnter={openUsageGuide} onMouseLeave={closeUsageGuideSoon}>
+            <p className="eyebrow">使用指南</p>
+            <h2>三步使用 Product Drill</h2>
+            <ol>
+              <li><strong>选择训练设置</strong><span>确定行业、模式、难度和具体场景后开始对话。</span></li>
+              <li><strong>回答 AI 追问</strong><span>围绕真实用户、真实问题、指标和约束持续澄清。</span></li>
+              <li><strong>提交方案生成评估</strong><span>让 AI 输出评分、短板和下一步训练建议。</span></li>
+            </ol>
+            <div className="usage-guide-actions">
+              <button className="primary" onClick={() => go("training")} type="button">去训练</button>
+              <button className="primary" onClick={() => go("products")} type="button">分析产品</button>
+            </div>
+          </aside>
+        ) : null}
       </main>
     </div>
   );
@@ -700,21 +744,55 @@ function AddProductPage({ onGo, onSave }: { onGo: (page: PageId) => void; onSave
     </div>
   );
 }
-function HistoryPage({ onGo, onResumeTraining, records }: { onGo: (page: PageId) => void; onResumeTraining: (record: TrainingHistoryRecord) => void; records: TrainingHistoryRecord[] }) {
+function HistoryPage({ onGo, onResumeTraining, records, searchQuery }: { onGo: (page: PageId) => void; onResumeTraining: (record: TrainingHistoryRecord) => void; records: TrainingHistoryRecord[]; searchQuery: string }) {
   const [selectedId, setSelectedId] = useState(records[0]?.id ?? "sample-0");
   const [reportRecordId, setReportRecordId] = useState<string | null>(null);
-  const selectedRecord = records.find((record) => record.id === selectedId) ?? records[0];
+  const [activeFilter, setActiveFilter] = useState("全部");
+  const historyFilters = ["全部", "本周", "已评估", "待复盘", "高价值记录"];
+  const realRows = records.map((record) => ({
+    id: record.id,
+    time: "刚刚",
+    modeText: record.scenario + " / " + record.mode,
+    scoreText: record.totalScore + " 分",
+    scoreValue: record.totalScore,
+    title: record.title,
+    status: "已评估",
+    record
+  }));
+  const sampleRows = trainingRows.map((row, index) => ({
+    id: "sample-" + index,
+    time: "06-" + (16 - index) + " 14:32",
+    modeText: row[1],
+    scoreText: row[2],
+    scoreValue: Number.parseFloat(row[2]),
+    title: row[0],
+    status: row[3],
+    record: null as TrainingHistoryRecord | null
+  }));
+  const allRows = [...realRows, ...sampleRows];
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredRows = allRows.filter((row) => {
+    const matchesFilter = activeFilter === "全部" || activeFilter === "本周" || row.status === activeFilter || (activeFilter === "高价值记录" && row.scoreValue >= 4);
+    const rowText = (row.time + " " + row.modeText + " " + row.scoreText + " " + row.title + " " + row.status).toLowerCase();
+    const matchesSearch = !normalizedQuery || rowText.includes(normalizedQuery);
+    return matchesFilter && matchesSearch;
+  });
+  const selectedRow = filteredRows.find((row) => row.id === selectedId) ?? allRows.find((row) => row.id === selectedId) ?? filteredRows[0] ?? allRows[0];
+  const selectedRecord = selectedRow?.record ?? records.find((record) => record.id === selectedId) ?? null;
   const selectedIssues = selectedRecord?.evaluation.issues ?? ["需求定义较清楚", "价值论证不足", "缺少可验证指标"];
   const selectedMessages = selectedRecord?.messages.filter((message) => message.role === "user") ?? [];
-  const selectedTitle = selectedRecord?.title ?? "企业培训服务需求澄清";
-  const selectedScenario = selectedRecord?.scenario ?? "AI+ 企业培训";
-  const selectedMode = selectedRecord?.mode ?? "客户咨询";
-  const selectedScore = selectedRecord?.totalScore ?? 3.2;
-  const reviewedCount = records.length + trainingRows.filter((row) => row[3] === "已评估").length;
-  const pendingCount = trainingRows.filter((row) => row[3] === "待复盘").length;
+  const selectedTitle = selectedRecord?.title ?? selectedRow?.title ?? "企业培训服务需求澄清";
+  const selectedScenario = selectedRecord?.scenario ?? selectedRow?.modeText ?? "AI+ 企业培训";
+  const selectedMode = selectedRecord?.mode ?? selectedRow?.modeText?.split("/")[1]?.trim() ?? "客户咨询";
+  const selectedScore = selectedRecord?.totalScore ?? selectedRow?.scoreValue ?? 3.2;
 
   function selectRecord(recordId: string) {
     setSelectedId(recordId);
+    setReportRecordId(null);
+  }
+
+  function selectFilter(filter: string) {
+    setActiveFilter(filter);
     setReportRecordId(null);
   }
 
@@ -731,8 +809,8 @@ function HistoryPage({ onGo, onResumeTraining, records }: { onGo: (page: PageId)
     <div className="history-layout">
       <section className="panel history-record-panel">
         <div className="history-record-top"><h2>训练记录</h2><div className="history-inline-summary" data-testid="history-inline-summary"><div><strong>24</strong><span>完成训练</span></div><div><strong>6</strong><span>待复盘</span></div><div><strong>+6.4</strong><span>平均提升</span></div></div></div>
-        <div className="timeline-tools"><span className="active">全部</span><span>本周</span><span>已评估</span><span>待复盘</span><span>高价值记录</span></div>
-        <div className="record-list" data-testid="history-record-list"><div className="table-head"><span>时间</span><span>行业 / 模式</span><span>评分</span><span>主题</span><span>状态</span></div>{records.map((record) => <button className={record.id === selectedId ? "active" : ""} key={record.id} onClick={() => selectRecord(record.id)} type="button"><span>刚刚</span><strong>{record.title}</strong><span>{record.totalScore} 分</span><span>{record.scenario} 训练评估</span><em>已评估</em></button>)}{trainingRows.map((row, index) => <button className={!selectedRecord && selectedId === `sample-${index}` ? "active" : ""} key={row[0]} onClick={() => selectRecord(`sample-${index}`)} type="button"><span>06-{16 - index} 14:32</span><strong>{row[1]}</strong><span>{row[2]}</span><span>{row[0]}</span><em>{row[3]}</em></button>)}</div>
+        <div className="timeline-tools" data-testid="history-filter-tools">{historyFilters.map((filter) => <button className={activeFilter === filter ? "active" : ""} key={filter} onClick={() => selectFilter(filter)} type="button">{filter}</button>)}</div>
+        <div className="record-list" data-testid="history-record-list"><div className="table-head"><span>时间</span><span>行业 / 模式</span><span>评分</span><span>主题</span><span>状态</span></div>{filteredRows.length ? filteredRows.map((row) => <button className={row.id === selectedId ? "active" : ""} key={row.id} onClick={() => selectRecord(row.id)} type="button"><span>{row.time}</span><strong>{row.modeText}</strong><span>{row.scoreText}</span><span>{row.title}</span><em>{row.status}</em></button>) : <div className="empty-records">没有找到匹配的训练记录</div>}</div>
       </section>
       <aside className="panel" data-testid="history-review-panel"><h2>记录复盘</h2><div className="fact"><strong>{selectedTitle}</strong><p>场景：{selectedScenario} | 模式：{selectedMode} | 提交方案：已提交</p></div><div className="score"><span>本次表现</span><strong>{selectedScore} / 5</strong></div><div className="fact"><strong>关键对话</strong>{selectedMessages.length ? selectedMessages.map((message) => <p key={message.id}>{message.content}</p>) : <p>AI 追问了真实使用者、业务损失和验证指标。</p>}</div><div className="fact"><strong>AI 点评</strong><ul>{selectedIssues.map((issue) => <li key={issue}>{issue}</li>)}</ul></div>{reportRecordId === selectedId ? <div className="notice">复盘报告已生成：建议围绕“{selectedIssues[0]}”重新训练，并补充可验证指标。</div> : null}<div className="review-actions"><button className="primary retrain-action" onClick={handleResumeTraining} type="button">重新训练此场景</button><button onClick={() => setReportRecordId(selectedId)} type="button">生成复盘报告</button></div></aside>
     </div>
