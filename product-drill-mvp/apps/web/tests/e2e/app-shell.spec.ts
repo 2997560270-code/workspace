@@ -703,3 +703,76 @@ test("product detail meta uses Chinese colons instead of question marks", async 
   await expect(meta).not.toContainText("目标用户?");
   await expect(meta).not.toContainText("链接?");
 });
+
+test("module10 usage guide appears on hover and closes when pointer leaves", async ({ page }) => {
+  await page.goto("/");
+
+  const guideButton = page.getByRole("button", { name: "使用指南" });
+  await expect(page.getByTestId("usage-guide-panel")).toHaveCount(0);
+
+  await guideButton.hover();
+  await expect(page.getByTestId("usage-guide-panel")).toBeVisible();
+  await expect(page.getByTestId("usage-guide-panel")).toContainText("三步使用 Product Drill");
+  await expect(page.getByTestId("usage-guide-panel")).toContainText("选择训练设置");
+  await expect(page.getByTestId("usage-guide-panel")).toContainText("提交方案生成评估");
+
+  await page.getByTestId("usage-guide-panel").hover();
+  await expect(page.getByTestId("usage-guide-panel")).toBeVisible();
+  await expect(page.getByTestId("side-nav")).toHaveCSS("width", "232px");
+  await expect(page.getByTestId("side-nav").getByText("Product Drill")).toBeVisible();
+
+  await page.mouse.move(900, 120);
+  await expect(page.getByTestId("usage-guide-panel")).toHaveCount(0);
+});
+
+test("module10 hovered usage guide can jump to training and product pages", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "使用指南" }).hover();
+  await page.getByTestId("usage-guide-panel").hover();
+  await page.getByRole("button", { name: "去训练" }).click();
+  await expect(page.getByRole("heading", { name: "训练", exact: true })).toBeVisible();
+  await expect(page.getByTestId("usage-guide-panel")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "使用指南" }).hover();
+  await page.getByTestId("usage-guide-panel").hover();
+  await page.getByRole("button", { name: "分析产品" }).click();
+  await expect(page.getByRole("heading", { name: "产品", exact: true })).toBeVisible();
+  await expect(page.getByTestId("usage-guide-panel")).toHaveCount(0);
+});
+
+test("module11 history search filters records by keyword", async ({ page }) => {
+  await page.goto("/");
+  await page.getByTestId("nav-history").click();
+
+  await expect(page.getByTestId("history-record-list")).toContainText("门店库存损耗方案");
+  await page.getByLabel("搜索历史").fill("门店库存");
+
+  await expect(page.getByTestId("history-record-list")).toContainText("门店库存损耗方案");
+  await expect(page.getByTestId("history-record-list")).not.toContainText("企业培训服务需求澄清");
+});
+
+
+test("module11 history filter chips render as visible pill buttons", async ({ page }) => {
+  await page.goto("/");
+  await page.getByTestId("nav-history").click();
+
+  const pendingChip = page.getByRole("button", { name: "\u5f85\u590d\u76d8", exact: true });
+  await expect(pendingChip).toBeVisible();
+  await expect(pendingChip).toHaveCSS("border-radius", "999px");
+  const borderTopWidth = await pendingChip.evaluate((element) => Number.parseFloat(getComputedStyle(element).borderTopWidth));
+  expect(borderTopWidth).toBeGreaterThanOrEqual(1);
+});
+
+test("module11 history status chips filter records and update empty state", async ({ page }) => {
+  await page.goto("/");
+  await page.getByTestId("nav-history").click();
+
+  await page.getByRole("button", { name: "待复盘", exact: true }).click();
+  await expect(page.getByTestId("history-record-list")).toContainText("学习路径设计复盘");
+  await expect(page.getByTestId("history-record-list")).toContainText("自有产品定位澄清");
+  await expect(page.getByTestId("history-record-list")).not.toContainText("销售知识库价值验证");
+
+  await page.getByLabel("搜索历史").fill("不存在的记录");
+  await expect(page.getByTestId("history-record-list")).toContainText("没有找到匹配的训练记录");
+});

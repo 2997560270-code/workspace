@@ -20,11 +20,11 @@ textarea { min-height: 84px; resize: vertical; }
 
 .pd-shell { min-height: 100vh; display: grid; grid-template-columns: 73px 1fr; transition: grid-template-columns .22s ease; }
 .pd-sidebar { position: sticky; top: 0; height: 100vh; border-right: 1px solid var(--line); background: rgba(255,255,255,.92); backdrop-filter: blur(16px); padding: 18px 10px; display: flex; flex-direction: column; gap: 28px; overflow: hidden; transition: width .22s ease; }
-.pd-shell:has(.pd-sidebar:hover) { grid-template-columns: 232px 1fr; }
+.pd-shell:has(.pd-sidebar:hover), .pd-shell.usage-guide-open { grid-template-columns: 232px 1fr; }
 .pd-brand { display: flex; align-items: center; gap: 12px; min-width: 210px; }
 .pd-mark { width: 38px; height: 38px; display: grid; place-items: center; background: #020403; color: #fff; border-radius: 8px; font-weight: 800; letter-spacing: -.04em; flex: 0 0 auto; }
 .pd-brand-text, .pd-nav-label { opacity: 0; transform: translateX(-4px); transition: opacity .16s ease, transform .16s ease; white-space: nowrap; }
-.pd-sidebar:hover .pd-brand-text, .pd-sidebar:hover .pd-nav-label { opacity: 1; transform: translateX(0); }
+.pd-sidebar:hover .pd-brand-text, .pd-sidebar:hover .pd-nav-label, .pd-shell.usage-guide-open .pd-brand-text, .pd-shell.usage-guide-open .pd-nav-label { opacity: 1; transform: translateX(0); }
 .pd-brand-text strong { display: block; font-size: 16px; }
 .pd-brand-text span { color: var(--muted); font-size: 12px; }
 .pd-nav { display: grid; gap: 8px; }
@@ -75,7 +75,7 @@ textarea { min-height: 84px; resize: vertical; }
 .training-settings { max-height: calc(100vh - 152px); padding-bottom: 76px; }
 .training-settings label, .field { display: grid; gap: 8px; margin-bottom: 16px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.chips button, .timeline-tools span { border-radius: 999px; padding: 7px 12px; }
+.chips button, .timeline-tools button { border-radius: 999px; padding: 7px 12px; }
 .chips .active, .timeline-tools .active { background: #e7f4ef; border-color: #a7d2c2; color: var(--accent); font-weight: 700; }
 .scene-list { display: grid; gap: 8px; margin-bottom: 16px; }
 .scene-list button { text-align: left; display: grid; gap: 2px; }
@@ -119,7 +119,7 @@ textarea { min-height: 84px; resize: vertical; }
 .history-inline-summary strong { display: block; font-size: 28px; }
 .history-inline-summary span { color: var(--muted); }
 .timeline-tools { display: flex; gap: 8px; margin: 14px 0; }
-.timeline-tools span { border: 1px solid var(--line); }
+.timeline-tools button { border: 1px solid var(--line) !important; border-style: solid !important; background: #fff; min-height: 36px; }
 .record-list { max-height: calc(100vh - 350px); overflow: auto; border-top: 1px solid var(--line); }
 .table-head, .record-list button { width: 100%; display: grid; grid-template-columns: 120px 180px 90px 1fr 90px; gap: 14px; align-items: center; padding: 14px 18px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; text-align: left; }
 .table-head { color: var(--muted); font-weight: 700; }
@@ -728,3 +728,64 @@ textarea { min-height: 84px; resize: vertical; }
   border-color: #050707 !important;
   color: #ffffff !important;
 }
+
+/* Module10: sidebar usage guide panel */
+.usage-guide-panel {
+  position: fixed;
+  left: 260px;
+  bottom: 28px;
+  width: min(420px, calc(100vw - 124px));
+  z-index: 20;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .96);
+  box-shadow: 0 24px 70px rgba(8, 17, 13, .14);
+  backdrop-filter: blur(18px);
+}
+
+.usage-guide-panel h2 {
+  margin: 4px 0 16px;
+  font-size: 22px;
+  letter-spacing: -.04em;
+}
+
+.usage-guide-panel ol {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 12px;
+}
+
+.usage-guide-panel li strong,
+.usage-guide-panel li span {
+  display: block;
+}
+
+.usage-guide-panel li span {
+  margin-top: 3px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.usage-guide-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.usage-guide-actions button.primary {
+  background: #050707 !important;
+  border-color: #050707 !important;
+  color: #ffffff !important;
+}
+
+@media (max-width: 900px) {
+  .usage-guide-panel {
+    left: 86px;
+    right: 14px;
+    width: auto;
+    bottom: 18px;
+  }
+}
+
