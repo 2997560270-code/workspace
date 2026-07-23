@@ -12,7 +12,8 @@ Issues and PRDs for this repository live in GitHub Issues. Use the `gh` CLI for 
 - Remove a label: `gh issue edit <number> --remove-label "..."`
 - Close: `gh issue close <number> --comment "..."`
 
-Run commands inside this clone so `gh` infers the repository from `git remote`.
+Run `gh issue` commands with `--repo 2997560270-code/workspace` to target the upstream
+issue tracker. The fork (wu908/Product-Drill) has issues disabled.
 
 ## Pull requests as a request surface
 
@@ -20,5 +21,7 @@ PRs as a request surface: no.
 
 ## Skill operations
 
-- When a skill says "publish to the issue tracker", create a GitHub issue.
-- When a skill says "fetch the relevant ticket", run `gh issue view <number> --comments`.
+- When a skill says "publish to the issue tracker", create a GitHub issue:
+  `gh issue create --repo 2997560270-code/workspace --title "..." --body "..."`
+- When a skill says "fetch the relevant ticket":
+  `gh issue view <number> --repo 2997560270-code/workspace --comments`
