@@ -104,6 +104,11 @@ export const TrainingHistoryRecordSchema = z.object({
   retry: RetryResultSchema.optional()
 });
 
+export const StoredHistorySchema = z.object({
+  version: z.literal(1),
+  records: z.array(TrainingHistoryRecordSchema)
+});
+
 export const CreateSessionBodySchema = z.object({
   scenarioId: z.string().min(1),
   mode: TrainingModeSchema.optional()

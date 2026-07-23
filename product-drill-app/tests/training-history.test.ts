@@ -1,7 +1,13 @@
 ﻿import { describe, expect, it } from "vitest";
 import { generateEvaluation } from "../src/lib/evaluation";
+import { readFileSync } from "node:fs";
+import { StoredHistorySchema, TrainingHistoryRecordSchema } from "../src/lib/api/schemas";
 import { addRetryToHistory, createTrainingHistoryRecord } from "../src/lib/training-history";
 import { createTrainingSession, moveToJudgment, submitJudgment } from "../src/lib/training-session";
+
+const directionAHistoryV1 = JSON.parse(
+  readFileSync(new URL("./fixtures/direction-a-history-v1.json", import.meta.url), "utf8")
+) as unknown;
 
 function makeSession() {
   const session = moveToJudgment(createTrainingSession({ scenarioId: "dashboard-request", mode: "练习" }));
@@ -18,6 +24,38 @@ function makeSession() {
 }
 
 describe("training history", () => {
+  it("reads the fixed Direction A v1 history fixture", () => {
+    const result = StoredHistorySchema.safeParse(directionAHistoryV1);
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.records[0].scenarioId).toBe("dashboard-request");
+  });
+
+  it("keeps legacy retries without engine metadata readable", () => {
+    const history = StoredHistorySchema.parse(directionAHistoryV1);
+
+    expect(history.records[0].retry).toMatchObject({
+      issueId: "missing-workflow",
+      improved: true
+    });
+    expect(history.records[0].retry?.engine).toBeUndefined();
+    expect(history.records[0].retry?.modelVersion).toBeUndefined();
+  });
+
+  it("rejects unsupported cache wrapper versions", () => {
+    const history = StoredHistorySchema.parse(directionAHistoryV1);
+
+    expect(StoredHistorySchema.safeParse({ ...history, version: 2 }).success).toBe(false);
+  });
+
+  it("rejects incomplete history records", () => {
+    const history = StoredHistorySchema.parse(directionAHistoryV1);
+    const { scenarioVersion: _scenarioVersion, ...incompleteRecord } = history.records[0];
+
+    expect(TrainingHistoryRecordSchema.safeParse(incompleteRecord).success).toBe(false);
+  });
+
   it("stores evidence feedback and a retry result", () => {
     const session = makeSession();
     const evaluation = generateEvaluation(session);

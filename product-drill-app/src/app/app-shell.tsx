@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { ANALYTICS_EVENTS } from "../lib/analytics/events";
 import { trackClientEvent } from "../lib/analytics/client";
+import { StoredHistorySchema } from "../lib/api/schemas";
 import {
   createRemoteSession,
   fetchRemoteHistory,
@@ -835,8 +836,8 @@ export function AppShell({
     try {
       const raw = window.localStorage.getItem(storageKey);
       if (raw) {
-        const parsed = JSON.parse(raw) as { version: 1; records: TrainingHistoryRecord[] };
-        if (parsed.version === 1 && Array.isArray(parsed.records)) cachedRecords = parsed.records;
+        const parsed = StoredHistorySchema.safeParse(JSON.parse(raw));
+        if (parsed.success) cachedRecords = parsed.data.records;
       }
     } catch {
       cachedRecords = [];

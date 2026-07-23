@@ -1,6 +1,7 @@
 ﻿import { getScenario } from "../training-config";
 import { isFormalRetryImprovement, type TrainingHistoryRecord } from "../training-history";
 import type { TrainingSession } from "../training-session";
+import { TrainingHistoryRecordSchema } from "../api/schemas";
 import { createSupabaseAdminClient } from "../supabase/admin";
 
 export class SessionOwnershipError extends Error {
@@ -12,6 +13,11 @@ export class SessionOwnershipError extends Error {
 
 export function assertSessionOwner(existingOwnerId: string | null | undefined, requestedUserId: string): void {
   if (existingOwnerId && existingOwnerId !== requestedUserId) throw new SessionOwnershipError();
+}
+
+function parseHistorySnapshot(value: unknown): TrainingHistoryRecord | null {
+  const result = TrainingHistoryRecordSchema.safeParse(value);
+  return result.success ? result.data : null;
 }
 
 async function verifySessionOwner(
@@ -29,7 +35,10 @@ export async function getHistoryRecords(userId: string): Promise<TrainingHistory
   if (!admin) return [];
   const { data, error } = await admin.from("training_sessions").select("snapshot").eq("user_id", userId).not("completed_at", "is", null).order("completed_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []).map((row) => row.snapshot as TrainingHistoryRecord).filter(Boolean);
+  return (data ?? []).flatMap((row) => {
+    const record = parseHistorySnapshot(row.snapshot);
+    return record ? [record] : [];
+  });
 }
 
 export async function getSessionSnapshot(userId: string, sessionId: string): Promise<TrainingSession | null> {
@@ -45,7 +54,7 @@ export async function getHistoryRecord(userId: string, sessionId: string): Promi
   if (!admin) return null;
   const { data, error } = await admin.from("training_sessions").select("snapshot").eq("id", sessionId).eq("user_id", userId).not("completed_at", "is", null).maybeSingle();
   if (error) throw error;
-  return (data?.snapshot as TrainingHistoryRecord | null) ?? null;
+  return parseHistorySnapshot(data?.snapshot);
 }
 
 async function ensureScenarioVersion(scenarioId: string, scenarioVersion: number, rubricVersion: string) {
