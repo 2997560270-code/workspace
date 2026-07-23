@@ -1,70 +1,14 @@
-import { expect, test } from "@playwright/test";
+﻿import { expect, test } from "@playwright/test";
+import { enterApp, reachFeedback } from "./e2e-helpers";
 
-test("opens a completed training history detail", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "进入工作台" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "训练工作台" })).toBeVisible();
-
-  await page.getByRole("button", { name: "开始训练" }).click();
-  await page.getByPlaceholder("输入你的回复，Enter 发送").fill("我会先确认真实用户和业务指标。");
-  await page.getByRole("button", { name: "发送" }).click();
-  await page.getByRole("button", { name: "提交方案" }).click();
-
-  await page.getByRole("button", { name: "对话历史" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "对话历史" })).toBeVisible();
-  await expect(page.locator(".history-record")).toHaveCount(1);
-
-  await page.getByRole("button", { name: "查看详情" }).click();
-
-  await expect(page.getByText("历史详情")).toBeVisible();
-  await expect(page.getByText("训练已开始")).toBeVisible();
-  await expect(page.getByText("综合评分")).toBeVisible();
-});
-
-test("keeps the current typed answer when submitting before sending", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "进入工作台" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "训练工作台" })).toBeVisible();
-
-  await page.getByRole("button", { name: "开始训练" }).click();
-  await page.getByPlaceholder("输入你的回复，Enter 发送").fill("这是我还没单独发送的方案回答。");
-  await page.getByRole("button", { name: "提交方案" }).click();
-
-  await page.getByRole("button", { name: "对话历史" }).click();
-  await page.getByRole("button", { name: "查看详情" }).click();
-
-  await expect(page.getByText("这是我还没单独发送的方案回答。")).toBeVisible();
-});
-
-test("opens history from the conversation record button", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "进入工作台" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "训练工作台" })).toBeVisible();
-
-  await page.getByRole("button", { name: "开始训练" }).click();
-  await page.getByPlaceholder("输入你的回复，Enter 发送").fill("从对话记录按钮进入历史也要看到我。");
-  await page.getByRole("button", { name: "发送" }).click();
-  await page.getByRole("button", { name: "提交方案" }).click();
-  await page.getByRole("button", { name: "查看对话记录" }).click();
-
-  await expect(page.getByRole("heading", { level: 1, name: "对话历史" })).toBeVisible();
-  await page.getByRole("button", { name: "查看详情" }).click();
-  await expect(page.locator(".bubble.user", { hasText: "从对话记录按钮进入历史也要看到我。" })).toBeVisible();
-});
-
-test("switching scenario updates the active session and history record", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "进入工作台" }).click();
-
-  await page.getByRole("button", { name: "开始训练" }).click();
-  await page.getByLabel("行业场景").selectOption("B2B");
-  await expect(page.locator(".bubble.ai", {
-    hasText: "当前行业场景已经切换到B2B，模式用户需求提出，难度标准"
-  })).toBeVisible();
-
-  await page.getByPlaceholder("输入你的回复，Enter 发送").fill("切换场景后提交的方案应该归到 B2B。");
-  await page.getByRole("button", { name: "提交方案" }).click();
-  await page.getByRole("button", { name: "对话历史" }).click();
-
-  await expect(page.locator(".history-record").first()).toContainText("B2B");
+test("records a successful local retry in review", async ({ page }) => {
+  await enterApp(page);
+  await reachFeedback(page);
+  await page.getByRole("button", { name: "开始 2 分钟复练", exact: true }).click();
+  await page.getByRole("textbox", { name: "只提出一个更好的问题", exact: true }).fill("你们目前的完整流程是怎么完成的？");
+  await page.getByRole("button", { name: "提交复练", exact: true }).click();
+  await expect(page.getByText("已观察到改善", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "完成并返回今日训练", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "复盘与复练" })).toBeVisible();
+  await expect(page.locator(".status-tag", { hasText: "已改善" })).toBeVisible();
 });

@@ -1,23 +1,18 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 import { NAV_ITEMS, getViewMeta } from "../src/lib/navigation";
 
-describe("navigation metadata", () => {
-  it("defines the five MVP modules in order", () => {
+describe("direction A navigation metadata", () => {
+  it("defines the four focused modules in order", () => {
     expect(NAV_ITEMS.map((item) => item.label)).toEqual([
-      "工作台",
-      "我的产品",
-      "对话历史",
-      "能力画像",
-      "场景库"
+      "今日训练",
+      "训练地图",
+      "复盘与复练",
+      "我的能力"
     ]);
   });
 
-  it("returns title and description for every module", () => {
-    for (const item of NAV_ITEMS) {
-      const meta = getViewMeta(item.view);
-
-      expect(meta.title.length).toBeGreaterThan(0);
-      expect(meta.description.length).toBeGreaterThan(0);
-    }
+  it("describes the evidence-led today view", () => {
+    expect(getViewMeta("today").title).toContain("产品判断");
+    expect(getViewMeta("review").description).toContain("改善");
   });
 });

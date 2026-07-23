@@ -1,21 +1,24 @@
-import { describe, expect, it } from "vitest";
-import { DEFAULT_SCENARIO, INDUSTRY_SCENARIOS, TRAINING_MODES } from "../src/lib/training-config";
+﻿import { describe, expect, it } from "vitest";
+import {
+  DEFAULT_SCENARIO_ID,
+  SKILLS,
+  TRAINING_SCENARIOS,
+  getScenario
+} from "../src/lib/training-config";
 
-describe("training configuration", () => {
-  it("keeps the MVP scenario set small and ordered", () => {
-    expect(INDUSTRY_SCENARIOS.map((scenario) => scenario.name)).toEqual([
-      "B2B",
-      "AI+",
-      "企业员工培训"
-    ]);
+describe("direction A training configuration", () => {
+  it("ships six focused scenarios for the first training map", () => {
+    expect(TRAINING_SCENARIOS).toHaveLength(6);
+    expect(TRAINING_SCENARIOS.map((scenario) => scenario.id)).toContain("dashboard-request");
+    expect(TRAINING_SCENARIOS.every((scenario) => scenario.opening && scenario.hiddenFacts.workflow)).toBe(true);
   });
 
-  it("uses AI+ as the default scenario", () => {
-    expect(DEFAULT_SCENARIO).toBe("AI+");
+  it("uses the data dashboard request as the default diagnosis", () => {
+    expect(DEFAULT_SCENARIO_ID).toBe("dashboard-request");
+    expect(getScenario(DEFAULT_SCENARIO_ID).title).toContain("数据大屏");
   });
 
-  it("supports the two MVP training modes with clear descriptions", () => {
-    expect(TRAINING_MODES.map((mode) => mode.name)).toEqual(["用户需求提出", "客户咨询"]);
-    expect(TRAINING_MODES.every((mode) => mode.description.length > 0)).toBe(true);
+  it("defines the five evidence-based discovery skills", () => {
+    expect(SKILLS.map((skill) => skill.id)).toEqual(["role", "workflow", "impact", "alternative", "metric"]);
   });
 });
