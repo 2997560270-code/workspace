@@ -4,4 +4,9 @@ test-results/
 playwright-report/
 .env.local
 *.log
+*.tsbuildinfo
 .tools/
+.codegraph/
+.codex/
+.claude/
+.mcp.json

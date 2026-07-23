@@ -1,0 +1,16 @@
+{
+  "name": "product-drill-lifecycle",
+  "version": "0.1.0",
+  "description": "Project-specific product, scenario, evaluation, and release workflows for Product Drill direction A.",
+  "author": { "name": "Product Drill" },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Product Drill Lifecycle",
+    "shortDescription": "Direction A product and engineering guardrails.",
+    "longDescription": "Project-local workflows for Product Drill product context, scenario authoring, evaluation calibration, and release readiness.",
+    "developerName": "Product Drill",
+    "category": "Developer Tools",
+    "capabilities": [],
+    "defaultPrompt": "Use the Product Drill lifecycle rules to plan, build, evaluate, or release this product."
+  }
+}
