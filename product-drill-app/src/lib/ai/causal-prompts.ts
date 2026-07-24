@@ -1,4 +1,5 @@
 import type { CausalWorldVersion, WorldEvent, DecisionEvent } from "../causal-world";
+import type { BehaviorObservation } from "./causal-pipeline";
 
 // ── World Narrator prompt ─────────────────────────────────────────
 export function buildWorldNarratorPrompt(params: {
@@ -128,7 +129,9 @@ export function buildHypothesisUpdaterPrompt(params: {
   habitName: string;
   currentConfidence: string;
   currentTriggerConditions: string[];
-  behaviorObservation: { observations: Array<{ behavior_code: string; description: string; evidence_event_ids: string[]; dimension_covered: string }>; missing_dimensions: string[]; assisted: boolean; confidence: string };
+  // Fix: use the canonical exported type instead of an inline shape that
+  // omitted insufficient_reason and model_version, risking silent divergence.
+  behaviorObservation: BehaviorObservation;
   worldId: string;
   worldVersion: string;
   isTransferWorld: boolean;
@@ -145,6 +148,9 @@ export function buildHypothesisUpdaterPrompt(params: {
     "",
     "BEHAVIOR OBSERVATION (from Behavior Observer):",
     JSON.stringify(behaviorObservation, null, 2),
+    "",
+    // Fix (HIGH): explicitly surface assisted status so AI doesn't miss it in JSON
+    `ASSISTED: ${behaviorObservation.assisted} (if true, this decision had pre-decision hints and cannot be counted as independent evidence)`,
     "",
     `WORLD: ${worldId} (version ${worldVersion})`,
     `IS TRANSFER WORLD (novel, surface-dissimilar to training world): ${isTransferWorld}`,

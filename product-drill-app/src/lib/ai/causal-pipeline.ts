@@ -2,7 +2,6 @@ import { zodTextFormat } from "openai/helpers/zod";
 import { captureServerException } from "../monitoring/server";
 import { runtimeEnv } from "../env";
 import { getOpenAIClient } from "./client";
-import { isOpenAIConfigured } from "../env";
 import {
   BehaviorObservationSchema,
   HypothesisUpdateSchema,
@@ -42,7 +41,8 @@ function deterministicNarration(
   // 检查是否匹配任何揭示条件
   const newReveals: string[] = [];
   for (const cond of worldVersion.immutable_rules.reveal_conditions) {
-    if (userAction.includes(cond.trigger) || cond.trigger === "*") {
+    // Fix: empty-string trigger must not match every user action
+    if (cond.trigger === "*" || (cond.trigger.length > 0 && userAction.includes(cond.trigger))) {
       newReveals.push(...cond.reveals);
     }
   }
@@ -69,7 +69,8 @@ function deterministicNarration(
 // ── 确定性降级：Behavior Observer ────────────────────────────────
 function deterministicBehaviorObservation(
   decisionEvent: DecisionEvent,
-  eventHistory: WorldEvent[]
+  eventHistory: WorldEvent[],
+  wasAssisted: boolean  // Fix: accept wasAssisted so fallback honours hint status
 ): BehaviorObservation {
   // 简单判断：evidence_basis 是否引用了真实 event id
   const validIds = new Set(eventHistory.map((e) => e.id));
@@ -78,20 +79,22 @@ function deterministicBehaviorObservation(
   // 判断是否过早承诺：evidence_basis 为空 = 跳过三维度
   const isPremature = validBasis.length === 0;
 
+  // Fix: when isPremature, evidence_event_ids must be empty — do NOT fabricate
+  // world_event_id as a stand-in for a real investigation event.
   return {
     observations: isPremature
       ? [
           {
             behavior_code: "E-02",
             description: "[确定性演示] 决策时未引用任何调查事件证据，可能存在过早承诺。",
-            evidence_event_ids: validBasis.length > 0 ? validBasis : [decisionEvent.world_event_id],
+            evidence_event_ids: validBasis,  // empty when isPremature — intentional
             evidence_quotes: [],
             dimension_covered: "none",
           },
         ]
       : [],
     missing_dimensions: isPremature ? ["workflow", "consequence", "alternative"] : [],
-    assisted: false,
+    assisted: wasAssisted,  // Fix: propagate wasAssisted instead of hardcoding false
     confidence: isPremature ? "low" : "medium",
     insufficient_reason: isPremature ? "[确定性演示] 证据不足，无法输出能力结论。" : null,
     model_version: "deterministic-v1",
@@ -113,7 +116,18 @@ function deterministicHypothesisUpdate(
   return {
     habit_name: habitName,
     update_direction: direction,
-    updated_confidence: observation.confidence === "low" ? "insufficient" : "low",
+    // Fix (HIGH): confidence must reflect the direction, not be hardcoded 'low'.
+    // contradicts (all dims covered, medium obs confidence) → 'medium'
+    // supports (some dims missing, medium obs confidence) → 'low'
+    // insufficient → 'insufficient'
+    updated_confidence:
+      direction === "insufficient"
+        ? "insufficient"
+        : direction === "supports"
+        // Fix (CRITICAL): 'supports' = bad habit confirmed → confidence rises
+        ? "medium"
+        // Fix (CRITICAL): 'contradicts' = good behavior → confidence falls
+        : "low",
     rationale: "[确定性演示] 基于行为观察的简单推断，不用于正式评估。",
     referenced_evidence_ids: observation.observations.flatMap((o) => o.evidence_event_ids),
     applicable_trigger_conditions: [],
@@ -134,7 +148,9 @@ export async function narrateWorldResponse(params: {
   revealedFactIds: string[];
 }): Promise<WorldNarration> {
   const client = getOpenAIClient();
-  if (!client || !isOpenAIConfigured()) {
+  // Fix: !isOpenAIConfigured() is dead code — getOpenAIClient() returns null
+  // when not configured, so !client already covers that case.
+  if (!client) {
     return deterministicNarration(
       params.worldVersion,
       params.userAction,
@@ -159,9 +175,17 @@ export async function narrateWorldResponse(params: {
     );
     const safeRevealedIds = parsed.revealed_fact_ids.filter((id) => validFactIds.has(id));
 
+    // Fix: if all AI-supplied fact IDs were hallucinated and filtered out,
+    // state_changed must be false — a contradictory envelope (changed=true,
+    // reveals=[]) would corrupt the caller's revealed-facts accumulator.
+    const stateChanged = safeRevealedIds.length > 0 ? parsed.state_changed : false;
+    const stateChangeSummary = stateChanged ? parsed.state_change_summary : null;
+
     return {
       ...parsed,
       revealed_fact_ids: safeRevealedIds,
+      state_changed: stateChanged,
+      state_change_summary: stateChangeSummary,
       unofficial: false,
       model_version: `${runtimeEnv.roleplayModel}:${runtimeEnv.modelVersion}`,
     };
@@ -183,10 +207,12 @@ export async function observeBehavior(params: {
   wasAssisted: boolean;
 }): Promise<BehaviorObservation> {
   const client = getOpenAIClient();
-  if (!client || !isOpenAIConfigured()) {
+  if (!client) {
+    // Fix: pass wasAssisted so the fallback records hint status correctly
     return deterministicBehaviorObservation(
       params.decisionEvent,
-      params.eventHistory
+      params.eventHistory,
+      params.wasAssisted
     );
   }
 
@@ -209,15 +235,17 @@ export async function observeBehavior(params: {
 
     // 安全校验：evidence_event_ids 只能引用真实 event id
     const validIds = new Set(params.eventHistory.map((e) => e.id));
-    const safeObservations = parsed.observations.map((obs) => ({
-      ...obs,
-      evidence_event_ids: obs.evidence_event_ids.filter((id) => validIds.has(id)),
-    }));
+    // Fix: drop entire observation when all its IDs are hallucinated, rather
+    // than keeping it with an empty array that bypasses the min(1) contract.
+    const safeObservations = parsed.observations
+      .map((obs) => ({
+        ...obs,
+        evidence_event_ids: obs.evidence_event_ids.filter((id) => validIds.has(id)),
+      }))
+      .filter((obs) => obs.evidence_event_ids.length > 0);
 
-    // 若校验后 evidence_event_ids 为空，降为 low confidence
-    const hasValidEvidence = safeObservations.some(
-      (obs) => obs.evidence_event_ids.length > 0
-    );
+    // 若校验后无任何有效证据，降为 low confidence
+    const hasValidEvidence = safeObservations.length > 0;
     const confidence =
       !hasValidEvidence && parsed.confidence !== "low" ? "low" : parsed.confidence;
     const insufficientReason =
@@ -228,15 +256,21 @@ export async function observeBehavior(params: {
     return {
       ...parsed,
       observations: safeObservations,
+      // Fix (CRITICAL): always override assisted with the authoritative
+      // params.wasAssisted flag — the AI-returned value must never win,
+      // because the hint-used state is system-tracked, not model-inferred.
+      assisted: params.wasAssisted,
       confidence,
       insufficient_reason: insufficientReason,
       model_version: `${runtimeEnv.evaluationModel}:${runtimeEnv.modelVersion}`,
     };
   } catch (error) {
     captureServerException(error, { area: "behavior_observer" });
+    // Fix: pass wasAssisted to the fallback on error path as well
     return deterministicBehaviorObservation(
       params.decisionEvent,
-      params.eventHistory
+      params.eventHistory,
+      params.wasAssisted
     );
   }
 }
@@ -252,7 +286,7 @@ export async function updateHypothesis(params: {
   isTransferWorld: boolean;
 }): Promise<HypothesisUpdate> {
   const client = getOpenAIClient();
-  if (!client || !isOpenAIConfigured()) {
+  if (!client) {
     return deterministicHypothesisUpdate(
       params.habitName,
       params.behaviorObservation

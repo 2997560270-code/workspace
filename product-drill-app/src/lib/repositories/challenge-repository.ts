@@ -264,6 +264,22 @@ export async function getJudgmentProfile(
   return (data ?? []) as JudgmentHypothesis[];
 }
 
+/** 查询属于指定假设列表的所有证据记录 */
+export async function getHypothesisEvidenceForProfile(
+  hypothesisIds: string[]
+): Promise<HypothesisEvidence[]> {
+  if (hypothesisIds.length === 0) return [];
+  const admin = createSupabaseAdminClient();
+  if (!admin) return [];
+  const { data, error } = await admin
+    .from("hypothesis_evidence")
+    .select("*")
+    .in("hypothesis_id", hypothesisIds)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as HypothesisEvidence[];
+}
+
 export async function upsertHypothesisEvidence(
   evidence: HypothesisEvidence
 ): Promise<void> {

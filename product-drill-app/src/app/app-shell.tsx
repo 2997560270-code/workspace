@@ -1,6 +1,8 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { WorldWorkbench } from "./world-workbench";
+import { JudgmentProfilePanel } from "./judgment-profile-panel";
 import { ANALYTICS_EVENTS } from "../lib/analytics/events";
 import { trackClientEvent } from "../lib/analytics/client";
 import { StoredHistorySchema } from "../lib/api/schemas";
@@ -95,11 +97,13 @@ function RuntimeNotice({
 function TodayPanel({
   records,
   onStart,
-  onOpenReview
+  onOpenReview,
+  onStartWorkbench,
 }: {
   records: TrainingHistoryRecord[];
   onStart: (scenarioId: string, mode?: TrainingSession["mode"]) => void;
   onOpenReview: () => void;
+  onStartWorkbench: (worldId?: string) => void;
 }) {
   const profile = buildAbilityProfile(records);
   const recommended = records.length ? TRAINING_SCENARIOS[0] : TRAINING_SCENARIOS[2];
@@ -121,6 +125,9 @@ function TodayPanel({
           <div className="hero-actions">
             <button className="button button-light" onClick={() => onStart(recommended.id)} type="button">
               {records.length ? "开始今日训练" : "开始 3 分钟诊断"} <ArrowIcon />
+            </button>
+            <button className="button button-secondary" onClick={() => onStartWorkbench()} type="button">
+              进入世界工作台 <ArrowIcon />
             </button>
             <span>完成后获得逐句证据反馈</span>
           </div>
@@ -824,6 +831,8 @@ export function AppShell({
 }) {
   const [view, setView] = useState<ViewId>("today");
   const [activeTraining, setActiveTraining] = useState<{ scenarioId: string; mode: TrainingSession["mode"] } | null>(null);
+  // #4 世界工作台：null = 未激活，string = 目标 world_id
+  const [activeWorkbenchWorldId, setActiveWorkbenchWorldId] = useState<string | null>(null);
   const [historyRecords, setHistoryRecords] = useState<TrainingHistoryRecord[]>([]);
   const [storageReady, setStorageReady] = useState(false);
   const [historyStatus, setHistoryStatus] = useState<"loading" | "server" | "local">("loading");
@@ -890,8 +899,16 @@ export function AppShell({
     }
   }
 
-  const pageTitle = activeTraining ? getScenario(activeTraining.scenarioId).shortTitle : meta.title;
-  const pageDescription = activeTraining ? "一次只训练一个主要能力，先理解问题，再做判断。" : meta.description;
+  const pageTitle = activeWorkbenchWorldId
+    ? "世界工作台"
+    : activeTraining
+    ? getScenario(activeTraining.scenarioId).shortTitle
+    : meta.title;
+  const pageDescription = activeWorkbenchWorldId
+    ? "调查、承诺、揭示后果，围绕世界规则工作。"
+    : activeTraining
+    ? "一次只训练一个主要能力，先理解问题，再做判断。"
+    : meta.description;
   const completedThisWeek = useMemo(() => historyRecords.length, [historyRecords.length]);
   const sourceLabel = historyStatus === "loading" ? "正在同步" : historyStatus === "server" ? "服务端记录" : "本地缓存";
 
@@ -941,7 +958,18 @@ export function AppShell({
           </div>
         </header>
         <div className="content">
-          {activeTraining ? (
+          {activeWorkbenchWorldId !== null ? (
+            <WorldWorkbench
+              initialWorldId={activeWorkbenchWorldId}
+              onClose={() => {
+                setActiveWorkbenchWorldId(null);
+                setView("today");
+              }}
+              onRunComplete={() => {
+                // 未来：更新世界完成记录
+              }}
+            />
+          ) : activeTraining ? (
             <TrainingWorkspace
               initialMode={activeTraining.mode}
               onClose={() => {
@@ -956,15 +984,21 @@ export function AppShell({
             <TodayPanel
               onOpenReview={() => setView("review")}
               onStart={startTraining}
+              onStartWorkbench={(worldId) => setActiveWorkbenchWorldId(worldId ?? "world-1")}
               records={historyRecords}
             />
           ) : view === "map" ? (
             <TrainingMap onStart={startTraining} />
           ) : view === "review" ? (
             <ReviewPanel onStart={startTraining} records={historyRecords} />
-          ) : (
-            <AbilityPanel records={historyRecords} />
-          )}
+          ) : view === "ability" ? (
+            // #6 新链路：判断证据画像（替换旧 totalScore / 雷达图）
+            // 旧 AbilityPanel 保留供旧训练链路使用
+            <div className="ability-layout">
+              <JudgmentProfilePanel />
+              <AbilityPanel records={historyRecords} />
+            </div>
+          ) : null}
         </div>
       </section>
     </main>
