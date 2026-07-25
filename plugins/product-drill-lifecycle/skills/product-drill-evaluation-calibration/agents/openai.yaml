@@ -1,0 +1,4 @@
+interface:
+  display_name: "Product Drill Evaluation Calibration"
+  short_description: "Calibrate evidence-based AI evaluations"
+  default_prompt: "Calibrate Product Drill rubrics and golden evaluations."

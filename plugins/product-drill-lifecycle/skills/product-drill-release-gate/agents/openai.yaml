@@ -1,0 +1,4 @@
+interface:
+  display_name: "Product Drill Release Gate"
+  short_description: "Verify quality security analytics and rollback readiness"
+  default_prompt: "Run the Product Drill release readiness workflow."

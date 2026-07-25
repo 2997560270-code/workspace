@@ -78,9 +78,14 @@ test("demov2 workbench uses demo training conversation flow", async ({ page }) =
   await expect(page.getByRole("heading", { name: text.aiChat })).toBeVisible();
   await expect(page.getByRole("heading", { name: text.aiReview })).toHaveCount(0);
   await expect(page.locator(".v2-chat-list .v2-bubble")).toHaveCount(0);
+  await expect(page.locator(".v2-score.compact")).toContainText("60 / 100");
 
   await page.locator(".v2-settings-panel").getByRole("button", { name: text.startTraining }).click();
   await expect(page.locator(".v2-chat-list .v2-bubble")).toHaveCount(1);
+
+  await page.locator(".v2-settings-panel").getByRole("button", { name: "独立" }).click();
+  await expect(page.locator(".v2-chat-list .v2-bubble")).toHaveCount(0);
+  await page.locator(".v2-settings-panel").getByRole("button", { name: text.startTraining }).click();
 
   await page.getByPlaceholder(/\u8f93\u5165\u4f60\u7684\u56de\u590d/).fill(text.userBusiness);
   await page.getByRole("button", { name: text.send }).click();
@@ -89,6 +94,8 @@ test("demov2 workbench uses demo training conversation flow", async ({ page }) =
   await page.getByPlaceholder(/\u8f93\u5165\u4f60\u7684\u56de\u590d/).fill("\u8fd9\u662f\u6211\u7684\u89e3\u51b3\u65b9\u6848");
   await page.getByRole("button", { name: text.submitSolution }).click();
   await expect(page.getByRole("heading", { name: text.scoreHeading })).toBeVisible();
+  await expect(page.locator(".v2-score.compact")).toContainText("/ 100");
+  await expect(page.getByText("过早进入解决方案")).toBeVisible();
 });
 
 test("demov2 product page supports list, detail, add, and save flow", async ({ page }) => {

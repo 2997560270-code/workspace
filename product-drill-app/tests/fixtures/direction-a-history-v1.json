@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "records": [
+    {
+      "id": "history-direction-a-v1",
+      "sessionId": "session-direction-a-v1",
+      "scenarioId": "dashboard-request",
+      "scenarioVersion": 1,
+      "rubricVersion": "direction-a-v1",
+      "modelVersion": "deterministic-v1",
+      "engine": "deterministic",
+      "mode": "练习",
+      "completedAt": "2026-07-01T08:00:00.000Z",
+      "totalScore": 45,
+      "messages": [
+        {
+          "id": "msg-direction-a-opening",
+          "role": "ai",
+          "content": "我们现在看经营情况太麻烦了，能不能给我们做一个数据大屏？最好所有指标都放上去。",
+          "turnIndex": 0
+        },
+        {
+          "id": "msg-direction-a-question",
+          "role": "user",
+          "content": "现在区域运营每周是怎么完成报表汇总的？",
+          "turnIndex": 1,
+          "revealedSkill": "workflow"
+        }
+      ],
+      "judgment": {
+        "targetUser": "区域运营",
+        "currentWorkflow": "每周从多个系统导出并汇总报表",
+        "coreProblem": "不同数据源的口径不一致",
+        "problemImpact": "每周需要大量人工核对",
+        "alternative": "Excel 模板和 BI 免费版",
+        "recommendation": "先验证数据一致性问题",
+        "successMetric": "周报准备时间从六小时降到一小时",
+        "biggestAssumption": "数据一致性比图表展示更重要"
+      },
+      "evaluation": {
+        "id": "evaluation-direction-a-v1",
+        "totalScore": 45,
+        "summary": "已还原部分当前流程，仍需补充角色、影响、替代方案和成功指标证据。",
+        "dimensions": [
+          {
+            "id": "role",
+            "name": "用户与角色识别",
+            "score": 1,
+            "level": "在提示下体现",
+            "evidence": "本次对话中没有找到直接证据。",
+            "evidenceMessageIds": [],
+            "evidenceQuotes": [],
+            "confidence": 0.45,
+            "why": "区分使用者、决策者、付费者与问题承担者。",
+            "nextAction": "先问谁每天使用、谁做决定、谁承担结果。"
+          },
+          {
+            "id": "workflow",
+            "name": "场景与当前流程",
+            "score": 4,
+            "level": "稳定且深入",
+            "evidence": "“现在区域运营每周是怎么完成报表汇总的？”",
+            "evidenceMessageIds": ["msg-direction-a-question"],
+            "evidenceQuotes": ["现在区域运营每周是怎么完成报表汇总的？"],
+            "confidence": 0.9,
+            "why": "还原问题发生前后的真实步骤，而不是停留在需求表述。",
+            "nextAction": "请用户带你走一遍现在是怎么完成这件事的。"
+          },
+          {
+            "id": "impact",
+            "name": "问题影响与根因",
+            "score": 1,
+            "level": "在提示下体现",
+            "evidence": "本次对话中没有找到直接证据。",
+            "evidenceMessageIds": [],
+            "evidenceQuotes": [],
+            "confidence": 0.45,
+            "why": "确认问题频率、严重程度、业务影响和真正原因。",
+            "nextAction": "追问多久发生一次、不解决会造成什么后果。"
+          },
+          {
+            "id": "alternative",
+            "name": "现有替代方案",
+            "score": 1,
+            "level": "在提示下体现",
+            "evidence": "本次对话中没有找到直接证据。",
+            "evidenceMessageIds": [],
+            "evidenceQuotes": [],
+            "confidence": 0.45,
+            "why": "理解用户当前如何绕过问题，以及为什么仍然不满意。",
+            "nextAction": "不要假设用户什么都没做，先问现在用什么方法解决。"
+          },
+          {
+            "id": "metric",
+            "name": "成功指标",
+            "score": 2,
+            "level": "在提示下体现",
+            "evidence": "本次对话中没有找到直接证据。",
+            "evidenceMessageIds": [],
+            "evidenceQuotes": [],
+            "confidence": 0.45,
+            "why": "把模糊的更好转成能够验证的行为或业务结果。",
+            "nextAction": "问什么变化能证明问题真的被解决。"
+          }
+        ],
+        "issues": [
+          {
+            "id": "missing-workflow",
+            "title": "需要更完整地还原当前流程",
+            "description": "当前只确认了汇总动作，还缺少数据来源和人工核对步骤。",
+            "evidence": "“现在区域运营每周是怎么完成报表汇总的？”",
+            "nextAction": "继续确认数据从哪里来以及哪些步骤需要人工处理。",
+            "retryPrompt": "只提出一个问题，继续还原区域运营制作周报的当前流程。",
+            "targetSkill": "workflow"
+          }
+        ],
+        "strengths": ["能够从客户提出的功能回到当前工作流程。"],
+        "confidence": "低",
+        "engine": "deterministic",
+        "modelVersion": "deterministic-v1",
+        "rubricVersion": "direction-a-v1",
+        "scenarioVersion": 1
+      },
+      "retry": {
+        "issueId": "missing-workflow",
+        "targetSkill": "workflow",
+        "answer": "这些数据分别从哪些系统导出，合并后还需要人工核对哪些步骤？",
+        "improved": true,
+        "feedback": "复练问题补充了数据来源和人工核对步骤。"
+      }
+    }
+  ]
+}

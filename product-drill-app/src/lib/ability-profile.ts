@@ -1,61 +1,76 @@
-import { SCORE_DIMENSIONS } from "./evaluation";
-import type { TrainingHistoryRecord } from "./training-history";
+﻿import { SKILLS, type SkillId } from "./training-config";
+import { isFormalRetryImprovement, type TrainingHistoryRecord } from "./training-history";
+
+export type MasteryState = "尚未训练" | "已接触" | "在提示下完成" | "可独立完成" | "表现稳定";
+
+export type AbilitySkill = {
+  id: SkillId;
+  name: string;
+  state: MasteryState;
+  evidenceCount: number;
+  improvedCount: number;
+  latestEvidence: string;
+};
 
 export type AbilityProfile = {
-  averageScore: number;
   completedCount: number;
-  bestScore: number;
-  progress: number;
-  trend: { label: string; score: number }[];
-  dimensions: { name: string; score: number }[];
-  shortcomings: string[];
+  retryCount: number;
+  improvedCount: number;
+  weeklyTarget: number;
+  skills: AbilitySkill[];
+  primaryWeakness: string;
   nextTraining: string;
 };
 
-function toHundred(score: number): number {
-  return Math.round(score * 20);
-}
+export function buildAbilityProfile(
+  records: TrainingHistoryRecord[],
+  options: { formalEvidenceOnly?: boolean } = {}
+): AbilityProfile {
+  const retryImproved = (record: TrainingHistoryRecord, targetSkill?: SkillId) => options.formalEvidenceOnly
+    ? isFormalRetryImprovement(record.retry, targetSkill)
+    : Boolean(record.retry?.improved && (!targetSkill || record.retry.targetSkill === targetSkill));
 
-export function buildAbilityProfile(records: TrainingHistoryRecord[]): AbilityProfile {
-  if (records.length === 0) {
+  const skills = SKILLS.map((skill): AbilitySkill => {
+    const dimensions = records
+      .map((record) => ({
+        record,
+        dimension: record.evaluation.dimensions.find((dimension) => dimension.id === skill.id)
+      }))
+      .filter((item) => item.dimension && item.dimension.score > 0);
+    const evidenceCount = dimensions.length;
+    const independentCount = dimensions.filter((item) => (item.dimension?.score ?? 0) >= 3).length;
+    const improvedCount = records.filter((record) => retryImproved(record, skill.id)).length;
+
+    let state: MasteryState = "尚未训练";
+    if (evidenceCount >= 3 && independentCount >= 3) state = "表现稳定";
+    else if (independentCount >= 1) state = "可独立完成";
+    else if (evidenceCount >= 1) state = "在提示下完成";
+    else if (records.length > 0) state = "已接触";
+
     return {
-      averageScore: 0,
-      completedCount: 0,
-      bestScore: 0,
-      progress: 0,
-      trend: [],
-      dimensions: SCORE_DIMENSIONS.map((name) => ({ name, score: 0 })),
-      shortcomings: ["完成一次训练后生成高频短板"],
-      nextTraining: "完成一次训练后推荐下一步方向"
+      id: skill.id,
+      name: skill.name,
+      state,
+      evidenceCount,
+      improvedCount,
+      latestEvidence: dimensions[0]?.dimension?.evidence ?? "完成训练后生成可追溯证据"
     };
-  }
-
-  const chronological = [...records].reverse();
-  const averageScore = Math.round(
-    records.reduce((sum, record) => sum + toHundred(record.totalScore), 0) / records.length
-  );
-  const bestScore = Math.max(...records.map((record) => toHundred(record.totalScore)));
-  const progress = toHundred(chronological.at(-1)!.totalScore) - toHundred(chronological[0].totalScore);
-
-  const dimensions = SCORE_DIMENSIONS.map((name) => {
-    const scores = records
-      .map((record) => record.evaluation.dimensions.find((item) => item.name === name)?.score)
-      .filter((score): score is number => typeof score === "number");
-    const score = scores.length ? Math.round(scores.reduce((sum, item) => sum + toHundred(item), 0) / scores.length) : 0;
-    return { name, score };
   });
 
-  const shortcomings = [...new Set(records.flatMap((record) => record.evaluation.issues))].slice(0, 3);
-  const weakest = [...dimensions].sort((a, b) => a.score - b.score)[0]?.name ?? "问题澄清";
+  const weakest = [...skills].sort((a, b) => {
+    if (a.evidenceCount !== b.evidenceCount) return a.evidenceCount - b.evidenceCount;
+    return a.improvedCount - b.improvedCount;
+  })[0];
 
   return {
-    averageScore,
     completedCount: records.length,
-    bestScore,
-    progress,
-    trend: chronological.map((record, index) => ({ label: `第 ${index + 1} 次`, score: toHundred(record.totalScore) })),
-    dimensions,
-    shortcomings,
-    nextTraining: `下一轮建议训练 ${weakest}：选择客户咨询 / 严格，集中补足追问、指标和价值论证。`
+    retryCount: records.filter((record) => record.retry).length,
+    improvedCount: records.filter((record) => retryImproved(record)).length,
+    weeklyTarget: 5,
+    skills,
+    primaryWeakness: weakest?.name ?? "场景与当前流程",
+    nextTraining: weakest
+      ? `下一次优先训练“${weakest.name}”，并在独立模式下留下新的行为证据。`
+      : "完成一次训练后生成下一步建议。"
   };
 }

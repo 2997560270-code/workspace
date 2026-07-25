@@ -1,20 +1,19 @@
 "use client";
 
 import { useState, type KeyboardEvent } from "react";
+import { submitDemoJudgment } from "../lib/demo-training";
 import { generateEvaluation, type Evaluation } from "../lib/evaluation";
 import {
-  addTrainingAnswer,
-  changeTrainingScenario,
   createTrainingSession,
   sendTrainingMessage,
+  TRAINING_MODE_OPTIONS,
   type TrainingSession
 } from "../lib/training-session";
-import { DEFAULT_SCENARIO, INDUSTRY_SCENARIOS, TRAINING_MODES } from "../lib/training-config";
+import { DEFAULT_SCENARIO_ID, TRAINING_SCENARIOS } from "../lib/training-config";
 
 type View = "home" | "workbench" | "product" | "history" | "profile";
 
-const modeDescription = TRAINING_MODES.map((mode) => `${mode.name}：${mode.description}`).join(" ");
-const DIFFICULTIES = ["基础", "标准", "严格"];
+const modeDescription = "练习：提供轻提示。 独立：只回答问题。 严格：只回答问题。";
 
 const navItems: Array<{ id: View; label: string; icon: string }> = [
   { id: "home", label: "首页", icon: "首" },
@@ -56,7 +55,7 @@ const features = [
     desc: "提交方案后直接生成评估，并把表现沉淀到能力画像和下一步推荐训练。",
     tag: "复盘闭环",
     visualTitle: "评估结果 · 能力画像",
-    aiLine: "综合评分 3.5 / 5，需求理解较好，价值论证不足。",
+    aiLine: "综合评分 70 / 100，需求理解较好，价值论证不足。",
     userLine: "下一步重点训练：真实指标、预算约束、落地路径。",
     footer: "查看能力画像"
   }
@@ -326,7 +325,7 @@ function FeatureCardPreview({ feature }: { feature: (typeof features)[number] })
     return (
       <div className="v2-card-score-preview">
         <span>综合评分</span>
-        <strong>3.5 / 5</strong>
+        <strong>70 / 100</strong>
       </div>
     );
   }
@@ -363,19 +362,27 @@ function WorkbenchView() {
   const [demoSession, setDemoSession] = useState<TrainingSession | null>(null);
   const [demoEvaluation, setDemoEvaluation] = useState<Evaluation | null>(null);
   const [demoReply, setDemoReply] = useState("");
-  const [demoScenario, setDemoScenario] = useState(DEFAULT_SCENARIO);
+  const [demoScenarioId, setDemoScenarioId] = useState(DEFAULT_SCENARIO_ID);
   const [demoNotice, setDemoNotice] = useState("");
-  const [demoMode, setDemoMode] = useState(TRAINING_MODES[0].name);
-  const [demoDifficulty, setDemoDifficulty] = useState("标准");
+  const [demoMode, setDemoMode] = useState<TrainingSession["mode"]>("练习");
 
-  function changeDemoScenario(nextScenario: string) {
-    setDemoScenario(nextScenario);
-    setDemoNotice(`行业场景已切换为 ${nextScenario}，可以继续在当前对话框交流。`);
-    setDemoSession((current) => current ? changeTrainingScenario(current, nextScenario, demoMode, demoDifficulty) : current);
+  function changeDemoScenario(nextScenarioId: string) {
+    const nextScenario = TRAINING_SCENARIOS.find((scenario) => scenario.id === nextScenarioId) ?? TRAINING_SCENARIOS[0];
+    setDemoScenarioId(nextScenario.id);
+    setDemoNotice(`行业场景已切换为 ${nextScenario.shortTitle}，请重新开始训练。`);
+    setDemoSession(null);
+    setDemoEvaluation(null);
   }
 
   function startDemoTraining() {
-    setDemoSession(createTrainingSession({ scenario: demoScenario, mode: demoMode, difficulty: demoDifficulty }));
+    setDemoSession(createTrainingSession({ scenarioId: demoScenarioId, mode: demoMode }));
+    setDemoEvaluation(null);
+    setDemoReply("");
+  }
+
+  function changeDemoMode(nextMode: TrainingSession["mode"]) {
+    setDemoMode(nextMode);
+    setDemoSession(null);
     setDemoEvaluation(null);
     setDemoReply("");
   }
@@ -402,7 +409,7 @@ function WorkbenchView() {
       return;
     }
 
-    const finalSession = demoReply.trim() ? addTrainingAnswer(demoSession, demoReply) : demoSession;
+    const finalSession = submitDemoJudgment(demoSession, demoReply);
     const nextEvaluation = generateEvaluation(finalSession);
     setDemoSession(finalSession);
     setDemoEvaluation(nextEvaluation);
@@ -414,9 +421,9 @@ function WorkbenchView() {
       <section className="v2-section v2-settings-panel">
         <h2>场景设置</h2>
         <label>行业场景
-          <select onChange={(event) => changeDemoScenario(event.target.value)} value={demoScenario}>
-            {INDUSTRY_SCENARIOS.map((scenario) => (
-              <option key={scenario.name}>{scenario.name}</option>
+          <select onChange={(event) => changeDemoScenario(event.target.value)} value={demoScenarioId}>
+            {TRAINING_SCENARIOS.map((scenario) => (
+              <option key={scenario.id} value={scenario.id}>{scenario.shortTitle}</option>
             ))}
           </select>
         </label>
@@ -424,29 +431,12 @@ function WorkbenchView() {
         <div className="v2-field">
           <span>训练模式</span>
           <div className="v2-segmented">
-            {TRAINING_MODES.map((item) => (
+            {TRAINING_MODE_OPTIONS.map((item) => (
               <button
-                aria-pressed={item.name === demoMode}
-                className={item.name === demoMode ? "selected" : ""}
-                key={item.name}
-                onClick={() => setDemoMode(item.name)}
-                type="button"
-              >
-                {item.name}
-              </button>
-            ))}
-          </div>
-        </div>
-        <p className="v2-muted">{modeDescription}</p>
-        <div className="v2-field">
-          <span>难度级别</span>
-          <div className="v2-segmented">
-            {DIFFICULTIES.map((item) => (
-              <button
-                aria-pressed={item === demoDifficulty}
-                className={item === demoDifficulty ? "selected" : ""}
+                aria-pressed={item === demoMode}
+                className={item === demoMode ? "selected" : ""}
                 key={item}
-                onClick={() => setDemoDifficulty(item)}
+                onClick={() => changeDemoMode(item)}
                 type="button"
               >
                 {item}
@@ -454,6 +444,8 @@ function WorkbenchView() {
             ))}
           </div>
         </div>
+        <p className="v2-muted">{modeDescription}</p>
+        <p className="v2-muted">难度级别：{TRAINING_SCENARIOS.find((scenario) => scenario.id === demoScenarioId)?.difficulty}</p>
         <button className="v2-primary" onClick={startDemoTraining} type="button">开始训练</button>
       </section>
 
@@ -490,7 +482,7 @@ function WorkbenchView() {
         {demoEvaluation ? (
           <div>
             <h3>综合评分</h3>
-            <div className="v2-score compact">{demoEvaluation.totalScore} / 5.0</div>
+            <div className="v2-score compact">{demoEvaluation.totalScore} / 100</div>
             <h3>维度评分</h3>
             {demoEvaluation.dimensions.map((dimension) => (
               <div className="v2-score-row" key={dimension.name}>
@@ -499,12 +491,12 @@ function WorkbenchView() {
               </div>
             ))}
             <h3>具体问题</h3>
-            <ul>{demoEvaluation.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul>
+            <ul>{demoEvaluation.issues.map((issue) => <li key={issue.id}>{issue.title}</li>)}</ul>
           </div>
         ) : (
           <>
             <h3>当前评分预览</h3>
-            <div className="v2-score compact">3.0 / 5.0</div>
+            <div className="v2-score compact">60 / 100</div>
           </>
         )}
       </section>
@@ -696,9 +688,9 @@ function HistoryView() {
       <h2>对话历史</h2>
       <div className="v2-table">
         {[
-          ["AI+ 服务训练", "用户需求提出", "3.5 / 5"],
-          ["企业培训方案", "客户咨询", "4.0 / 5"],
-          ["自有产品分析", "产品深挖", "3.8 / 5"]
+          ["AI+ 服务训练", "用户需求提出", "70 / 100"],
+          ["企业培训方案", "客户咨询", "80 / 100"],
+          ["自有产品分析", "产品深挖", "76 / 100"]
         ].map(([title, mode, score]) => (
           <div key={title}>
             <strong>{title}</strong>

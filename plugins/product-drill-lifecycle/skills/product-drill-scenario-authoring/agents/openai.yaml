@@ -1,0 +1,4 @@
+interface:
+  display_name: "Product Drill Scenario Authoring"
+  short_description: "Author and validate deep training scenarios"
+  default_prompt: "Create or review a Product Drill training scenario."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Product Drill Product Context"
+  short_description: "Direction A product guardrails and success metrics"
+  default_prompt: "Use Product Drill direction A context to guide this task."

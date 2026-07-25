@@ -1,0 +1,774 @@
+"use client";
+
+/**
+ * world-workbench.tsx — 世界工作台主组件
+ *
+ * 阶段：investigate → commit → reveal → reflect
+ *
+ * 设计约束（Issue #4）：
+ * - 不依赖固定 TrainingStage 控制新主链路
+ * - 后果揭示前必须完成 decision event
+ * - 提示状态（辅助）和独立状态对用户可辨认
+ * - 复用 globals.css 设计系统，不引入无关 UI 重写
+ */
+
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import {
+  createWorkbenchState,
+  commitToDecisionPhase,
+  recordHintUsed,
+  recordDecisionSubmitted,
+  advanceToReveal,
+  advanceToReflect,
+  canRevealConsequences,
+  buildDecisionPayload,
+  type WorkbenchState,
+  type DecisionDraft,
+} from "../lib/workbench-state";
+import {
+  createChallengeRun,
+  appendAction,
+  submitDecision,
+  revealConsequences,
+  recordIntervention,
+} from "../lib/challenge-client";
+import { buildInterventionContent } from "../lib/intervention-generator";
+import { DEMO_WORLDS, getDemoWorld, type WorldSeed } from "../lib/world-seeds";
+import { trackClientEvent } from "../lib/analytics/client";
+import {
+  CAUSAL_EVENTS,
+  buildChallengeStartedProps,
+  buildInvestigationActionProps,
+  buildDecisionCommittedProps,
+  buildConsequenceRevealedProps,
+  buildInterventionReceivedProps,
+  buildTransferEvidenceProps,
+} from "../lib/causal-analytics";
+
+// ── 类型 ──────────────────────────────────────────────────────────
+
+type Message = {
+  id: string;
+  role: "user" | "world";
+  content: string;
+  event_id?: string;
+};
+
+type WorkbenchProps = {
+  /** 初始世界 id，若不传则由工作台自行按选择规则决定 */
+  initialWorldId?: string;
+  onClose: () => void;
+  /** run 完成后回调，用于更新父组件状态 */
+  onRunComplete?: (worldId: string) => void;
+};
+
+// ── 工具函数 ──────────────────────────────────────────────────────
+
+let _msgId = 0;
+function nextMsgId() { return `msg-${++_msgId}`; }
+
+function worldMessage(content: string, eventId?: string): Message {
+  return { id: nextMsgId(), role: "world", content, event_id: eventId };
+}
+
+function userMessage(content: string, eventId?: string): Message {
+  return { id: nextMsgId(), role: "user", content, event_id: eventId };
+}
+
+// ── 子组件：阶段标签 ──────────────────────────────────────────────
+
+function PhaseTag({
+  phase,
+  wasAssisted,
+}: {
+  phase: WorkbenchState["phase"];
+  wasAssisted: boolean;
+}) {
+  const labels: Record<WorkbenchState["phase"], string> = {
+    investigate: "调查中",
+    commit:      "决策承诺",
+    reveal:      "后果揭示",
+    reflect:     "反思",
+  };
+  return (
+    <span className="wb-phase-tag">
+      {labels[phase]}
+      {wasAssisted && (
+        <span className="wb-assisted-badge" title="本次决策前使用了提示，证据将标记为辅助">
+          提示辅助
+        </span>
+      )}
+    </span>
+  );
+}
+
+// ── 子组件：决策表单 ──────────────────────────────────────────────
+
+function DecisionForm({
+  draft,
+  onChange,
+  onSubmit,
+  busy,
+  eventIds,
+}: {
+  draft: DecisionDraft;
+  onChange: (d: DecisionDraft) => void;
+  onSubmit: () => void;
+  busy: boolean;
+  eventIds: string[];
+}) {
+  const isValid = buildDecisionPayload(draft) !== null;
+
+  function field(
+    label: string,
+    key: keyof DecisionDraft,
+    placeholder: string,
+    rows = 2
+  ) {
+    const value = draft[key];
+    return (
+      <div className="wb-field">
+        <label htmlFor={`wb-${key}`}>{label}</label>
+        <textarea
+          disabled={busy}
+          id={`wb-${key}`}
+          onChange={(e) => onChange({ ...draft, [key]: e.target.value })}
+          placeholder={placeholder}
+          rows={rows}
+          value={typeof value === "string" ? value : ""}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="wb-decision-form surface">
+      <span className="section-kicker">决策承诺（后果揭示前必须完成）</span>
+      <p className="wb-form-notice">
+        在这里写下你的判断和行动方案。提交后才会揭示世界的实际后果，不可撤回。
+      </p>
+
+      {field("你的判断（问题是什么）", "judgment", "例如：真正的问题是数据编码不一致，而不是缺少展示工具", 3)}
+      {field("你的行动方案", "chosen_action", "例如：建议先统一数据编码，再评估大屏必要性", 2)}
+      {field("预期结果", "expected_outcome", "例如：数据整理时间从每周6小时缩短到1小时以内", 2)}
+
+      <div className="wb-field">
+        <label htmlFor="wb-confidence">置信度</label>
+        <select
+          disabled={busy}
+          id="wb-confidence"
+          onChange={(e) =>
+            onChange({ ...draft, confidence: e.target.value as DecisionDraft["confidence"] })
+          }
+          value={draft.confidence}
+        >
+          <option value="high">高 — 证据充分，我很确定</option>
+          <option value="medium">中 — 有一定证据但仍有不确定性</option>
+          <option value="low">低 — 信息不足，这是我的最优猜测</option>
+        </select>
+      </div>
+
+      <div className="wb-field">
+        <label htmlFor="wb-rejected">放弃的方案（可选，多行分隔）</label>
+        <textarea
+          disabled={busy}
+          id="wb-rejected"
+          onChange={(e) =>
+            onChange({
+              ...draft,
+              rejected_alternatives: e.target.value
+                .split("\n")
+                .map((s) => s.trim())
+                .filter(Boolean),
+            })
+          }
+          placeholder="例如：直接建大屏&#10;全面重构系统"
+          rows={2}
+          value={draft.rejected_alternatives.join("\n")}
+        />
+      </div>
+
+      <div className="wb-field">
+        <label>引用的调查事件（{eventIds.length} 个可用）</label>
+        <div className="wb-evidence-checkboxes">
+          {eventIds.length === 0 ? (
+            <span className="wb-no-evidence">尚无调查事件可引用</span>
+          ) : (
+            eventIds.map((eid) => (
+              <label className="wb-evidence-check" key={eid}>
+                <input
+                  checked={draft.evidence_basis.includes(eid)}
+                  disabled={busy}
+                  onChange={(e) =>
+                    onChange({
+                      ...draft,
+                      evidence_basis: e.target.checked
+                        ? [...draft.evidence_basis, eid]
+                        : draft.evidence_basis.filter((id) => id !== eid),
+                    })
+                  }
+                  type="checkbox"
+                />
+                <span>{eid.slice(0, 16)}…</span>
+              </label>
+            ))
+          )}
+        </div>
+      </div>
+
+      <button
+        className="button button-primary"
+        disabled={busy || !isValid}
+        onClick={onSubmit}
+        type="button"
+      >
+        {busy ? "提交中…" : "提交决策（不可撤回）"}
+      </button>
+    </div>
+  );
+}
+
+// ── 主组件 ────────────────────────────────────────────────────────
+
+const EMPTY_DRAFT: DecisionDraft = {
+  judgment: "",
+  chosen_action: "",
+  expected_outcome: "",
+  confidence: "medium",
+  rejected_alternatives: [],
+  evidence_basis: [],
+};
+
+export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: WorkbenchProps) {
+  const [world, setWorld] = useState<WorldSeed | null>(null);
+  const [state, setState] = useState<WorkbenchState | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [draft, setDraft] = useState<DecisionDraft>(EMPTY_DRAFT);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [revealContent, setRevealContent] = useState("");
+  const [reflectContent, setReflectContent] = useState("");
+  const [userEventIds, setUserEventIds] = useState<string[]>([]);
+  const [seqIndex, setSeqIndex] = useState(0);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  // 选择起始世界
+  useEffect(() => {
+    const seed = initialWorldId
+      ? getDemoWorld(initialWorldId)
+      : DEMO_WORLDS.find((w) => w.transfer_role === "calibration");
+    if (!seed) return;
+    setWorld(seed);
+
+    const initial = createWorkbenchState(seed.world_id, seed.version.version);
+    setState(initial);
+    setMessages([
+      worldMessage(seed.version.trigger_statement),
+    ]);
+  }, [initialWorldId]);
+
+  // 自动滚动到底部
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // ── 初始化 run ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!world || !state || state.run_id) return;
+    let cancelled = false;
+    setBusy(true);
+    createChallengeRun(world.world_id, world.version.version)
+      .then((run) => {
+        if (cancelled) return;
+        setState((prev) => prev ? { ...prev, run_id: run.id } : prev);
+        // #3 analytics: challenge_started
+        trackClientEvent(
+          world.version.transfer_role === "transfer_test"
+            ? CAUSAL_EVENTS.transferChallengeStarted
+            : CAUSAL_EVENTS.challengeStarted,
+          buildChallengeStartedProps({
+            worldId: world.world_id,
+            worldVersion: world.version.version,
+            transferRole: world.version.transfer_role,
+            runId: run.id,
+          })
+        );
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // demo mode: use a fake run id
+        setState((prev) => prev ? { ...prev, run_id: `demo-run-${Date.now()}` } : prev);
+      })
+      .finally(() => { if (!cancelled) setBusy(false); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [world?.world_id]);
+
+  // ── 发送调查动作 ────────────────────────────────────────────────
+  async function sendAction() {
+    const content = input.trim();
+    if (!content || busy || !state?.run_id || !world) return;
+    setInput("");
+    setBusy(true);
+    setError("");
+
+    const userIdx = seqIndex;
+    // Fix (MEDIUM): increment by 1 per event — the world-response slot is
+    // submitted by the server, not reserved client-side.
+    setSeqIndex((n) => n + 1);
+
+    // 乐观更新：先加用户消息
+    const tmpUserId = nextMsgId();
+    setMessages((prev) => [...prev, { id: tmpUserId, role: "user", content }]);
+
+    try {
+      const result = await appendAction(state.run_id, {
+        sequence_index: userIdx,
+        actor: "user",
+        event_type: "user_action",
+        payload: { text: content },
+      });
+
+      // 记录 user event id（供决策引用）
+      setUserEventIds((prev) => {
+        const next = [...prev, result.event_id];
+        // #3 analytics: investigation_action_committed
+        if (world && state) {
+          trackClientEvent(CAUSAL_EVENTS.investigationActionCommitted,
+            buildInvestigationActionProps({
+              worldId: world.world_id,
+              worldVersion: world.version.version,
+              runId: state.run_id ?? result.event_id,
+              actionCount: next.length,
+            })
+          );
+        }
+        return next;
+      });
+
+      // 更新消息（含 narration）
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === tmpUserId
+            ? { ...m, event_id: result.event_id }
+            : m
+        )
+      );
+
+      if (result.narration) {
+        setMessages((prev) => [...prev, worldMessage(result.narration!, result.event_id)]);
+      }
+    } catch {
+      // 离线降级：生成本地 event id，确保决策表单可引用
+      const localEventId = `local-evt-${Date.now()}-${userIdx}`;
+      // Fix (CRITICAL): register the local event ID so the decision form's
+      // evidence-basis checkbox list is non-empty in offline mode.
+      setUserEventIds((prev) => [...prev, localEventId]);
+      setMessages((prev) =>
+        prev.map((m) => m.id === tmpUserId ? { ...m, event_id: localEventId } : m)
+      );
+
+      const seed = world.version;
+      const matchedFact = seed.immutable_rules.reveal_conditions.find(
+        (rc) => rc.trigger.length > 0 && content.includes(rc.trigger)
+      );
+      const narration = matchedFact
+        ? `[演示模式] 发现了新信息：${matchedFact.reveals.map((id) =>
+            seed.immutable_rules.hidden_facts.find((f) => f.id === id)?.content ?? id
+          ).join("；")}`
+        : "[演示模式] 角色收到了你的问题，需要更具体的信息才能回应。";
+
+      setMessages((prev) => [...prev, worldMessage(narration)]);
+      setError("离线演示模式：动作已记录，叙述由本地规则生成。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      void sendAction();
+    }
+  }
+
+  // ── 使用提示 ────────────────────────────────────────────────────
+  async function useHint() {
+    if (!state?.run_id || busy || !world) return;
+    setBusy(true);
+    setError("");
+
+    // 构造提示内容（本地生成，决策前触发）
+    const hintContent = buildInterventionContent({
+      decision: {
+        id: "pending",
+        run_id: state.run_id,
+        world_event_id: "pending",
+        judgment: "",
+        chosen_action: "",
+        expected_outcome: "",
+        confidence: "low",
+        rejected_alternatives: [],
+        evidence_basis: [],
+        consequences_revealed: false,
+        created_at: new Date().toISOString(),
+      },
+      missing_dimensions: ["workflow", "consequence", "alternative"],
+      world_trigger: world.version.trigger_statement,
+      intervention_type: "hint",
+    });
+
+    try {
+      const result = await recordIntervention(state.run_id, {
+        decision_event_id: null,
+        intervention_type: "hint",
+        content: hintContent,
+      });
+      setState((prev) => prev ? recordHintUsed(prev, result.id) : prev);
+      setMessages((prev) => [...prev, worldMessage(`💡 提示：${hintContent}`)]);
+      // #3 analytics: intervention_received
+      trackClientEvent(CAUSAL_EVENTS.interventionReceived,
+        buildInterventionReceivedProps({
+          worldId: world.world_id,
+          worldVersion: world.version.version,
+          runId: state.run_id,
+          interventionType: "hint",
+        })
+      );
+    } catch {
+      // offline: still mark assisted
+      setState((prev) => prev ? recordHintUsed(prev, `local-hint-${Date.now()}`) : prev);
+      setMessages((prev) => [...prev, worldMessage(`💡 提示：${hintContent}`)]);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // ── 进入决策阶段 ────────────────────────────────────────────────
+  function enterCommitPhase() {
+    setState((prev) => prev ? commitToDecisionPhase(prev) : prev);
+  }
+
+  // ── 提交决策 ────────────────────────────────────────────────────
+  async function handleSubmitDecision() {
+    if (!state?.run_id || busy) return;
+    const payload = buildDecisionPayload(draft);
+    if (!payload) return;
+
+    setBusy(true);
+    setError("");
+
+    // world_event_id: 使用最后一个用户调查事件，若无则用 run_id 作占位
+    const worldEventId = userEventIds.at(-1) ?? state.run_id;
+
+    try {
+      const result = await submitDecision(state.run_id, draft, worldEventId);
+      setState((prev) =>
+        prev ? recordDecisionSubmitted(prev, result.id) : prev
+      );
+      // #3 analytics: decision_committed
+      if (world) {
+        trackClientEvent(CAUSAL_EVENTS.decisionCommitted,
+          buildDecisionCommittedProps({
+            worldId: world.world_id,
+            worldVersion: world.version.version,
+            runId: state.run_id,
+            wasAssisted: state.was_assisted,
+            evidenceBasisCount: draft.evidence_basis.length,
+            confidence: draft.confidence,
+          })
+        );
+      }
+      setMessages((prev) => [
+        ...prev,
+        worldMessage("✅ 决策已提交。点击「揭示后果」查看世界的实际反应。"),
+      ]);
+    } catch (err) {
+      // offline fallback: generate a local decision id
+      const localDecId = `local-dec-${Date.now()}`;
+      setState((prev) =>
+        prev ? recordDecisionSubmitted(prev, localDecId) : prev
+      );
+      setMessages((prev) => [
+        ...prev,
+        worldMessage("[演示模式] 决策已在本地记录，后果将由规则生成。"),
+      ]);
+      setError("离线演示模式：决策记录在本地。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // ── 揭示后果 ────────────────────────────────────────────────────
+  async function handleReveal() {
+    if (!state?.run_id || !state.decision_event_id || busy) return;
+    setBusy(true);
+    setError("");
+
+    // Fix (MEDIUM): use userEventIds.length (actual investigation events sent to
+    // the world) rather than draft.evidence_basis.length (checkbox UI state) to
+    // determine whether the learner investigated. A learner may forget to tick
+    // checkboxes after genuine investigation; the event record is authoritative.
+    const rules = world?.version.immutable_rules.causal_rules ?? [];
+    const isPrematurePath = userEventIds.length === 0;
+    const rule =
+      rules.find((r) => r.consequence_path === (isPrematurePath ? "premature" : "investigated"))
+      ?? rules[0];
+
+    const buildContent = (prefix: string) =>
+      rule
+        ? `${prefix}后果揭示：${rule.short_term}\n\n反事实路径：${rule.counterfactual}`
+        : `${prefix}后果已揭示。`;
+
+    try {
+      await revealConsequences(state.run_id, state.decision_event_id);
+      const content = buildContent("");
+      setState((prev) => prev ? advanceToReveal(prev) : prev);
+      setRevealContent(content);
+      setMessages((prev) => [...prev, worldMessage(`🔍 ${content}`)]);
+      // #3 analytics: consequence_revealed
+      if (world) {
+        trackClientEvent(CAUSAL_EVENTS.consequenceRevealed,
+          buildConsequenceRevealedProps({
+            worldId: world.world_id,
+            worldVersion: world.version.version,
+            runId: state.run_id,
+          })
+        );
+      }
+    } catch {
+      const content = buildContent("[演示模式] ");
+      setState((prev) => prev ? advanceToReveal(prev) : prev);
+      setRevealContent(content);
+      setMessages((prev) => [...prev, worldMessage(`🔍 ${content}`)]);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // ── 进入反思阶段 ────────────────────────────────────────────────
+  async function handleAdvanceToReflect() {
+    if (!state?.run_id || busy || !world) return;
+    setBusy(true);
+
+    const missingDims: Array<"workflow" | "consequence" | "alternative"> = [];
+    if (!draft.evidence_basis.length) {
+      missingDims.push("workflow", "consequence", "alternative");
+    }
+
+    const feedbackContent = buildInterventionContent({
+      decision: {
+        id: state.decision_event_id ?? "unknown",
+        run_id: state.run_id,
+        world_event_id: userEventIds.at(-1) ?? state.run_id,
+        judgment: draft.judgment,
+        chosen_action: draft.chosen_action,
+        expected_outcome: draft.expected_outcome,
+        confidence: draft.confidence,
+        rejected_alternatives: draft.rejected_alternatives,
+        evidence_basis: draft.evidence_basis,
+        consequences_revealed: true,
+        created_at: new Date().toISOString(),
+      },
+      missing_dimensions: missingDims,
+      world_trigger: world.version.trigger_statement,
+      intervention_type: "feedback",
+    });
+
+    try {
+      if (state.run_id && state.decision_event_id) {
+        await recordIntervention(state.run_id, {
+          decision_event_id: state.decision_event_id,
+          intervention_type: "feedback",
+          content: feedbackContent,
+        });
+      }
+    } catch {
+      // ignore recording errors in offline mode
+    }
+
+    setReflectContent(feedbackContent);
+    setState((prev) => prev ? advanceToReflect(prev) : prev);
+    setBusy(false);
+  }
+
+  // ── 完成本轮 ────────────────────────────────────────────────────
+  function handleFinish() {
+    // #3 analytics: transfer_evidence_recorded (只对 transfer_test 世界触发)
+    if (world?.version.transfer_role === "transfer_test" && state?.run_id) {
+      trackClientEvent(CAUSAL_EVENTS.transferEvidenceRecorded,
+        buildTransferEvidenceProps({
+          worldId: world.world_id,
+          worldVersion: world.version.version,
+          runId: state.run_id,
+          evidenceType: state.was_assisted ? "assisted" : "transfer",
+        })
+      );
+    }
+    if (world) onRunComplete?.(world.world_id);
+    onClose();
+  }
+
+  if (!world || !state) {
+    return (
+      <div className="wb-loading surface">
+        <p>加载世界中…</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="world-workbench">
+      {/* 顶栏 */}
+      <header className="wb-header surface">
+        <div className="wb-header-left">
+          <button className="back-button" onClick={onClose} type="button">← 返回</button>
+          <div>
+            <span className="section-kicker">{world.domain} · {world.transfer_role}</span>
+            <h2>{world.title}</h2>
+          </div>
+        </div>
+        <PhaseTag phase={state.phase} wasAssisted={state.was_assisted} />
+      </header>
+
+      {error && (
+        <div className="wb-error-banner" role="alert">{error}</div>
+      )}
+
+      {/* 主体：对话 + 工具栏 */}
+      <div className="wb-body">
+        {/* 左：对话时间线 */}
+        <section className="wb-timeline surface">
+          <div className="wb-messages" aria-live="polite">
+            {messages.map((m) => (
+              <article className={`wb-message wb-message-${m.role}`} key={m.id}>
+                <span className="wb-message-role">
+                  {m.role === "world" ? "世界" : "你"}
+                </span>
+                <p>{m.content}</p>
+              </article>
+            ))}
+            <div ref={bottomRef} />
+          </div>
+
+          {/* 输入区（仅 investigate 阶段） */}
+          {state.phase === "investigate" && (
+            <div className="wb-composer">
+              <textarea
+                aria-label="调查动作"
+                disabled={busy}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="提出调查问题或采取行动，Enter 发送，Shift+Enter 换行"
+                rows={3}
+                value={input}
+              />
+              <div className="wb-composer-actions">
+                <button
+                  className="text-button"
+                  disabled={busy}
+                  onClick={() => { void useHint(); }}
+                  type="button"
+                >
+                  💡 提示（标记辅助证据）
+                </button>
+                <button
+                  className="button button-secondary"
+                  disabled={busy || messages.filter((m) => m.role === "user").length < 1}
+                  onClick={enterCommitPhase}
+                  type="button"
+                >
+                  完成调查，提交决策
+                </button>
+                <button
+                  className="button button-primary"
+                  disabled={busy || !input.trim()}
+                  onClick={() => { void sendAction(); }}
+                  type="button"
+                >
+                  {busy ? "等待中…" : "发送"}
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* 右：阶段面板 */}
+        <aside className="wb-panel">
+          {/* 世界已知事实 */}
+          <div className="wb-facts surface">
+            <span className="section-kicker">已知信息</span>
+            <ul>
+              {world.version.visible_facts.map((f) => (
+                <li key={f}>{f}</li>
+              ))}
+            </ul>
+          </div>
+
+          {/* commit 阶段：决策表单 */}
+          {state.phase === "commit" && (
+            <DecisionForm
+              busy={busy}
+              draft={draft}
+              eventIds={userEventIds}
+              onChange={setDraft}
+              onSubmit={() => { void handleSubmitDecision(); }}
+            />
+          )}
+
+          {/* commit 阶段：揭示后果按钮 */}
+          {canRevealConsequences(state) && (
+            <button
+              className="button button-coral"
+              disabled={busy}
+              onClick={() => { void handleReveal(); }}
+              style={{ width: "100%", marginTop: 12 }}
+              type="button"
+            >
+              {busy ? "揭示中…" : "揭示后果"}
+            </button>
+          )}
+
+          {/* reveal 阶段：后果内容 + 进入反思 */}
+          {state.phase === "reveal" && (
+            <div className="wb-reveal surface">
+              <span className="section-kicker">后果回放</span>
+              <p style={{ whiteSpace: "pre-line" }}>{revealContent}</p>
+              <button
+                className="button button-secondary"
+                disabled={busy}
+                onClick={() => { void handleAdvanceToReflect(); }}
+                style={{ marginTop: 12 }}
+                type="button"
+              >
+                {busy ? "生成反馈…" : "查看证据反馈"}
+              </button>
+            </div>
+          )}
+
+          {/* reflect 阶段：反馈内容 + 结束 */}
+          {state.phase === "reflect" && (
+            <div className="wb-reflect surface">
+              <span className="section-kicker">证据反馈</span>
+              <p style={{ whiteSpace: "pre-line" }}>{reflectContent}</p>
+              {state.was_assisted && (
+                <p className="wb-assisted-notice">
+                  ⚠ 本轮使用了提示，决策证据标记为辅助，不计入独立能力趋势。
+                </p>
+              )}
+              <button
+                className="button button-primary"
+                onClick={handleFinish}
+                style={{ marginTop: 16 }}
+                type="button"
+              >
+                完成本轮训练
+              </button>
+            </div>
+          )}
+        </aside>
+      </div>
+    </div>
+  );
+}

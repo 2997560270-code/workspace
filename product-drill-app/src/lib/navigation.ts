@@ -1,8 +1,9 @@
-export type ViewId = "workbench" | "product" | "history" | "profile" | "scenarios";
+﻿export type ViewId = "today" | "map" | "review" | "ability";
 
 export type NavItem = {
   view: ViewId;
   label: string;
+  hint: string;
 };
 
 export type ViewMeta = {
@@ -11,33 +12,28 @@ export type ViewMeta = {
 };
 
 export const NAV_ITEMS: NavItem[] = [
-  { view: "workbench", label: "工作台" },
-  { view: "product", label: "我的产品" },
-  { view: "history", label: "对话历史" },
-  { view: "profile", label: "能力画像" },
-  { view: "scenarios", label: "场景库" }
+  { view: "today", label: "今日训练", hint: "开始一次针对性练习" },
+  { view: "map", label: "训练地图", hint: "按能力选择训练任务" },
+  { view: "review", label: "复盘与复练", hint: "重练具体失误时刻" },
+  { view: "ability", label: "我的能力", hint: "查看掌握状态和证据" }
 ];
 
 const VIEW_META: Record<ViewId, ViewMeta> = {
-  workbench: {
-    title: "训练工作台",
-    description: "通过 AI 角色扮演与产品分析，训练需求澄清和产品表达。"
+  today: {
+    title: "今天，练会一个真正的产品判断",
+    description: "用 5—10 分钟完成一个真实业务情境，获得逐句证据反馈。"
   },
-  product: {
-    title: "我的产品",
-    description: "输入产品资料，生成理解摘要、追问和优化建议。"
+  map: {
+    title: "训练地图",
+    description: "按产品发现能力逐步进阶，而不是机械刷题。"
   },
-  history: {
-    title: "对话历史",
-    description: "查看过往训练、评分复盘和下一步建议。"
+  review: {
+    title: "复盘与复练",
+    description: "回到具体失误时刻，用更好的行为证明自己已经改善。"
   },
-  profile: {
-    title: "能力画像",
-    description: "用基础趋势和高频短板定位下一轮训练方向。"
-  },
-  scenarios: {
-    title: "场景库",
-    description: "B2B、AI+、企业员工培训三个深场景。"
+  ability: {
+    title: "我的能力",
+    description: "每一个结论都可以追溯到真实训练证据。"
   }
 };
 

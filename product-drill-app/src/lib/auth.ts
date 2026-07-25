@@ -1,4 +1,4 @@
-export const SESSION_COOKIE = "product_drill_user";
+﻿export const SESSION_COOKIE = "product_drill_user";
 
 export const DEV_USER = {
   id: "demo-user",
@@ -9,3 +9,14 @@ export const DEV_USER = {
 export function isLoggedIn(sessionValue: string | undefined): boolean {
   return sessionValue === DEV_USER.id;
 }
+
+export function isDemoAuthAllowed(nodeEnv: string | undefined, allowDemoAuth: string | undefined): boolean {
+  return nodeEnv !== "production" || allowDemoAuth === "true";
+}
+
+export type ProductDrillUser = {
+  id: string;
+  name: string;
+  email: string;
+  source: "supabase" | "demo";
+};

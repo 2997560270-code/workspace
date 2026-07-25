@@ -1,62 +1,52 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 import {
-  addTrainingAnswer,
-  changeTrainingScenario,
   createTrainingSession,
-  sendTrainingMessage
+  getCoveragePercent,
+  moveToJudgment,
+  sendTrainingMessage,
+  submitJudgment,
+  useTrainingHint
 } from "../src/lib/training-session";
 
-describe("training session", () => {
-  it("creates a session with an AI opening message", () => {
-    const session = createTrainingSession({ scenario: "AI+", mode: "用户需求提出" });
-
-    expect(session.id.length).toBeGreaterThan(0);
+describe("direction A training session", () => {
+  it("starts with the selected scenario role opening", () => {
+    const session = createTrainingSession({ scenarioId: "dashboard-request", mode: "练习" });
+    expect(session.scenarioId).toBe("dashboard-request");
     expect(session.messages).toHaveLength(1);
-    expect(session.messages[0]).toMatchObject({ role: "ai" });
-    expect(session.messages[0].content).toContain("AI+");
-    expect(session.messages[0].content).toContain("您的具体业务是什么");
-    expect(session.messages[0].content).not.toContain("最需要澄清的问题");
+    expect(session.messages[0].content).toContain("数据大屏");
+    expect(session.stage).toBe("interview");
   });
 
-  it("stores user messages and returns the next AI follow-up", () => {
-    const session = createTrainingSession({ scenario: "企业员工培训", mode: "客户咨询" });
-    const updated = sendTrainingMessage(session, "我们先解决培训完成率低的问题。");
-
+  it("reveals a scenario fact and records the covered skill", () => {
+    const session = createTrainingSession({ scenarioId: "dashboard-request", mode: "独立" });
+    const updated = sendTrainingMessage(session, "你们目前的完整流程是怎么完成的？");
     expect(updated.messages.map((message) => message.role)).toEqual(["ai", "user", "ai"]);
-    expect(updated.messages[1].content).toContain("培训完成率低");
-    expect(updated.messages[2].content).toContain("围绕 企业员工培训 方向");
-    expect(updated.messages[2].content).toContain("培训完成率低");
+    expect(updated.coveredSkills).toContain("workflow");
+    expect(updated.messages.at(-1)?.content).toContain("三个系统导出 Excel");
+    expect(getCoveragePercent(updated)).toBe(20);
   });
 
-  it("adds a final answer without another AI follow-up", () => {
-    const session = createTrainingSession({ scenario: "AI+", mode: "用户需求提出" });
-    const updated = addTrainingAnswer(session, "这是最终方案。");
-
-    expect(updated.messages.map((message) => message.role)).toEqual(["ai", "user"]);
-    expect(updated.messages[1].content).toContain("最终方案");
+  it("records hint use in practice mode", () => {
+    const session = createTrainingSession({ scenarioId: "dashboard-request", mode: "练习" });
+    const updated = useTrainingHint(session);
+    expect(updated.hintsUsed).toBe(1);
+    expect(updated.messages).toHaveLength(2);
+    expect(updated.messages.at(-1)?.content).toContain("轻提示");
   });
 
-  it("adds a scenario switch message to an active session", () => {
-    const session = createTrainingSession({ scenario: "AI+", mode: "客户咨询", difficulty: "严格" });
-    const updated = changeTrainingScenario(session, "B2B", "客户咨询", "严格");
-
-    expect(updated.scenario).toBe("B2B");
-    expect(updated.mode).toBe("客户咨询");
-    expect(updated.messages.at(-1)?.content).toContain("当前行业场景已经切换到B2B，模式客户咨询，难度严格");
-  });
-  it("restarts business clarification after switching scenario", () => {
-    let session = createTrainingSession({ scenario: "AI+", mode: "客户咨询", difficulty: "严格" });
-    session = sendTrainingMessage(session, "我的业务是AI客服。");
-    session = sendTrainingMessage(session, "主要服务企业售后团队。");
-
-    const switched = changeTrainingScenario(session, "B2B", "客户咨询", "严格");
-    expect(switched.messages.at(-1)?.content).toContain("当前行业场景已经切换到B2B，模式客户咨询，难度严格");
-    expect(switched.messages.at(-1)?.content).toContain("您的具体业务是什么");
-
-    const next = sendTrainingMessage(switched, "我的业务是B2B采购系统。");
-    expect(next.messages.at(-1)?.content).toContain("围绕 B2B 方向");
-    expect(next.messages.at(-1)?.content).toContain("B2B采购系统");
-    expect(next.messages.at(-1)?.content).not.toContain("第 3 轮继续追问");
-    expect(next.messages.at(-1)?.content).not.toContain("第 4 轮继续追问");
+  it("moves from interview to a structured product judgment", () => {
+    const session = moveToJudgment(createTrainingSession({ scenarioId: "dashboard-request" }));
+    const submitted = submitJudgment(session, {
+      targetUser: "区域运营",
+      currentWorkflow: "从三个系统导出数据并合并",
+      coreProblem: "数据编码不一致导致人工核对",
+      problemImpact: "每周消耗六小时",
+      alternative: "Excel 和免费 BI",
+      recommendation: "先统一数据编码，再优化汇总",
+      successMetric: "周报准备降低到一小时",
+      biggestAssumption: "编码统一可以显著减少核对"
+    });
+    expect(submitted.stage).toBe("feedback");
+    expect(submitted.judgment?.coreProblem).toContain("数据编码");
   });
 });

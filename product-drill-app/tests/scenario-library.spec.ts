@@ -1,17 +1,10 @@
-import { expect, test } from "@playwright/test";
+﻿import { expect, test } from "@playwright/test";
+import { enterApp } from "./e2e-helpers";
 
-test("starts training from each scenario card", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "进入工作台" }).click();
-
-  for (const scenario of ["B2B", "AI+", "企业员工培训"]) {
-    await page.getByRole("button", { name: "场景库" }).click();
-    await expect(page.getByRole("heading", { name: scenario })).toBeVisible();
-    await page.getByRole("button", { name: `用 ${scenario} 开始训练` }).click();
-
-    await expect(page.getByRole("heading", { level: 1, name: "训练工作台" })).toBeVisible();
-    await expect(page.getByLabel("行业场景")).toHaveValue(scenario);
-    await page.getByRole("button", { name: "开始训练" }).click();
-    await expect(page.getByText(`当前场景是 ${scenario}`)).toBeVisible();
-  }
+test("renders six focused scenarios in the training map", async ({ page }) => {
+  await enterApp(page);
+  await page.getByRole("button", { name: "02 训练地图 按能力选择训练任务", exact: true }).click();
+  await expect(page.locator(".scenario-card")).toHaveCount(6);
+  await expect(page.getByText("数据大屏需求", { exact: true })).toBeVisible();
+  await expect(page.getByText("老板要求加 AI", { exact: true })).toBeVisible();
 });

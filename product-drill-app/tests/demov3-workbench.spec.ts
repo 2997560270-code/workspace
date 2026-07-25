@@ -6,10 +6,15 @@ test("demov3 workbench entry keeps the total acceptance route separate and runs 
   await expect(page.getByRole("heading", { level: 1, name: "训练工作台" })).toBeVisible();
   await expect(page.getByText("Demo V3 交互重构测试入口")).toBeVisible();
   await expect(page.getByTestId("v3live-start")).toBeVisible();
+  await expect(page.locator(".v3live-score")).toContainText("60 / 100");
 
   await page.getByTestId("v3live-start").click();
   await expect(page.locator(".v3live-message.ai")).toHaveCount(1);
-  await expect(page.getByText("您的具体业务是什么")).toBeVisible();
+  await expect(page.locator(".v3live-message.ai")).toContainText("我们现在看经营情况太麻烦了");
+
+  await page.getByRole("button", { name: "独立" }).click();
+  await expect(page.locator(".v3live-message")).toHaveCount(0);
+  await page.getByTestId("v3live-start").click();
 
   await page.getByPlaceholder("输入你的回答，Enter 发送").fill("我的业务是AI+服务");
   await page.getByTestId("v3live-send").click();
@@ -17,9 +22,11 @@ test("demov3 workbench entry keeps the total acceptance route separate and runs 
   await expect(page.locator(".v3live-message.user").getByText("我的业务是AI+服务")).toBeVisible();
   await expect(page.locator(".v3live-message.ai")).toHaveCount(2);
 
+  await page.getByPlaceholder("输入你的回答，Enter 发送").fill("这是我的解决方案");
   await page.getByTestId("v3live-submit").click();
   await expect(page.getByRole("heading", { name: "综合评分" })).toBeVisible();
-  await expect(page.getByText(/\/ 5\.0/)).toBeVisible();
+  await expect(page.locator(".v3live-score")).toContainText("/ 100");
+  await expect(page.getByText("过早进入解决方案")).toBeVisible();
 });
 
 test("demov3 product module supports list, detail, add, and save flow", async ({ page }) => {
@@ -80,5 +87,5 @@ test("demov3 history module switches records and updates the review panel", asyn
   await page.getByTestId("v3live-history-record-store").click();
 
   await expect(page.getByTestId("v3live-history-review")).toContainText("门店库存损耗方案");
-  await expect(page.getByTestId("v3live-history-score")).toContainText("3.8 / 5");
+  await expect(page.getByTestId("v3live-history-score")).toContainText("76 / 100");
 });

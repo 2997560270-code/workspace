@@ -1,0 +1,43 @@
+﻿name: Product improvement
+description: 记录有用户证据的产品优化机会
+labels: [product]
+body:
+  - type: textarea
+    id: user
+    attributes:
+      label: 用户角色与场景
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 原始证据
+      description: 访谈原话、行为数据或可复现步骤；不要填写敏感信息。
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: 用户问题与影响
+    validations:
+      required: true
+  - type: dropdown
+    id: module
+    attributes:
+      label: 功能模块
+      options:
+        - 首次诊断
+        - 情境访谈
+        - 产品判断画布
+        - 证据反馈
+        - 局部复练
+        - 能力证据
+        - 平台基础设施
+    validations:
+      required: true
+  - type: textarea
+    id: success
+    attributes:
+      label: 验收指标
+    validations:
+      required: true

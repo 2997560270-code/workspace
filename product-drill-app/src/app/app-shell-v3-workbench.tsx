@@ -1,15 +1,15 @@
 "use client";
 
 import { useMemo, useState, type KeyboardEvent } from "react";
+import { submitDemoJudgment } from "../lib/demo-training";
 import { generateEvaluation, type Evaluation } from "../lib/evaluation";
 import {
-  addTrainingAnswer,
-  changeTrainingScenario,
   createTrainingSession,
   sendTrainingMessage,
+  TRAINING_MODE_OPTIONS,
   type TrainingSession
 } from "../lib/training-session";
-import { DEFAULT_SCENARIO, INDUSTRY_SCENARIOS, TRAINING_MODES } from "../lib/training-config";
+import { DEFAULT_SCENARIO_ID, getScenario, TRAINING_SCENARIOS } from "../lib/training-config";
 
 type View = "workbench" | "product" | "history";
 
@@ -35,20 +35,12 @@ type HistoryRecord = {
   comments: string[];
 };
 
-const DIFFICULTIES = ["基础", "标准", "严格"];
-
 const navItems: Array<{ id: View | "home" | "profile"; label: string; icon: string; testId?: string }> = [
   { id: "home", label: "首页", icon: "home" },
   { id: "workbench", label: "工作台", icon: "grid", testId: "v3live-nav-workbench" },
   { id: "product", label: "我的产品", icon: "box", testId: "v3live-nav-product" },
   { id: "history", label: "对话历史", icon: "chat", testId: "v3live-nav-history" },
   { id: "profile", label: "能力画像", icon: "bars" }
-];
-
-const sceneLibrary = [
-  ["AI+ 服务落地", "验证用户场景、数据边界与价值表达"],
-  ["B2B 采购咨询", "识别预算、决策链与落地阻力"],
-  ["企业员工培训", "追问培训效果、业务转化与组织协同"]
 ];
 
 const seedProduct: ProductProfile = {
@@ -101,7 +93,7 @@ const historyRecords: HistoryRecord[] = [
     id: "training-need",
     time: "06-16 14:32",
     industryMode: "AI+ / 客户咨询",
-    score: "3.2 / 5",
+    score: "64 / 100",
     title: "企业培训服务需求澄清",
     status: "已评估",
     summary: "AI 追问了真实使用者、业务损失和验证指标，用户已提交初步方案。",
@@ -111,7 +103,7 @@ const historyRecords: HistoryRecord[] = [
     id: "store",
     time: "06-15 10:18",
     industryMode: "B2B / 用户需求提出",
-    score: "3.8 / 5",
+    score: "76 / 100",
     title: "门店库存损耗方案",
     status: "已评估",
     summary: "围绕门店库存损耗、补货频率和店长日常操作进行了多轮澄清。",
@@ -121,7 +113,7 @@ const historyRecords: HistoryRecord[] = [
     id: "learning",
     time: "06-12 16:40",
     industryMode: "企业培训 / 方案评估",
-    score: "2.9 / 5",
+    score: "58 / 100",
     title: "学习路径设计复盘",
     status: "待复盘",
     summary: "方案覆盖了学习路径，但对业务结果、使用频率和管理者价值解释不足。",
@@ -131,7 +123,7 @@ const historyRecords: HistoryRecord[] = [
     id: "sales",
     time: "06-10 09:20",
     industryMode: "AI+ / 方案评估",
-    score: "4.1 / 5",
+    score: "82 / 100",
     title: "销售知识库价值验证",
     status: "已评估",
     summary: "对销售新人上手、话术复用和成交效率的价值解释较完整。",
@@ -177,15 +169,14 @@ function Icon({ name }: { name: string }) {
   );
 }
 
-function scenarioDescription(scenario: string) {
-  return INDUSTRY_SCENARIOS.find((item) => item.name === scenario)?.description ?? "围绕该行业客户持续追问真实问题。";
+function scenarioDescription(scenarioId: string) {
+  return getScenario(scenarioId).context;
 }
 
 export function AppShellV3Workbench() {
   const [view, setView] = useState<View>("workbench");
-  const [scenario, setScenario] = useState(DEFAULT_SCENARIO);
-  const [mode, setMode] = useState(TRAINING_MODES[0].name);
-  const [difficulty, setDifficulty] = useState("标准");
+  const [scenarioId, setScenarioId] = useState(DEFAULT_SCENARIO_ID);
+  const [mode, setMode] = useState<TrainingSession["mode"]>("练习");
   const [session, setSession] = useState<TrainingSession | null>(null);
   const [reply, setReply] = useState("");
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
@@ -219,19 +210,28 @@ export function AppShellV3Workbench() {
     }
   }
 
-  function updateScenario(nextScenario: string) {
-    setScenario(nextScenario);
+  function updateScenario(nextScenarioId: string) {
+    const nextScenario = getScenario(nextScenarioId);
+    setScenarioId(nextScenario.id);
     setEvaluation(null);
-    setNotice(`当前行业场景已经切换到 ${nextScenario}，模式 ${mode}，难度 ${difficulty}。`);
-    setSession((current) => current ? changeTrainingScenario(current, nextScenario, mode, difficulty) : current);
+    setNotice(`当前行业场景已经切换到 ${nextScenario.shortTitle}，请重新开始训练。`);
+    setSession(null);
   }
 
   function startTraining() {
     setView("workbench");
-    setSession(createTrainingSession({ scenario, mode, difficulty }));
+    setSession(createTrainingSession({ scenarioId, mode }));
     setEvaluation(null);
     setReply("");
-    setNotice(`训练已开始：${scenario} / ${mode} / ${difficulty}`);
+    const scenario = getScenario(scenarioId);
+    setNotice(`训练已开始：${scenario.shortTitle} / ${mode} / ${scenario.difficulty}`);
+  }
+
+  function changeMode(nextMode: TrainingSession["mode"]) {
+    setMode(nextMode);
+    setSession(null);
+    setEvaluation(null);
+    setReply("");
   }
 
   function sendReply(content = reply) {
@@ -254,7 +254,7 @@ export function AppShellV3Workbench() {
     if (!session) {
       return;
     }
-    const finalSession = reply.trim() ? addTrainingAnswer(session, reply) : session;
+    const finalSession = submitDemoJudgment(session, reply);
     setSession(finalSession);
     setEvaluation(generateEvaluation(finalSession));
     setReply("");
@@ -405,50 +405,41 @@ export function AppShellV3Workbench() {
               <h2>场景设置</h2>
               <label className="v3live-field">
                 <span>行业场景</span>
-                <select onChange={(event) => updateScenario(event.target.value)} value={scenario}>
-                  {INDUSTRY_SCENARIOS.map((item) => (
-                    <option key={item.name}>{item.name}</option>
+                <select onChange={(event) => updateScenario(event.target.value)} value={scenarioId}>
+                  {TRAINING_SCENARIOS.map((item) => (
+                    <option key={item.id} value={item.id}>{item.shortTitle}</option>
                   ))}
                 </select>
               </label>
               <div className="v3live-scene-list">
-                {sceneLibrary.map(([title, desc]) => (
+                {TRAINING_SCENARIOS.slice(0, 3).map((libraryScenario) => (
                   <button
-                    className={title.includes(scenario) || scenario.includes(title.split(" ")[0]) ? "active" : ""}
-                    key={title}
-                    onClick={() => updateScenario(title.startsWith("B2B") ? "B2B" : title.startsWith("企业") ? "企业员工培训" : "AI+")}
+                    className={libraryScenario.id === scenarioId ? "active" : ""}
+                    key={libraryScenario.id}
+                    onClick={() => updateScenario(libraryScenario.id)}
                     type="button"
                   >
-                    <strong>{title}</strong>
-                    <span>{desc}</span>
+                    <strong>{libraryScenario.shortTitle}</strong>
+                    <span>{libraryScenario.context}</span>
                   </button>
                 ))}
               </div>
               <div className="v3live-field">
                 <span>训练模式</span>
                 <div className="v3live-chips">
-                  {TRAINING_MODES.map((item) => (
-                    <button className={item.name === mode ? "active" : ""} key={item.name} onClick={() => setMode(item.name)} type="button">
-                      {item.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="v3live-field">
-                <span>难度级别</span>
-                <div className="v3live-chips">
-                  {DIFFICULTIES.map((item) => (
-                    <button className={item === difficulty ? "active" : ""} key={item} onClick={() => setDifficulty(item)} type="button">
+                  {TRAINING_MODE_OPTIONS.map((item) => (
+                    <button className={item === mode ? "active" : ""} key={item} onClick={() => changeMode(item)} type="button">
                       {item}
                     </button>
                   ))}
                 </div>
               </div>
+              <div className="v3live-field"><span>难度级别</span><strong>{getScenario(scenarioId).difficulty}</strong></div>
               <div className="v3live-settings-actions">
                 <button className="v3live-primary" data-testid="v3live-start" onClick={startTraining} type="button">开始训练</button>
                 <button data-testid="v3live-product-add-top" onClick={openProductAdd} type="button">添加产品</button>
               </div>
-              <p className="v3live-muted">{scenarioDescription(scenario)}</p>
+              <p className="v3live-muted">{scenarioDescription(scenarioId)}</p>
               {notice ? <div className="v3live-notice">{notice}</div> : null}
             </section>
 
@@ -456,7 +447,7 @@ export function AppShellV3Workbench() {
               <div className="v3live-panel-head">
                 <div>
                   <h2>AI 对话</h2>
-                  <p>{session ? `当前：${scenario} / ${mode} / ${difficulty}` : "选择场景后点击开始训练，对话区才会输出内容。"}</p>
+                  <p>{session ? `当前：${getScenario(scenarioId).shortTitle} / ${mode} / ${getScenario(scenarioId).difficulty}` : "选择场景后点击开始训练，对话区才会输出内容。"}</p>
                 </div>
                 <button type="button">查看对话历史</button>
               </div>
@@ -501,19 +492,20 @@ export function AppShellV3Workbench() {
               {evaluation ? (
                 <div className="v3live-fact">
                   <h3>综合评分</h3>
-                  <div className="v3live-score">{evaluation.totalScore} / 5.0</div>
+                  <div className="v3live-score">{evaluation.totalScore} / 100</div>
                   {evaluation.dimensions.slice(0, 4).map((item) => (
                     <div className="v3live-score-row" key={item.name}>
                       <span>{item.name}</span>
-                      <i><b style={{ width: `${item.score * 20}%` }} /></i>
+                      <i><b style={{ width: `${item.score * 25}%` }} /></i>
                       <strong>{item.score}</strong>
                     </div>
                   ))}
+                  <ul>{evaluation.issues.map((issue) => <li key={issue.id}>{issue.title}</li>)}</ul>
                 </div>
               ) : (
                 <div className="v3live-fact">
                   <strong>评分预览</strong>
-                  <div className="v3live-score">3.0 / 5.0</div>
+                  <div className="v3live-score">60 / 100</div>
                 </div>
               )}
             </aside>

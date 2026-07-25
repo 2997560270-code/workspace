@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { DEV_USER, SESSION_COOKIE, isLoggedIn } from "../src/lib/auth";
+﻿import { describe, expect, it } from "vitest";
+import { DEV_USER, SESSION_COOKIE, isDemoAuthAllowed, isLoggedIn } from "../src/lib/auth";
 
 describe("auth foundation", () => {
   it("uses one named session cookie for the demo user", () => {
@@ -15,5 +15,11 @@ describe("auth foundation", () => {
     expect(isLoggedIn("demo-user")).toBe(true);
     expect(isLoggedIn("")).toBe(false);
     expect(isLoggedIn("someone-else")).toBe(false);
+  });
+
+  it("keeps demo auth disabled in production unless explicitly enabled for E2E", () => {
+    expect(isDemoAuthAllowed("production", undefined)).toBe(false);
+    expect(isDemoAuthAllowed("production", "true")).toBe(true);
+    expect(isDemoAuthAllowed("development", undefined)).toBe(true);
   });
 });
