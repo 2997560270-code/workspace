@@ -43,6 +43,7 @@ import {
   sendTrainingMessage,
   startRetry,
   submitJudgment,
+  TRAINING_MODE_OPTIONS,
   useTrainingHint,
   type ProductJudgment,
   type TrainingSession
@@ -615,7 +616,7 @@ function TrainingWorkspace({
             {scenario.briefing.map((item) => <div key={item}><CheckMark /> {item}</div>)}
           </div>
           <div className="mode-switch" aria-label="训练模式">
-            {(["练习", "独立", "严格"] as const).map((mode) => (
+            {TRAINING_MODE_OPTIONS.map((mode) => (
               <button
                 aria-pressed={session.mode === mode}
                 className={session.mode === mode ? "active" : ""}

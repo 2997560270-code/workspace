@@ -2,6 +2,7 @@
 
 export const DETERMINISTIC_ENGINE_VERSION = "deterministic-v1";
 export const DEFAULT_RUBRIC_VERSION = "direction-a-v1";
+export const TRAINING_MODE_OPTIONS = ["练习", "独立", "严格"] as const;
 
 export type TrainingRole = "ai" | "user";
 export type TrainingStage = "interview" | "judgment" | "feedback" | "retry" | "complete";
@@ -33,7 +34,7 @@ export type TrainingSession = {
   rubricVersion: string;
   modelVersion: string;
   engine: TrainingEngine;
-  mode: "练习" | "独立" | "严格";
+  mode: (typeof TRAINING_MODE_OPTIONS)[number];
   stage: TrainingStage;
   messages: TrainingMessage[];
   coveredSkills: SkillId[];
