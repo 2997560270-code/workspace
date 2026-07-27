@@ -11,7 +11,9 @@ This repository uses a single-context domain documentation layout.
 ## Layout
 
 - `CONTEXT.md`: domain vocabulary, boundaries, and invariants.
+- `docs/product/`: current product direction and planning documents.
 - `docs/adr/`: accepted architectural decisions.
+- `docs/research/`: research and assessment source material.
 - `product-drill-app/`: application source.
 
 ## Vocabulary
