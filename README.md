@@ -2,6 +2,17 @@
 
 `product-drill-app/` 是本仓库唯一的活动应用。需求、缺陷和工作状态以 GitHub Issues 为准。
 
+## 仓库结构
+
+| 路径 | 用途 |
+| --- | --- |
+| `product-drill-app/` | Next.js 产品应用、测试与评测数据 |
+| `docs/product/` | 当前产品方案 |
+| `docs/adr/` | 已接受的架构决策 |
+| `docs/research/` | 研究与评测资料 |
+| `docs/agents/` | 代理协作和 Issue 规范 |
+| `plugins/product-drill-lifecycle/` | Product Drill 生命周期插件 |
+
 ## 本地开发
 
 ```powershell
@@ -20,4 +31,13 @@ npm run build
 npm run e2e:run
 ```
 
-项目背景见 [`CONTEXT.md`](./CONTEXT.md)，架构决策见 [`docs/adr/`](./docs/adr/)，协作规则见 [`AGENTS.md`](./AGENTS.md)。
+Windows PowerShell 若阻止执行 `npm.ps1`，请将上述 `npm` 替换为 `npm.cmd`。
+
+## 文档与协作
+
+- 项目背景与领域词汇：[`CONTEXT.md`](./CONTEXT.md)
+- 文档索引：[`docs/README.md`](./docs/README.md)
+- AI 原生重构方案：[`docs/product/ai-native-refactor-plan.md`](./docs/product/ai-native-refactor-plan.md)
+- 方向 A 产品优化方案：[`docs/product/direction-a-product-optimization.md`](./docs/product/direction-a-product-optimization.md)
+- 协作规则：[`AGENTS.md`](./AGENTS.md)
+- 需求与缺陷：[GitHub Issues](https://github.com/2997560270-code/workspace/issues)
