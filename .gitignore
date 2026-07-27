@@ -2,6 +2,8 @@
 .next/
 test-results/
 playwright-report/
+.playwright-mcp/
+audit-evidence/
 .env.local
 *.log
 *.tsbuildinfo
