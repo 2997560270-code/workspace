@@ -433,7 +433,7 @@ p { color: var(--ink-2); line-height: 1.66; }
 .empty-state .button { margin-top: 16px; }
 
 /* ══════════════════════════ ABILITY ════════════════════════════════════ */
-.ability-layout { display: grid; gap: 18px; }
+.ability-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
 .ability-summary { padding: 36px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 44px; }
 .ability-summary h2 { max-width: 720px; font-size: var(--fs-title-lg); line-height: 1.3; }
 .ability-summary p { margin-bottom: 0; font-size: var(--fs-body-sm); }
@@ -610,6 +610,7 @@ p { color: var(--ink-2); line-height: 1.66; }
   .evidence-row { grid-template-columns: 1fr; }
   .ability-table > article { grid-template-columns: 38px minmax(0, 1fr); padding: 20px 0; }
   .ability-counts, .ability-table .mastery { grid-column: 2; }
+  .summary-stats div { min-width: 0; }
   .login-page { grid-template-columns: 1fr; }
   .login-story { min-height: 560px; }
   .runtime-notice { align-items: flex-start; flex-direction: column; gap: 6px; }
