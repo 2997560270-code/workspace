@@ -14,3 +14,28 @@ test("navigates between the four direction A modules", async ({ page }) => {
     await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
   }
 });
+
+test("keeps the ability view within the mobile viewport", async ({ page }) => {
+  await enterApp(page);
+  await page.setViewportSize({ width: 375, height: 844 });
+  await page.getByRole("button", { name: "04 我的能力 查看掌握状态和证据", exact: true }).click();
+
+  const widths = await page.evaluate(() => ({
+    client: document.documentElement.clientWidth,
+    scroll: document.documentElement.scrollWidth
+  }));
+
+  expect(widths.scroll).toBe(widths.client);
+});
+
+test("keeps the world workbench heading in the mobile viewport", async ({ page }) => {
+  await enterApp(page);
+  await page.setViewportSize({ width: 375, height: 600 });
+  await page.evaluate(() => {
+    document.body.style.minHeight = "2000px";
+    window.scrollTo(0, 500);
+  });
+  await page.getByRole("button", { name: "进入世界工作台", exact: true }).click();
+
+  await expect(page.getByRole("heading", { level: 1, name: "世界工作台" })).toBeInViewport();
+});

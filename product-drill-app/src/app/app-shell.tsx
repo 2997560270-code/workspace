@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { WorldWorkbench } from "./world-workbench";
 import { JudgmentProfilePanel } from "./judgment-profile-panel";
 import { ANALYTICS_EVENTS } from "../lib/analytics/events";
@@ -837,6 +837,7 @@ export function AppShell({
   const [historyRecords, setHistoryRecords] = useState<TrainingHistoryRecord[]>([]);
   const [storageReady, setStorageReady] = useState(false);
   const [historyStatus, setHistoryStatus] = useState<"loading" | "server" | "local">("loading");
+  const topbarRef = useRef<HTMLElement>(null);
   const meta = getViewMeta(view);
   const storageKey = `${STORAGE_KEY}:${userId}`;
 
@@ -878,6 +879,12 @@ export function AppShell({
     if (!storageReady) return;
     window.localStorage.setItem(storageKey, JSON.stringify({ version: 1, records: historyRecords }));
   }, [historyRecords, storageKey, storageReady]);
+
+  useEffect(() => {
+    topbarRef.current?.focus({ preventScroll: true });
+    const timer = window.setTimeout(() => window.scrollTo(0, 0), 100);
+    return () => window.clearTimeout(timer);
+  }, [activeTraining, activeWorkbenchWorldId, view]);
 
   function startTraining(scenarioId: string, mode: TrainingSession["mode"] = "练习") {
     setActiveTraining({ scenarioId, mode });
@@ -948,7 +955,7 @@ export function AppShell({
       </aside>
 
       <section className="main">
-        <header className="topbar">
+        <header className="topbar" ref={topbarRef} tabIndex={-1}>
           <div>
             <h1>{pageTitle}</h1>
             <p>{pageDescription}</p>
