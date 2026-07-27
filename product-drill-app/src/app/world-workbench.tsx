@@ -720,10 +720,9 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
           {/* commit 阶段：揭示后果按钮 */}
           {canRevealConsequences(state) && (
             <button
-              className="button button-coral"
+              className="button button-coral wb-full-width"
               disabled={busy}
               onClick={() => { void handleReveal(); }}
-              style={{ width: "100%", marginTop: 12 }}
               type="button"
             >
               {busy ? "揭示中…" : "揭示后果"}
@@ -734,12 +733,11 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
           {state.phase === "reveal" && (
             <div className="wb-reveal surface">
               <span className="section-kicker">后果回放</span>
-              <p style={{ whiteSpace: "pre-line" }}>{revealContent}</p>
+              <p>{revealContent}</p>
               <button
                 className="button button-secondary"
                 disabled={busy}
                 onClick={() => { void handleAdvanceToReflect(); }}
-                style={{ marginTop: 12 }}
                 type="button"
               >
                 {busy ? "生成反馈…" : "查看证据反馈"}
@@ -751,7 +749,7 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
           {state.phase === "reflect" && (
             <div className="wb-reflect surface">
               <span className="section-kicker">证据反馈</span>
-              <p style={{ whiteSpace: "pre-line" }}>{reflectContent}</p>
+              <p>{reflectContent}</p>
               {state.was_assisted && (
                 <p className="wb-assisted-notice">
                   ⚠ 本轮使用了提示，决策证据标记为辅助，不计入独立能力趋势。
@@ -760,7 +758,6 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
               <button
                 className="button button-primary"
                 onClick={handleFinish}
-                style={{ marginTop: 16 }}
                 type="button"
               >
                 完成本轮训练
