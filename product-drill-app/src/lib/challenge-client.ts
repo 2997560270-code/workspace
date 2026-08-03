@@ -9,6 +9,8 @@ import type {
   DecisionEventResponse,
 } from "./api/challenge-schemas";
 import type { DecisionDraft } from "./workbench-state";
+import type { ChallengeDecisionSummary, ChallengeDecisionTimeline } from "./challenge-history";
+import type { NextChallengeSelection } from "./challenge-selection";
 
 // ── 通用 fetch 工具 ───────────────────────────────────────────────
 async function apiPost<T>(path: string, body: unknown): Promise<T> {
@@ -105,6 +107,16 @@ export type InterventionResponse = {
   triggered_at: string;
 };
 
+export type InterventionApiResponse = {
+  intervention: InterventionResponse;
+  evaluation: {
+    confidence: "high" | "medium" | "low";
+    update_direction: "supports" | "contradicts" | "insufficient" | "neutral";
+    evidence_type: "supporting" | "counter" | "assisted" | "transfer" | null;
+  } | null;
+  next_challenge: NextChallengeSelection | null;
+};
+
 /** 记录干预（hint / feedback / counterfactual / reveal_consequence） */
 export async function recordIntervention(
   runId: string,
@@ -113,8 +125,8 @@ export async function recordIntervention(
     intervention_type: "hint" | "feedback" | "counterfactual" | "reveal_consequence";
     content: string;
   }
-): Promise<InterventionResponse> {
-  return apiPost<InterventionResponse>(
+): Promise<InterventionApiResponse> {
+  return apiPost<InterventionApiResponse>(
     `/api/challenge-runs/${runId}/interventions`,
     params
   );
@@ -126,4 +138,21 @@ import type { JudgmentProfile } from "./judgment-profile-builder";
 
 export async function fetchJudgmentProfile(): Promise<JudgmentProfile> {
   return apiGet<JudgmentProfile>("/api/judgment-profile");
+}
+
+export async function fetchChallengeHistory(): Promise<ChallengeDecisionSummary[]> {
+  const response = await apiGet<{ records: ChallengeDecisionSummary[] }>("/api/challenge-runs/history");
+  return response.records;
+}
+
+export async function fetchDecisionTimeline(decisionEventId: string): Promise<ChallengeDecisionTimeline> {
+  const response = await apiGet<{ timeline: ChallengeDecisionTimeline }>(
+    `/api/decision-events/${encodeURIComponent(decisionEventId)}`
+  );
+  return response.timeline;
+}
+
+export async function fetchNextChallenge(): Promise<NextChallengeSelection> {
+  const response = await apiGet<{ selection: NextChallengeSelection }>("/api/challenges/next");
+  return response.selection;
 }

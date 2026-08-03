@@ -25,6 +25,7 @@ export type CausalRule = {
   consequence_path: "premature" | "investigated";
   short_term: string;
   medium_term: string;
+  long_term: string;
   counterfactual: string;
 };
 
@@ -49,19 +50,31 @@ export type BehaviorAnchor = {
 };
 
 export type ImmutableRules = {
+  model_forbidden_to_modify: true;
   hidden_facts: HiddenFact[];
   causal_rules: CausalRule[];
   role_interests: RoleInterest[];
   reveal_conditions: RevealCondition[];
 };
 
+export type WorldAction = {
+  id: string;
+  label: string;
+  category: "investigate" | "request_data" | "commit";
+};
+
 // ── 世界版本（不可变快照）────────────────────────────────────────
 export type CausalWorldVersion = {
   world_id: string;
   version: string;
+  target_habit: string;
+  domain: string;
+  governance_status: WorldGovernanceStatus;
   transfer_role: TransferRole;
   trigger_statement: string;
   visible_facts: string[];
+  available_actions: WorldAction[];
+  pressure_context: string;
   immutable_rules: ImmutableRules;
   behavior_anchors: {
     premature_commitment: BehaviorAnchor;
@@ -73,6 +86,86 @@ export type CausalWorldVersion = {
   source_references: string[];
   created_at: string;
 };
+
+export const CausalWorldVersionSchema: z.ZodType<CausalWorldVersion> = z.object({
+  world_id: z.string().min(1),
+  version: z.string().min(1),
+  target_habit: z.string().min(1),
+  domain: z.string().min(1),
+  governance_status: z.enum(["draft", "review", "approved", "deprecated"]),
+  transfer_role: z.enum(["calibration", "intervention", "transfer_test"]),
+  trigger_statement: z.string().min(1),
+  visible_facts: z.array(z.string().min(1)),
+  available_actions: z.array(
+    z.object({
+      id: z.string().min(1),
+      label: z.string().min(1),
+      category: z.enum(["investigate", "request_data", "commit"]),
+    })
+  ),
+  pressure_context: z.string().min(1),
+  immutable_rules: z.object({
+    model_forbidden_to_modify: z.literal(true),
+    hidden_facts: z.array(
+      z.object({
+        id: z.string().min(1),
+        content: z.string().min(1),
+        reveal_condition_id: z.string().min(1),
+        causal_significance: z.string().min(1),
+      })
+    ),
+    causal_rules: z.array(
+      z.object({
+        id: z.string().min(1),
+        trigger_action: z.string().min(1),
+        consequence_path: z.enum(["premature", "investigated"]),
+        short_term: z.string().min(1),
+        medium_term: z.string().min(1),
+        long_term: z.string().min(1),
+        counterfactual: z.string().min(1),
+      })
+    ),
+    role_interests: z.array(
+      z.object({
+        role: z.string().min(1),
+        stated_position: z.string().min(1),
+        true_interest: z.string().min(1),
+        information_boundary: z.string().min(1),
+      })
+    ),
+    reveal_conditions: z.array(
+      z.object({
+        id: z.string().min(1),
+        trigger: z.string().min(1),
+        reveals: z.array(z.string().min(1)).min(1),
+      })
+    ),
+  }),
+  behavior_anchors: z.object({
+    premature_commitment: z.object({
+      level: z.literal(1),
+      description: z.string().min(1),
+      observable_indicators: z.array(z.string()),
+      anti_examples: z.array(z.string()),
+    }),
+    adequate_investigation: z.object({
+      level: z.literal(3),
+      description: z.string().min(1),
+      observable_indicators: z.array(z.string()),
+      anti_examples: z.array(z.string()),
+    }),
+    model_behavior: z.object({
+      level: z.literal(5),
+      description: z.string().min(1),
+      observable_indicators: z.array(z.string()),
+      anti_examples: z.array(z.string()),
+    }),
+  }),
+  transfer_surface_differences: z.array(z.string()),
+  approved_by: z.string().min(1).nullable(),
+  source_references: z.array(z.string().min(1)),
+  created_at: z.string().min(1),
+});
 
 // ── 世界身份 ─────────────────────────────────────────────────────
 export type CausalWorld = {
@@ -297,7 +390,29 @@ export function createIntervention(params: {
   };
 }
 
+export function createJudgmentHypothesis(params: {
+  id?: string;
+  userId: string;
+  habitName: string;
+  triggerConditions?: string[];
+  confidence?: HypothesisConfidence;
+}): JudgmentHypothesis {
+  const now = new Date().toISOString();
+  return {
+    id: params.id ?? uid("hyp"),
+    user_id: params.userId,
+    habit_name: params.habitName,
+    trigger_conditions: params.triggerConditions ?? [],
+    confidence: params.confidence ?? "insufficient",
+    supporting_evidence_ids: [],
+    counter_evidence_ids: [],
+    last_updated_at: now,
+    created_at: now,
+  };
+}
+
 export function createHypothesisEvidence(params: {
+  evidenceId?: string;
   hypothesisId: string;
   decisionEventId: string;
   evidenceType: HypothesisEvidenceType;
@@ -307,7 +422,7 @@ export function createHypothesisEvidence(params: {
   transferWorldId?: string;
 }): HypothesisEvidence {
   return {
-    id: uid("hyp-ev"),
+    id: params.evidenceId ?? uid("hyp-ev"),
     hypothesis_id: params.hypothesisId,
     decision_event_id: params.decisionEventId,
     evidence_type: params.evidenceType,

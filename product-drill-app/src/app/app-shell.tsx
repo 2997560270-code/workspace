@@ -2,10 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { WorldWorkbench } from "./world-workbench";
-import { JudgmentProfilePanel } from "./judgment-profile-panel";
+import { JudgmentProfilePanel, WorldDecisionHistoryPanel } from "./judgment-profile-panel";
+import {
+  DEFAULT_WORLD_ID,
+  getNextDemoWorld,
+  getNextIncompleteDemoWorld,
+} from "../lib/world-seeds";
 import { ANALYTICS_EVENTS } from "../lib/analytics/events";
 import { trackClientEvent } from "../lib/analytics/client";
 import { StoredHistorySchema } from "../lib/api/schemas";
+import { fetchNextChallenge } from "../lib/challenge-client";
 import {
   createRemoteSession,
   fetchRemoteHistory,
@@ -15,6 +21,7 @@ import {
   submitRemoteRetry,
   syncDeterministicRecord
 } from "../lib/api/training-client";
+import type { NextChallengeSelection } from "../lib/challenge-selection";
 import { buildAbilityProfile } from "../lib/ability-profile";
 import {
   evaluateRetry,
@@ -50,6 +57,7 @@ import {
 } from "../lib/training-session";
 
 const STORAGE_KEY = "product-drill-direction-a-v1";
+const WORLD_PROGRESS_STORAGE_KEY = "product-drill-world-progress-v1";
 const EMPTY_JUDGMENT: ProductJudgment = {
   targetUser: "",
   currentWorkflow: "",
@@ -100,11 +108,15 @@ function TodayPanel({
   onStart,
   onOpenReview,
   onStartWorkbench,
+  nextWorldTitle,
+  nextWorldReason,
 }: {
   records: TrainingHistoryRecord[];
   onStart: (scenarioId: string, mode?: TrainingSession["mode"]) => void;
   onOpenReview: () => void;
   onStartWorkbench: (worldId?: string) => void;
+  nextWorldTitle: string;
+  nextWorldReason: string;
 }) {
   const profile = buildAbilityProfile(records);
   const recommended = records.length ? TRAINING_SCENARIOS[0] : TRAINING_SCENARIOS[2];
@@ -130,7 +142,7 @@ function TodayPanel({
             <button className="button button-secondary" onClick={() => onStartWorkbench()} type="button">
               进入世界工作台 <ArrowIcon />
             </button>
-            <span>完成后获得逐句证据反馈</span>
+            <span title={nextWorldReason}>下一挑战：{nextWorldTitle}</span>
           </div>
         </div>
         <div className="hero-proof">
@@ -834,12 +846,49 @@ export function AppShell({
   const [activeTraining, setActiveTraining] = useState<{ scenarioId: string; mode: TrainingSession["mode"] } | null>(null);
   // #4 世界工作台：null = 未激活，string = 目标 world_id
   const [activeWorkbenchWorldId, setActiveWorkbenchWorldId] = useState<string | null>(null);
+  const [completedWorldIds, setCompletedWorldIds] = useState<string[]>([]);
+  const [nextChallengeSelection, setNextChallengeSelection] = useState<NextChallengeSelection | null>(null);
+  const [worldProgressReady, setWorldProgressReady] = useState(false);
   const [historyRecords, setHistoryRecords] = useState<TrainingHistoryRecord[]>([]);
   const [storageReady, setStorageReady] = useState(false);
   const [historyStatus, setHistoryStatus] = useState<"loading" | "server" | "local">("loading");
   const topbarRef = useRef<HTMLElement>(null);
   const meta = getViewMeta(view);
   const storageKey = `${STORAGE_KEY}:${userId}`;
+  const worldProgressKey = `${WORLD_PROGRESS_STORAGE_KEY}:${userId}`;
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(worldProgressKey);
+      const parsed: unknown = raw ? JSON.parse(raw) : [];
+      setCompletedWorldIds(
+        Array.isArray(parsed)
+          ? parsed.filter((id): id is string => typeof id === "string")
+          : []
+      );
+    } catch {
+      setCompletedWorldIds([]);
+    } finally {
+      setWorldProgressReady(true);
+    }
+  }, [worldProgressKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchNextChallenge()
+      .then((selection) => {
+        if (!cancelled) setNextChallengeSelection(selection);
+      })
+      .catch(() => {
+        // The local progression fallback remains available when the API is offline.
+      });
+    return () => { cancelled = true; };
+  }, [userId]);
+
+  useEffect(() => {
+    if (!worldProgressReady) return;
+    window.localStorage.setItem(worldProgressKey, JSON.stringify(completedWorldIds));
+  }, [completedWorldIds, worldProgressKey, worldProgressReady]);
 
   useEffect(() => {
     let cancelled = false;
@@ -907,6 +956,29 @@ export function AppShell({
     }
   }
 
+  function completeWorkbenchWorld(worldId: string, nextChallenge?: NextChallengeSelection) {
+    setCompletedWorldIds((current) => current.includes(worldId) ? current : [...current, worldId]);
+    setNextChallengeSelection(nextChallenge ?? null);
+    if (nextChallenge && nextChallenge.completed_world_ids.length >= 3) {
+      setActiveWorkbenchWorldId(null);
+      setView("ability");
+      return;
+    }
+    const nextWorld = nextChallenge
+      ? getNextDemoWorld(nextChallenge.world_id) ?? getNextDemoWorld(worldId)
+      : getNextDemoWorld(worldId);
+    if (nextChallenge?.world_id) {
+      setActiveWorkbenchWorldId(nextChallenge.world_id);
+      return;
+    }
+    if (nextWorld) {
+      setActiveWorkbenchWorldId(nextWorld.world_id);
+      return;
+    }
+    setActiveWorkbenchWorldId(null);
+    setView("ability");
+  }
+
   const pageTitle = activeWorkbenchWorldId
     ? "世界工作台"
     : activeTraining
@@ -919,6 +991,15 @@ export function AppShell({
     : meta.description;
   const completedThisWeek = useMemo(() => historyRecords.length, [historyRecords.length]);
   const sourceLabel = historyStatus === "loading" ? "正在同步" : historyStatus === "server" ? "服务端记录" : "本地缓存";
+  const nextWorkbenchWorld = useMemo(
+    () => getNextIncompleteDemoWorld(completedWorldIds),
+    [completedWorldIds]
+  );
+  const displayedNextChallenge = nextChallengeSelection ?? {
+    world_title: nextWorkbenchWorld.title,
+    reason: "按本地世界进度继续挑战。",
+    world_id: nextWorkbenchWorld.world_id,
+  };
 
   return (
     <main className="app-shell">
@@ -938,6 +1019,7 @@ export function AppShell({
               key={item.view}
               onClick={() => {
                 setActiveTraining(null);
+                setActiveWorkbenchWorldId(null);
                 setView(item.view);
               }}
               type="button"
@@ -968,14 +1050,13 @@ export function AppShell({
         <div className="content">
           {activeWorkbenchWorldId !== null ? (
             <WorldWorkbench
+              key={activeWorkbenchWorldId}
               initialWorldId={activeWorkbenchWorldId}
               onClose={() => {
                 setActiveWorkbenchWorldId(null);
                 setView("today");
               }}
-              onRunComplete={() => {
-                // 未来：更新世界完成记录
-              }}
+              onRunComplete={completeWorkbenchWorld}
             />
           ) : activeTraining ? (
             <TrainingWorkspace
@@ -992,13 +1073,18 @@ export function AppShell({
             <TodayPanel
               onOpenReview={() => setView("review")}
               onStart={startTraining}
-              onStartWorkbench={(worldId) => setActiveWorkbenchWorldId(worldId ?? "world-1")}
+              onStartWorkbench={(worldId) => setActiveWorkbenchWorldId(worldId ?? displayedNextChallenge.world_id ?? DEFAULT_WORLD_ID)}
+              nextWorldTitle={displayedNextChallenge.world_title}
+              nextWorldReason={displayedNextChallenge.reason}
               records={historyRecords}
             />
           ) : view === "map" ? (
             <TrainingMap onStart={startTraining} />
           ) : view === "review" ? (
-            <ReviewPanel onStart={startTraining} records={historyRecords} />
+            <div className="stack-lg">
+              <WorldDecisionHistoryPanel />
+              <ReviewPanel onStart={startTraining} records={historyRecords} />
+            </div>
           ) : view === "ability" ? (
             // #6 新链路：判断证据画像（替换旧 totalScore / 雷达图）
             // 旧 AbilityPanel 保留供旧训练链路使用

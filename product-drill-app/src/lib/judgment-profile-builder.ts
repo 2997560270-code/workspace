@@ -8,6 +8,7 @@
  * - 辅助/迁移/同世界修正状态可区分
  */
 import type { HypothesisConfidence, HypothesisEvidence, JudgmentHypothesis } from "./causal-world";
+import { PREMATURE_SOLUTION_COMMITMENT_CLAIM } from "./behavior-claims";
 
 // ── 输入 ──────────────────────────────────────────────────────────
 export type JudgmentProfileInput = {
@@ -42,6 +43,7 @@ export type HypothesisDisplayItem = {
   trigger_conditions: string[];
   /** 人类可读的置信度标签（不是数字） */
   confidence_label: string;
+  rubric_version: string;
   /**
    * 永远为 false — 置信度不得作为数字分数展示。
    * 存在此字段让调用方无需猜测意图。
@@ -112,6 +114,7 @@ export function buildJudgmentProfile(
       habit_name: hyp.habit_name,
       trigger_conditions: hyp.trigger_conditions,
       confidence_label: getConfidenceLabel(hyp.confidence),
+      rubric_version: PREMATURE_SOLUTION_COMMITMENT_CLAIM.version,
       show_confidence_as_score: false,
       supporting_evidence: supporting,
       counter_evidence: counter,

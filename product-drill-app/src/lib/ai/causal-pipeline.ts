@@ -18,6 +18,11 @@ import type {
   WorldEvent,
 } from "../causal-world";
 import { z } from "zod";
+import {
+  DISCOVERY_DIMENSIONS,
+  REQUIRED_FORBIDDEN_INFERENCES,
+  type DiscoveryDimension,
+} from "../behavior-claims";
 
 export type WorldNarration = z.infer<typeof WorldNarratorOutputSchema> & {
   unofficial: boolean;
@@ -76,27 +81,35 @@ function deterministicBehaviorObservation(
   const validIds = new Set(eventHistory.map((e) => e.id));
   const validBasis = decisionEvent.evidence_basis.filter((id) => validIds.has(id));
 
-  // 判断是否过早承诺：evidence_basis 为空 = 跳过三维度
-  const isPremature = validBasis.length === 0;
+  const eventsById = new Map(eventHistory.map((event) => [event.id, event]));
+  const structuredEvidence = validBasis.flatMap((eventId) => {
+    const event = eventsById.get(eventId);
+    if (!event) return [];
+    const dimension = event.payload.discovery_dimension;
+    if (!DISCOVERY_DIMENSIONS.includes(dimension as DiscoveryDimension)) return [];
+    return [{ event, eventId, dimension: dimension as DiscoveryDimension }];
+  });
+  const coveredDimensions = new Set(structuredEvidence.map((item) => item.dimension));
+  const missingDimensions = DISCOVERY_DIMENSIONS.filter((dimension) => !coveredDimensions.has(dimension));
+  const hasMinimumEvidence = coveredDimensions.size >= 2;
 
-  // Fix: when isPremature, evidence_event_ids must be empty — do NOT fabricate
-  // world_event_id as a stand-in for a real investigation event.
   return {
-    observations: isPremature
-      ? [
-          {
-            behavior_code: "E-02",
-            description: "[确定性演示] 决策时未引用任何调查事件证据，可能存在过早承诺。",
-            evidence_event_ids: validBasis,  // empty when isPremature — intentional
-            evidence_quotes: [],
-            dimension_covered: "none",
-          },
-        ]
+    observations: hasMinimumEvidence
+      ? structuredEvidence.map(({ event, eventId, dimension }) => ({
+          behavior_code: `DISCOVERY_${dimension.toUpperCase()}`,
+          description: `[确定性演示] 决策引用了结构化的 ${dimension} 调查事件。`,
+          evidence_event_ids: [eventId],
+          evidence_quotes:
+            typeof event.payload.text === "string" ? [event.payload.text] : [],
+          dimension_covered: dimension,
+        }))
       : [],
-    missing_dimensions: isPremature ? ["workflow", "consequence", "alternative"] : [],
-    assisted: wasAssisted,  // Fix: propagate wasAssisted instead of hardcoding false
-    confidence: isPremature ? "low" : "medium",
-    insufficient_reason: isPremature ? "[确定性演示] 证据不足，无法输出能力结论。" : null,
+    missing_dimensions: missingDimensions,
+    assisted: wasAssisted,
+    confidence: hasMinimumEvidence ? "medium" : "low",
+    insufficient_reason: hasMinimumEvidence
+      ? null
+      : "[确定性演示] 缺少至少两个结构化发现维度，无法输出能力结论。",
     model_version: "deterministic-v1",
   };
 }
@@ -131,11 +144,7 @@ function deterministicHypothesisUpdate(
     rationale: "[确定性演示] 基于行为观察的简单推断，不用于正式评估。",
     referenced_evidence_ids: observation.observations.flatMap((o) => o.evidence_event_ids),
     applicable_trigger_conditions: [],
-    forbidden_inferences_confirmed: [
-      "overall_PM_competency",
-      "hiring_fit",
-      "permanent_trait",
-    ],
+    forbidden_inferences_confirmed: [...REQUIRED_FORBIDDEN_INFERENCES],
     model_version: "deterministic-v1",
   };
 }
@@ -237,11 +246,22 @@ export async function observeBehavior(params: {
     const validIds = new Set(params.eventHistory.map((e) => e.id));
     // Fix: drop entire observation when all its IDs are hallucinated, rather
     // than keeping it with an empty array that bypasses the min(1) contract.
+    const eventsById = new Map(params.eventHistory.map((event) => [event.id, event]));
     const safeObservations = parsed.observations
-      .map((obs) => ({
-        ...obs,
-        evidence_event_ids: obs.evidence_event_ids.filter((id) => validIds.has(id)),
-      }))
+      .map((obs) => {
+        const evidenceEventIds = obs.evidence_event_ids.filter((id) => validIds.has(id));
+        const sourceTexts = evidenceEventIds.flatMap((id) => {
+          const text = eventsById.get(id)?.payload.text;
+          return typeof text === "string" ? [text] : [];
+        });
+        return {
+          ...obs,
+          evidence_event_ids: evidenceEventIds,
+          evidence_quotes: obs.evidence_quotes.filter((quote) =>
+            sourceTexts.some((source) => source.includes(quote))
+          ),
+        };
+      })
       .filter((obs) => obs.evidence_event_ids.length > 0);
 
     // 若校验后无任何有效证据，降为 low confidence
@@ -314,11 +334,7 @@ export async function updateHypothesis(params: {
 
     // 确保禁止推断项被声明
     const forbiddenInferences = new Set(parsed.forbidden_inferences_confirmed);
-    for (const required of [
-      "overall_PM_competency",
-      "hiring_fit",
-      "permanent_trait",
-    ]) {
+    for (const required of REQUIRED_FORBIDDEN_INFERENCES) {
       forbiddenInferences.add(required);
     }
 

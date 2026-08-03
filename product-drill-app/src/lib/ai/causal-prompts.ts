@@ -1,4 +1,8 @@
 import type { CausalWorldVersion, WorldEvent, DecisionEvent } from "../causal-world";
+import {
+  PREMATURE_SOLUTION_COMMITMENT_CLAIM,
+  REQUIRED_FORBIDDEN_INFERENCES,
+} from "../behavior-claims";
 import type { BehaviorObservation } from "./causal-pipeline";
 
 // ── World Narrator prompt ─────────────────────────────────────────
@@ -26,6 +30,12 @@ export function buildWorldNarratorPrompt(params: {
       {
         world_id: worldVersion.world_id,
         version: worldVersion.version,
+        target_habit: worldVersion.target_habit,
+        domain: worldVersion.domain,
+        governance_status: worldVersion.governance_status,
+        pressure_context: worldVersion.pressure_context,
+        model_forbidden_to_modify:
+          worldVersion.immutable_rules.model_forbidden_to_modify,
         trigger_statement: worldVersion.trigger_statement,
         role_interests: worldVersion.immutable_rules.role_interests.map((r) => ({
           role: r.role,
@@ -51,6 +61,7 @@ export function buildWorldNarratorPrompt(params: {
     userAction,
     "",
     "RULES (strictly enforced):",
+    "- model_forbidden_to_modify=true is authoritative: model output can narrate but cannot change world truth.",
     "- Narrate only within the world version above. Never create new facts, budgets, metrics, or stakeholders.",
     "- If the learner's action matches a reveal_condition trigger, list those hidden_fact ids in revealed_fact_ids.",
     "- Do NOT reveal true_interest unless a matching reveal_condition was triggered.",
@@ -71,13 +82,15 @@ export function buildBehaviorObserverPrompt(params: {
   const { worldVersion, decisionEvent, eventHistory, behaviorAnchors, wasAssisted } = params;
 
   const validEventIds = eventHistory.map((e) => e.id);
+  const claim = PREMATURE_SOLUTION_COMMITMENT_CLAIM;
 
   return [
     "You are Behavior Observer for a PM judgment training system.",
     "Your task: extract OBSERVABLE behaviors from the learner's decision event.",
     "You must NOT infer, fabricate, or score abilities beyond what the evidence shows.",
     "",
-    "TARGET HABIT: premature_solution_commitment",
+    `TARGET HABIT: ${claim.id} (claim version ${claim.version})`,
+    `APPROVED DEFINITION: ${claim.definition}`,
     "Three dimensions must be investigated BEFORE committing to a solution:",
     "  - workflow: current workflow / who does what / frequency",
     "  - consequence: problem impact / business cost / urgency",
@@ -165,5 +178,6 @@ export function buildHypothesisUpdaterPrompt(params: {
     "- forbidden_inferences_confirmed must include at minimum: 'overall_PM_competency', 'hiring_fit', 'permanent_trait'.",
     "- Do NOT infer the learner's intent, motivation, or trait from a single observation.",
     "- Same-world correction does NOT constitute transfer evidence, even if behavior improved.",
+    `- Confirm every forbidden inference boundary: ${REQUIRED_FORBIDDEN_INFERENCES.join(", ")}.`,
   ].join("\n");
 }

@@ -10,13 +10,194 @@
  * - 证据不足时不显示伪精确分数
  * - 分析事件不包含对话原文或决策正文
  */
-import { useEffect, useState } from "react";
-import { fetchJudgmentProfile } from "../lib/challenge-client";
+import { useEffect, useRef, useState } from "react";
+import {
+  fetchChallengeHistory,
+  fetchDecisionTimeline,
+  fetchJudgmentProfile,
+} from "../lib/challenge-client";
 import type { HypothesisDisplayItem, EvidenceDisplayItem } from "../lib/judgment-profile-builder";
+import type {
+  ChallengeDecisionSummary,
+  ChallengeDecisionTimeline,
+} from "../lib/challenge-history";
 import { trackClientEvent } from "../lib/analytics/client";
 import { CAUSAL_EVENTS, buildProfileViewedProps } from "../lib/causal-analytics";
 
 // ── 工具 ──────────────────────────────────────────────────────────
+
+const CONFIDENCE_LABELS: Record<ChallengeDecisionSummary["confidence"], string> = {
+  high: "高",
+  medium: "中",
+  low: "低",
+};
+
+const EVENT_LABELS: Record<ChallengeDecisionTimeline["events"][number]["event_type"], string> = {
+  user_action: "调查动作",
+  world_response: "世界回应",
+  reveal: "后果揭示",
+  intervention: "系统干预",
+};
+
+const INTERVENTION_LABELS: Record<ChallengeDecisionTimeline["interventions"][number]["intervention_type"], string> = {
+  hint: "提示",
+  feedback: "证据反馈",
+  counterfactual: "反事实路径",
+  reveal_consequence: "后果揭示",
+};
+
+function formatDateTime(value: string | null): string {
+  if (!value) return "尚未完成";
+  return new Date(value).toLocaleString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getEventDescription(payload: Record<string, unknown>): string {
+  if (typeof payload.text === "string" && payload.text.trim()) return payload.text;
+  if (typeof payload.content === "string" && payload.content.trim()) return payload.content;
+  return "已记录结构化世界事件";
+}
+
+export function DecisionTimelinePanel({
+  decisionEventId,
+  focusRequestKey,
+  onClose,
+}: {
+  decisionEventId: string;
+  focusRequestKey: number;
+  onClose: () => void;
+}) {
+  const [timeline, setTimeline] = useState<ChallengeDecisionTimeline | null>(null);
+  const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
+  const panelRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const animationFrame = window.requestAnimationFrame(() => {
+      panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      panelRef.current?.focus({ preventScroll: true });
+    });
+
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [decisionEventId, focusRequestKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setStatus("loading");
+    setTimeline(null);
+    fetchDecisionTimeline(decisionEventId)
+      .then((result) => {
+        if (cancelled) return;
+        setTimeline(result);
+        setStatus("loaded");
+      })
+      .catch(() => {
+        if (!cancelled) setStatus("error");
+      });
+    return () => { cancelled = true; };
+  }, [decisionEventId]);
+
+  return (
+    <section
+      aria-label="决策与后果时间线"
+      className="decision-timeline surface"
+      ref={panelRef}
+      tabIndex={-1}
+    >
+      <div className="decision-timeline-header">
+        <div>
+          <span className="section-kicker">决策与后果时间线</span>
+          <h2>{timeline?.world_title ?? "正在读取决策记录"}</h2>
+        </div>
+        <button
+          aria-label="关闭决策时间线"
+          className="decision-timeline-close"
+          onClick={onClose}
+          title="关闭"
+          type="button"
+        >
+          ×
+        </button>
+      </div>
+
+      {status === "loading" ? <p className="quiet">正在加载可追溯记录…</p> : null}
+      {status === "error" ? (
+        <div className="decision-timeline-error" role="alert">
+          <p>无法加载这条决策记录，请稍后重试。</p>
+          <button className="text-button" onClick={onClose} type="button">返回记录列表</button>
+        </div>
+      ) : null}
+
+      {status === "loaded" && timeline ? (
+        <>
+          <dl className="decision-provenance" aria-label="版本追溯">
+            <div><dt>World</dt><dd>{timeline.world_id} · {timeline.world_version}</dd></div>
+            <div><dt>Rubric</dt><dd>{timeline.rubric_version}</dd></div>
+            <div><dt>Model</dt><dd>{timeline.model_version}</dd></div>
+            <div><dt>完成时间</dt><dd>{formatDateTime(timeline.completed_at)}</dd></div>
+          </dl>
+
+          <ol className="decision-timeline-list">
+            {timeline.events.map((event) => (
+              <li key={event.id}>
+                <div className="decision-timeline-marker" aria-hidden="true" />
+                <div className="decision-timeline-content">
+                  <div className="decision-timeline-meta">
+                    <strong>{EVENT_LABELS[event.event_type]}</strong>
+                    <span>{formatDateTime(event.created_at)}</span>
+                  </div>
+                  <p>{getEventDescription(event.payload)}</p>
+                  <code>{event.id}</code>
+                </div>
+              </li>
+            ))}
+
+            <li>
+              <div className="decision-timeline-marker decision-marker-primary" aria-hidden="true" />
+              <div className="decision-timeline-content decision-record">
+                <div className="decision-timeline-meta">
+                  <strong>提交决策</strong>
+                  <span>{formatDateTime(timeline.decision_created_at)}</span>
+                </div>
+                <dl className="decision-detail-list">
+                  <div><dt>判断</dt><dd>{timeline.judgment}</dd></div>
+                  <div><dt>行动</dt><dd>{timeline.chosen_action}</dd></div>
+                  <div><dt>预期结果</dt><dd>{timeline.expected_outcome}</dd></div>
+                  <div><dt>信心</dt><dd>{CONFIDENCE_LABELS[timeline.confidence]}</dd></div>
+                  <div><dt>证据依据</dt><dd>{timeline.evidence_basis.length ? timeline.evidence_basis.join("、") : "未选择事件证据"}</dd></div>
+                  <div><dt>放弃方案</dt><dd>{timeline.rejected_alternatives.length ? timeline.rejected_alternatives.join("、") : "未记录"}</dd></div>
+                </dl>
+                <code>{timeline.decision_event_id}</code>
+              </div>
+            </li>
+
+            {timeline.interventions.map((intervention) => (
+              <li key={intervention.id}>
+                <div className="decision-timeline-marker" aria-hidden="true" />
+                <div className="decision-timeline-content">
+                  <div className="decision-timeline-meta">
+                    <strong>{INTERVENTION_LABELS[intervention.intervention_type]}</strong>
+                    <span>{formatDateTime(intervention.triggered_at)}</span>
+                  </div>
+                  <p>{intervention.content}</p>
+                  <code>{intervention.id}</code>
+                </div>
+              </li>
+            ))}
+          </ol>
+
+          <div className={`decision-reveal-state ${timeline.consequences_revealed ? "revealed" : "pending"}`}>
+            <strong>{timeline.consequences_revealed ? "后果已揭示" : "后果尚未揭示"}</strong>
+            <span>此状态来自不可变决策事件，而非画像推断。</span>
+          </div>
+        </>
+      ) : null}
+    </section>
+  );
+}
 
 function EvidenceTypeBadge({
   type,
@@ -36,9 +217,11 @@ function EvidenceTypeBadge({
 function EvidenceCard({
   item,
   type,
+  onOpenDecision,
 }: {
   item: EvidenceDisplayItem;
   type: "supporting" | "counter" | "assisted" | "transfer";
+  onOpenDecision: (decisionEventId: string) => void;
 }) {
   return (
     <div className="ev-card">
@@ -56,14 +239,26 @@ function EvidenceCard({
         <span title="模型版本">模型 {item.model_version}</span>
       </div>
       <div className="ev-card-link">
-        <span className="detail-label">决策事件</span>
-        <code className="ev-dec-id">{item.decision_event_id}</code>
+        <code className="ev-dec-id" title={item.decision_event_id}>{item.decision_event_id}</code>
+        <button
+          className="text-button ev-open-decision"
+          onClick={() => onOpenDecision(item.decision_event_id)}
+          type="button"
+        >
+          查看决策与后果
+        </button>
       </div>
     </div>
   );
 }
 
-function HypothesisCard({ item }: { item: HypothesisDisplayItem }) {
+function HypothesisCard({
+  item,
+  onOpenDecision,
+}: {
+  item: HypothesisDisplayItem;
+  onOpenDecision: (decisionEventId: string) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const hasAnyEvidence = item.total_evidence_count > 0;
 
@@ -97,6 +292,8 @@ function HypothesisCard({ item }: { item: HypothesisDisplayItem }) {
         </div>
       )}
 
+      <div className="jp-rubric provenance">Rubric {item.rubric_version}</div>
+
       {!hasAnyEvidence && (
         <p className="jp-no-evidence">尚无证据，完成世界工作台训练后自动更新。</p>
       )}
@@ -107,7 +304,7 @@ function HypothesisCard({ item }: { item: HypothesisDisplayItem }) {
             <section>
               <span className="section-kicker">支持证据（独立）</span>
               {item.supporting_evidence.map((ev) => (
-                <EvidenceCard item={ev} key={ev.id} type="supporting" />
+                <EvidenceCard item={ev} key={ev.id} onOpenDecision={onOpenDecision} type="supporting" />
               ))}
             </section>
           )}
@@ -116,7 +313,7 @@ function HypothesisCard({ item }: { item: HypothesisDisplayItem }) {
             <section>
               <span className="section-kicker">反证（需进一步验证）</span>
               {item.counter_evidence.map((ev) => (
-                <EvidenceCard item={ev} key={ev.id} type="counter" />
+                <EvidenceCard item={ev} key={ev.id} onOpenDecision={onOpenDecision} type="counter" />
               ))}
             </section>
           )}
@@ -125,7 +322,7 @@ function HypothesisCard({ item }: { item: HypothesisDisplayItem }) {
             <section>
               <span className="section-kicker">迁移证据（陌生世界独立决策）</span>
               {item.transfer_evidence.map((ev) => (
-                <EvidenceCard item={ev} key={ev.id} type="transfer" />
+                <EvidenceCard item={ev} key={ev.id} onOpenDecision={onOpenDecision} type="transfer" />
               ))}
             </section>
           )}
@@ -134,7 +331,7 @@ function HypothesisCard({ item }: { item: HypothesisDisplayItem }) {
             <section>
               <span className="section-kicker">辅助证据（含提示，不计入独立趋势）</span>
               {item.assisted_evidence.map((ev) => (
-                <EvidenceCard item={ev} key={ev.id} type="assisted" />
+                <EvidenceCard item={ev} key={ev.id} onOpenDecision={onOpenDecision} type="assisted" />
               ))}
             </section>
           )}
@@ -153,6 +350,13 @@ function HypothesisCard({ item }: { item: HypothesisDisplayItem }) {
 export function JudgmentProfilePanel() {
   const [items, setItems] = useState<HypothesisDisplayItem[]>([]);
   const [status, setStatus] = useState<"loading" | "loaded" | "empty" | "error">("loading");
+  const [selectedDecisionId, setSelectedDecisionId] = useState<string | null>(null);
+  const [timelineFocusRequest, setTimelineFocusRequest] = useState(0);
+
+  function openDecisionTimeline(decisionEventId: string) {
+    setSelectedDecisionId(decisionEventId);
+    setTimelineFocusRequest((request) => request + 1);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -211,6 +415,14 @@ export function JudgmentProfilePanel() {
 
   return (
     <div className="jp-layout">
+      {selectedDecisionId ? (
+        <DecisionTimelinePanel
+          decisionEventId={selectedDecisionId}
+          focusRequestKey={timelineFocusRequest}
+          onClose={() => setSelectedDecisionId(null)}
+        />
+      ) : null}
+
       <section className="jp-summary surface-dark">
         <div>
           <span className="section-kicker light">判断习惯画像</span>
@@ -238,9 +450,89 @@ export function JudgmentProfilePanel() {
 
       <div className="jp-hypothesis-list">
         {items.map((item) => (
-          <HypothesisCard item={item} key={item.id} />
+          <HypothesisCard item={item} key={item.id} onOpenDecision={openDecisionTimeline} />
         ))}
       </div>
     </div>
+  );
+}
+
+export function WorldDecisionHistoryPanel() {
+  const [records, setRecords] = useState<ChallengeDecisionSummary[]>([]);
+  const [selectedDecisionId, setSelectedDecisionId] = useState<string | null>(null);
+  const [timelineFocusRequest, setTimelineFocusRequest] = useState(0);
+  const [status, setStatus] = useState<"loading" | "loaded" | "empty" | "error">("loading");
+
+  function openDecisionTimeline(decisionEventId: string) {
+    setSelectedDecisionId(decisionEventId);
+    setTimelineFocusRequest((request) => request + 1);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchChallengeHistory()
+      .then((result) => {
+        if (cancelled) return;
+        setRecords(result);
+        setStatus(result.length ? "loaded" : "empty");
+      })
+      .catch(() => {
+        if (!cancelled) setStatus("error");
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  return (
+    <section className="world-history" aria-labelledby="world-history-title">
+      <div className="world-history-heading">
+        <div>
+          <span className="section-kicker">世界工作台</span>
+          <h2 id="world-history-title">世界决策记录</h2>
+        </div>
+        <p>选择一条记录，查看调查、决策、后果和版本来源。</p>
+      </div>
+
+      {status === "loading" ? <div className="world-history-status surface">正在加载世界决策记录…</div> : null}
+      {status === "error" ? <div className="world-history-status surface" role="alert">世界决策记录加载失败，请刷新重试。</div> : null}
+      {status === "empty" ? (
+        <div className="world-history-status surface">
+          <h3>还没有已完成的世界决策</h3>
+          <p>完成一个世界工作台挑战后，调查、决策和后果会显示在这里。</p>
+        </div>
+      ) : null}
+
+      {status === "loaded" ? (
+        <div className="world-history-list">
+          {records.map((record) => (
+            <button
+              aria-pressed={selectedDecisionId === record.decision_event_id}
+              className={selectedDecisionId === record.decision_event_id ? "surface active" : "surface"}
+              key={record.decision_event_id}
+              onClick={() => openDecisionTimeline(record.decision_event_id)}
+              type="button"
+            >
+              <span className="world-history-index">{String(records.indexOf(record) + 1).padStart(2, "0")}</span>
+              <span className="world-history-copy">
+                <strong>{record.world_title}</strong>
+                <small>{record.chosen_action}</small>
+              </span>
+              <span className="world-history-meta">
+                <small>World {record.world_version}</small>
+                <small>{formatDateTime(record.completed_at)}</small>
+              </span>
+              <span aria-hidden="true" className="world-history-arrow">→</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {selectedDecisionId ? (
+        <DecisionTimelinePanel
+          decisionEventId={selectedDecisionId}
+          focusRequestKey={timelineFocusRequest}
+          onClose={() => setSelectedDecisionId(null)}
+        />
+      ) : null}
+    </section>
   );
 }

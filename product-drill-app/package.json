@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
+    "test:rls": "node scripts/test-local-rls.mjs",
+    "test:rls:local": "node scripts/test-local-rls.mjs",
+    "test:rls:supabase": "node --env-file-if-exists=.env.local scripts/test-supabase-rls.mjs",
     "e2e": "npm run build && playwright test",
     "eval:golden": "node scripts/validate-golden.cjs && vitest run tests/golden-evals.test.ts",
     "typecheck": "tsc --noEmit",
@@ -25,6 +28,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4",
     "@playwright/test": "latest",
     "@testing-library/react": "latest",
     "@types/node": "latest",

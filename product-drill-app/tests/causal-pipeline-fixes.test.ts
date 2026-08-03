@@ -20,10 +20,16 @@ function makeWorldVersion(
   return {
     world_id: "world-1",
     version: "1.0.0",
+    target_habit: "premature_solution_commitment",
+    domain: "test",
+    governance_status: "approved",
     transfer_role: "calibration",
     trigger_statement: "数据大屏请求",
     visible_facts: ["有一个数据大屏建设需求"],
+    available_actions: [],
+    pressure_context: "test",
     immutable_rules: {
+      model_forbidden_to_modify: true,
       hidden_facts: [
         { id: "fact-1", content: "报表使用频率低", reveal_condition_id: "rc-1", causal_significance: "重要" },
       ],
@@ -65,14 +71,14 @@ function makeDecision(override: Partial<DecisionEvent> = {}): DecisionEvent {
   };
 }
 
-function makeEvent(id: string): WorldEvent {
+function makeEvent(id: string, discoveryDimension?: "workflow" | "consequence" | "alternative"): WorldEvent {
   return {
     id,
     run_id: "run-001",
     event_type: "user_action",
     sequence_index: 0,
     actor: "user",
-    payload: { text: "调查行动" },
+    payload: { text: "调查行动", ...(discoveryDimension ? { discovery_dimension: discoveryDimension } : {}) },
     created_at: new Date().toISOString(),
   };
 }
@@ -169,18 +175,22 @@ describe("deterministicBehaviorObservation — no fabricated evidence IDs", () =
     }
   });
 
-  it("evidence_event_ids contains valid basis IDs when isPremature=false", async () => {
-    const evt = makeEvent("real-evt-001");
-    const decision = makeDecision({ evidence_basis: ["real-evt-001"] });
+  it("only emits observations for real, structured discovery evidence", async () => {
+    const events = [
+      makeEvent("real-evt-001", "workflow"),
+      makeEvent("real-evt-002", "consequence"),
+    ];
+    const decision = makeDecision({ evidence_basis: events.map((event) => event.id) });
     const result = await observeBehavior({
       worldVersion: makeWorldVersion(),
       decisionEvent: decision,
-      eventHistory: [evt],
+      eventHistory: events,
       wasAssisted: false,
     });
 
     expect(result.confidence).toBe("medium");
-    expect(result.observations).toHaveLength(0); // non-premature → no E-02
+    expect(result.observations).toHaveLength(2);
+    expect(result.observations.flatMap((observation) => observation.evidence_event_ids)).toEqual(events.map((event) => event.id));
   });
 });
 

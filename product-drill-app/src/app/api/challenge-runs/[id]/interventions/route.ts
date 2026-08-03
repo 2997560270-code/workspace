@@ -6,6 +6,8 @@ import {
 } from "@/lib/repositories/challenge-repository";
 import { captureServerException } from "@/lib/monitoring/server";
 import { isOpenAIConfigured, runtimeEnv } from "@/lib/env";
+import { evaluateChallengeDecision } from "@/lib/challenge-evaluation";
+import { selectNextChallengeForUser } from "@/lib/challenge-selection";
 
 export async function POST(
   request: Request,
@@ -28,9 +30,29 @@ export async function POST(
       interventionType: parsed.data.intervention_type,
       content: parsed.data.content,
       modelVersion,
-      worldVersion: "unknown", // worldVersion resolved from run in production
     });
-    return Response.json({ intervention }, { status: 201 });
+    const evaluation =
+      parsed.data.intervention_type === "feedback" && parsed.data.decision_event_id
+        ? await evaluateChallengeDecision({
+            userId: user.id,
+            runId,
+            decisionEventId: parsed.data.decision_event_id,
+          })
+        : null;
+    const nextChallenge = evaluation
+      ? await selectNextChallengeForUser(user.id)
+      : null;
+    return Response.json({
+      intervention,
+      evaluation: evaluation
+        ? {
+            confidence: evaluation.observation.confidence,
+            update_direction: evaluation.update.update_direction,
+            evidence_type: evaluation.evidence?.evidence_type ?? null,
+          }
+        : null,
+      next_challenge: nextChallenge,
+    }, { status: 201 });
   } catch (error) {
     if (error instanceof RunNotFoundError) return apiError("训练运行不存在。", 404);
     captureServerException(error, { area: "create_intervention", runId });

@@ -1,7 +1,16 @@
 import { apiError, parseJsonBody, requireApiUser } from "@/lib/api/server";
 import { AppendActionBodySchema } from "@/lib/api/challenge-schemas";
-import { appendWorldEvent, RunNotFoundError, InvalidRunStateError } from "@/lib/repositories/challenge-repository";
+import { narrateWorldResponse } from "@/lib/ai/causal-pipeline";
+import { isOpenAIConfigured } from "@/lib/env";
+import {
+  appendWorldEvent,
+  getChallengeRun,
+  getWorldEventsForRun,
+  RunNotFoundError,
+  InvalidRunStateError,
+} from "@/lib/repositories/challenge-repository";
 import { captureServerException } from "@/lib/monitoring/server";
+import { getDemoWorld } from "@/lib/world-seeds";
 
 export async function POST(
   request: Request,
@@ -23,7 +32,27 @@ export async function POST(
       actor: parsed.data.actor,
       payload: parsed.data.payload,
     });
-    return Response.json({ event: evt }, { status: 201 });
+    const run = await getChallengeRun(user.id, runId);
+    const world = run ? getDemoWorld(run.world_id) : undefined;
+    const userAction = parsed.data.payload.text ?? "";
+    const eventHistory = await getWorldEventsForRun(user.id, runId);
+    const narration = world && parsed.data.actor === "user"
+      ? await narrateWorldResponse({
+          worldVersion: world.version,
+          userAction,
+          eventHistory,
+          revealedFactIds: [],
+        })
+      : null;
+
+    return Response.json(
+      {
+        event_id: evt.id,
+        narration: narration?.narration,
+        unofficial: narration?.unofficial ?? !isOpenAIConfigured(),
+      },
+      { status: 201 }
+    );
   } catch (error) {
     if (error instanceof RunNotFoundError) return apiError("训练运行不存在。", 404);
     if (error instanceof InvalidRunStateError) return apiError("训练运行已结束，无法追加事件。", 409);

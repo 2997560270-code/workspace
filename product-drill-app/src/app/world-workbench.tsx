@@ -28,12 +28,22 @@ import {
 import {
   createChallengeRun,
   appendAction,
+  fetchNextChallenge,
   submitDecision,
   revealConsequences,
   recordIntervention,
 } from "../lib/challenge-client";
 import { buildInterventionContent } from "../lib/intervention-generator";
-import { DEMO_WORLDS, getDemoWorld, type WorldSeed } from "../lib/world-seeds";
+import {
+  DEMO_WORLDS,
+  allowsPreDecisionHint,
+  getDemoWorld,
+  getNextDemoWorld,
+  type WorldSeed,
+} from "../lib/world-seeds";
+import { DISCOVERY_DIMENSIONS, type DiscoveryDimension } from "../lib/behavior-claims";
+import type { NextChallengeSelection } from "../lib/challenge-selection";
+import type { InterventionApiResponse } from "../lib/challenge-client";
 import { trackClientEvent } from "../lib/analytics/client";
 import {
   CAUSAL_EVENTS,
@@ -59,7 +69,7 @@ type WorkbenchProps = {
   initialWorldId?: string;
   onClose: () => void;
   /** run 完成后回调，用于更新父组件状态 */
-  onRunComplete?: (worldId: string) => void;
+  onRunComplete?: (worldId: string, nextChallenge?: NextChallengeSelection) => void;
 };
 
 // ── 工具函数 ──────────────────────────────────────────────────────
@@ -244,11 +254,14 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
   const [state, setState] = useState<WorkbenchState | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [discoveryDimension, setDiscoveryDimension] = useState<DiscoveryDimension>("workflow");
   const [draft, setDraft] = useState<DecisionDraft>(EMPTY_DRAFT);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [revealContent, setRevealContent] = useState("");
   const [reflectContent, setReflectContent] = useState("");
+  const [nextChallenge, setNextChallenge] = useState<NextChallengeSelection | null>(null);
+  const [evaluation, setEvaluation] = useState<InterventionApiResponse["evaluation"]>(null);
   const [userEventIds, setUserEventIds] = useState<string[]>([]);
   const [seqIndex, setSeqIndex] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -327,7 +340,7 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
         sequence_index: userIdx,
         actor: "user",
         event_type: "user_action",
-        payload: { text: content },
+        payload: { text: content, discovery_dimension: discoveryDimension },
       });
 
       // 记录 user event id（供决策引用）
@@ -346,6 +359,9 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
         }
         return next;
       });
+      setDraft((current) => current.evidence_basis.includes(result.event_id)
+        ? current
+        : { ...current, evidence_basis: [...current.evidence_basis, result.event_id] });
 
       // 更新消息（含 narration）
       setMessages((prev) =>
@@ -365,6 +381,9 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
       // Fix (CRITICAL): register the local event ID so the decision form's
       // evidence-basis checkbox list is non-empty in offline mode.
       setUserEventIds((prev) => [...prev, localEventId]);
+      setDraft((current) => current.evidence_basis.includes(localEventId)
+        ? current
+        : { ...current, evidence_basis: [...current.evidence_basis, localEventId] });
       setMessages((prev) =>
         prev.map((m) => m.id === tmpUserId ? { ...m, event_id: localEventId } : m)
       );
@@ -395,7 +414,7 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
 
   // ── 使用提示 ────────────────────────────────────────────────────
   async function useHint() {
-    if (!state?.run_id || busy || !world) return;
+    if (!state?.run_id || busy || !world || !allowsPreDecisionHint(world)) return;
     setBusy(true);
     setError("");
 
@@ -425,7 +444,7 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
         intervention_type: "hint",
         content: hintContent,
       });
-      setState((prev) => prev ? recordHintUsed(prev, result.id) : prev);
+      setState((prev) => prev ? recordHintUsed(prev, result.intervention.id) : prev);
       setMessages((prev) => [...prev, worldMessage(`💡 提示：${hintContent}`)]);
       // #3 analytics: intervention_received
       trackClientEvent(CAUSAL_EVENTS.interventionReceived,
@@ -524,6 +543,16 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
     try {
       await revealConsequences(state.run_id, state.decision_event_id);
       const content = buildContent("");
+      try {
+        await recordIntervention(state.run_id, {
+          decision_event_id: state.decision_event_id,
+          intervention_type: "reveal_consequence",
+          content,
+        });
+      } catch {
+        // Revealing the governed consequence remains successful even if its
+        // timeline annotation cannot be persisted.
+      }
       setState((prev) => prev ? advanceToReveal(prev) : prev);
       setRevealContent(content);
       setMessages((prev) => [...prev, worldMessage(`🔍 ${content}`)]);
@@ -576,9 +605,10 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
       intervention_type: "feedback",
     });
 
+    let response: InterventionApiResponse | null = null;
     try {
       if (state.run_id && state.decision_event_id) {
-        await recordIntervention(state.run_id, {
+        response = await recordIntervention(state.run_id, {
           decision_event_id: state.decision_event_id,
           intervention_type: "feedback",
           content: feedbackContent,
@@ -588,6 +618,15 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
       // ignore recording errors in offline mode
     }
 
+    setEvaluation(response?.evaluation ?? null);
+    setNextChallenge(response?.next_challenge ?? null);
+    if (response && !response.next_challenge && state.run_id) {
+      try {
+        setNextChallenge(await fetchNextChallenge());
+      } catch {
+        // Keep the deterministic local fallback when the selection endpoint is unavailable.
+      }
+    }
     setReflectContent(feedbackContent);
     setState((prev) => prev ? advanceToReflect(prev) : prev);
     setBusy(false);
@@ -596,17 +635,24 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
   // ── 完成本轮 ────────────────────────────────────────────────────
   function handleFinish() {
     // #3 analytics: transfer_evidence_recorded (只对 transfer_test 世界触发)
-    if (world?.version.transfer_role === "transfer_test" && state?.run_id) {
+    if (
+      world?.version.transfer_role === "transfer_test" &&
+      state?.run_id &&
+      evaluation?.evidence_type
+    ) {
       trackClientEvent(CAUSAL_EVENTS.transferEvidenceRecorded,
         buildTransferEvidenceProps({
           worldId: world.world_id,
           worldVersion: world.version.version,
           runId: state.run_id,
-          evidenceType: state.was_assisted ? "assisted" : "transfer",
+          evidenceType: evaluation.evidence_type,
         })
       );
     }
-    if (world) onRunComplete?.(world.world_id);
+    if (world && onRunComplete) {
+      onRunComplete(world.world_id, nextChallenge ?? undefined);
+      return;
+    }
     onClose();
   }
 
@@ -618,6 +664,11 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
     );
   }
 
+  const worldNumber = DEMO_WORLDS.findIndex((item) => item.world_id === world.world_id) + 1;
+  const fallbackNextWorld = getNextDemoWorld(world.world_id);
+  const nextWorld = nextChallenge ? getDemoWorld(nextChallenge.world_id) : fallbackNextWorld;
+  const loopComplete = (nextChallenge?.completed_world_ids.length ?? 0) >= DEMO_WORLDS.length;
+
   return (
     <div className="world-workbench">
       {/* 顶栏 */}
@@ -625,7 +676,7 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
         <div className="wb-header-left">
           <button className="back-button" onClick={onClose} type="button">← 返回</button>
           <div>
-            <span className="section-kicker">{world.domain} · {world.transfer_role}</span>
+            <span className="section-kicker">世界 {worldNumber} / {DEMO_WORLDS.length} · {world.domain} · {world.transfer_role}</span>
             <h2>{world.title}</h2>
           </div>
         </div>
@@ -655,6 +706,23 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
           {/* 输入区（仅 investigate 阶段） */}
           {state.phase === "investigate" && (
             <div className="wb-composer">
+              <div className="wb-dimension-picker" aria-label="本次调查维度">
+                <span className="detail-label">本次调查维度</span>
+                <div className="wb-dimension-options">
+                  {DISCOVERY_DIMENSIONS.map((dimension) => (
+                    <button
+                      aria-pressed={discoveryDimension === dimension}
+                      className={discoveryDimension === dimension ? "active" : ""}
+                      disabled={busy}
+                      key={dimension}
+                      onClick={() => setDiscoveryDimension(dimension)}
+                      type="button"
+                    >
+                      {dimension === "workflow" ? "当前流程" : dimension === "consequence" ? "问题影响" : "替代方案"}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <textarea
                 aria-label="调查动作"
                 disabled={busy}
@@ -665,14 +733,16 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
                 value={input}
               />
               <div className="wb-composer-actions">
-                <button
-                  className="text-button"
-                  disabled={busy}
-                  onClick={() => { void useHint(); }}
-                  type="button"
-                >
-                  💡 提示（标记辅助证据）
-                </button>
+                {allowsPreDecisionHint(world) && (
+                  <button
+                    className="text-button"
+                    disabled={busy}
+                    onClick={() => { void useHint(); }}
+                    type="button"
+                  >
+                    提示（标记辅助证据）
+                  </button>
+                )}
                 <button
                   className="button button-secondary"
                   disabled={busy || messages.filter((m) => m.role === "user").length < 1}
@@ -750,6 +820,13 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
             <div className="wb-reflect surface">
               <span className="section-kicker">证据反馈</span>
               <p>{reflectContent}</p>
+              {nextChallenge && (
+                <div className="wb-next-challenge">
+                  <span className="detail-label">下一挑战</span>
+                  <strong>{nextChallenge.world_title}</strong>
+                  <p>{nextChallenge.reason}</p>
+                </div>
+              )}
               {state.was_assisted && (
                 <p className="wb-assisted-notice">
                   ⚠ 本轮使用了提示，决策证据标记为辅助，不计入独立能力趋势。
@@ -760,7 +837,13 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
                 onClick={handleFinish}
                 type="button"
               >
-                完成本轮训练
+                {loopComplete
+                  ? "完成闭环，查看判断画像"
+                  : nextChallenge?.is_remediation
+                  ? "进入修正练习"
+                  : nextWorld
+                    ? "进入下一个世界"
+                    : "完成闭环，查看判断画像"}
               </button>
             </div>
           )}

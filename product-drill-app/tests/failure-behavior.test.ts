@@ -14,10 +14,16 @@ function worldVersion(): CausalWorldVersion {
   return {
     world_id: "world-1",
     version: "1.0.0",
+    target_habit: "premature_solution_commitment",
+    domain: "test",
+    governance_status: "approved",
     transfer_role: "calibration",
     trigger_statement: "触发情境",
     visible_facts: [],
+    available_actions: [],
+    pressure_context: "test",
     immutable_rules: {
+      model_forbidden_to_modify: true,
       hidden_facts: [],
       causal_rules: [],
       role_interests: [],
@@ -52,14 +58,14 @@ function decision(override: Partial<DecisionEvent> = {}): DecisionEvent {
   };
 }
 
-function event(id: string): WorldEvent {
+function event(id: string, discoveryDimension?: "workflow" | "consequence" | "alternative"): WorldEvent {
   return {
     id,
     run_id: "run-1",
     event_type: "user_action",
     sequence_index: 0,
     actor: "user",
-    payload: {},
+    payload: discoveryDimension ? { discovery_dimension: discoveryDimension } : {},
     created_at: "2026-07-24T00:00:00.000Z",
   };
 }
@@ -147,11 +153,15 @@ describe("deterministic fallback — repeatable output", () => {
 // ── 降级契约：好行为提升假设置信度 ────────────────────────────────
 describe("deterministic fallback — good behavior weakens habit hypothesis", () => {
   it("all dimensions covered (contradicts) → confidence stays low, not medium", async () => {
-    // evidence_basis 引用真实事件 → 非过早 → medium 观察置信度
+    const events = [
+      event("workflow-evt", "workflow"),
+      event("consequence-evt", "consequence"),
+      event("alternative-evt", "alternative"),
+    ];
     const obs = await observeBehavior({
       worldVersion: worldVersion(),
-      decisionEvent: decision({ evidence_basis: ["real-evt"] }),
-      eventHistory: [event("real-evt")],
+      decisionEvent: decision({ evidence_basis: events.map((item) => item.id) }),
+      eventHistory: events,
       wasAssisted: false,
     });
     const update = await updateHypothesis({

@@ -14,6 +14,42 @@ import {
 } from "../causal-world";
 import { isEvidenceTraceable } from "../causal-world";
 
+type DemoChallengeStore = {
+  runs: Map<string, ChallengeRun>;
+  worldEvents: Map<string, WorldEvent>;
+  decisionEvents: Map<string, DecisionEvent>;
+  interventions: Map<string, Intervention>;
+  hypotheses: Map<string, JudgmentHypothesis>;
+  hypothesisEvidence: Map<string, HypothesisEvidence>;
+};
+
+export type ChallengeDecisionRecord = {
+  run: ChallengeRun;
+  decision: DecisionEvent;
+};
+
+export type ChallengeDecisionContext = ChallengeDecisionRecord & {
+  events: WorldEvent[];
+  interventions: Intervention[];
+};
+
+const demoGlobal = globalThis as typeof globalThis & {
+  __productDrillDemoChallengeStore?: DemoChallengeStore;
+};
+
+const demoStore = demoGlobal.__productDrillDemoChallengeStore ??= {
+  runs: new Map(),
+  worldEvents: new Map(),
+  decisionEvents: new Map(),
+  interventions: new Map(),
+  hypotheses: new Map(),
+  hypothesisEvidence: new Map(),
+};
+
+// Next.js hot reload can retain a store created before new collections existed.
+demoStore.hypotheses ??= new Map();
+demoStore.hypothesisEvidence ??= new Map();
+
 // ── challenge runs ────────────────────────────────────────────────
 export async function insertChallengeRun(
   userId: string,
@@ -23,7 +59,10 @@ export async function insertChallengeRun(
 ): Promise<ChallengeRun> {
   const run = createChallengeRun({ userId, worldId, worldVersion, modelVersion });
   const admin = createSupabaseAdminClient();
-  if (!admin) return run; // demo mode: in-memory only
+  if (!admin) {
+    demoStore.runs.set(run.id, run);
+    return run;
+  }
   const { error } = await admin.from("challenge_runs").insert({
     id: run.id,
     user_id: run.user_id,
@@ -43,7 +82,10 @@ export async function getChallengeRun(
   runId: string
 ): Promise<ChallengeRun | null> {
   const admin = createSupabaseAdminClient();
-  if (!admin) return null;
+  if (!admin) {
+    const run = demoStore.runs.get(runId);
+    return run?.user_id === userId ? run : null;
+  }
   const { data, error } = await admin
     .from("challenge_runs")
     .select("*")
@@ -59,7 +101,17 @@ export async function completeChallengeRun(
   runId: string
 ): Promise<void> {
   const admin = createSupabaseAdminClient();
-  if (!admin) return;
+  if (!admin) {
+    const run = demoStore.runs.get(runId);
+    if (run?.user_id === userId && run.status === "active") {
+      demoStore.runs.set(runId, {
+        ...run,
+        status: "completed",
+        completed_at: new Date().toISOString(),
+      });
+    }
+    return;
+  }
   const { error } = await admin
     .from("challenge_runs")
     .update({ status: "completed", completed_at: new Date().toISOString() })
@@ -67,6 +119,73 @@ export async function completeChallengeRun(
     .eq("user_id", userId)
     .eq("status", "active"); // 只允许从 active 转为 completed
   if (error) throw error;
+}
+
+export async function getChallengeDecisionRecords(
+  userId: string
+): Promise<ChallengeDecisionRecord[]> {
+  const admin = createSupabaseAdminClient();
+  if (!admin) {
+    const runs = [...demoStore.runs.values()]
+      .filter((run) => run.user_id === userId && run.status === "completed")
+      .sort((a, b) => Date.parse(b.completed_at ?? b.started_at) - Date.parse(a.completed_at ?? a.started_at));
+    return runs.flatMap((run) =>
+      [...demoStore.decisionEvents.values()]
+        .filter((decision) => decision.run_id === run.id)
+        .map((decision) => ({ run, decision }))
+    );
+  }
+
+  const { data: runs, error: runsError } = await admin
+    .from("challenge_runs")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("status", "completed")
+    .order("completed_at", { ascending: false });
+  if (runsError) throw runsError;
+  const typedRuns = (runs ?? []) as ChallengeRun[];
+  if (typedRuns.length === 0) return [];
+
+  const runById = new Map(typedRuns.map((run) => [run.id, run]));
+  const { data: decisions, error: decisionsError } = await admin
+    .from("decision_events")
+    .select("*")
+    .in("run_id", typedRuns.map((run) => run.id));
+  if (decisionsError) throw decisionsError;
+  return ((decisions ?? []) as DecisionEvent[])
+    .flatMap((decision) => {
+      const run = runById.get(decision.run_id);
+      return run ? [{ run, decision }] : [];
+    })
+    .sort((a, b) => Date.parse(b.run.completed_at ?? b.run.started_at) - Date.parse(a.run.completed_at ?? a.run.started_at));
+}
+
+export async function getChallengeDecisionContext(
+  userId: string,
+  decisionEventId: string
+): Promise<ChallengeDecisionContext | null> {
+  const admin = createSupabaseAdminClient();
+  let decision: DecisionEvent | null;
+  if (!admin) {
+    decision = demoStore.decisionEvents.get(decisionEventId) ?? null;
+  } else {
+    const { data, error } = await admin
+      .from("decision_events")
+      .select("*")
+      .eq("id", decisionEventId)
+      .maybeSingle();
+    if (error) throw error;
+    decision = data as DecisionEvent | null;
+  }
+  if (!decision) return null;
+
+  const run = await getChallengeRun(userId, decision.run_id);
+  if (!run) return null;
+  const [events, interventions] = await Promise.all([
+    getWorldEventsForRun(userId, run.id),
+    getInterventionsForRun(userId, run.id),
+  ]);
+  return { run, decision, events, interventions };
 }
 
 // ── world events ──────────────────────────────────────────────────
@@ -92,7 +211,10 @@ export async function appendWorldEvent(params: {
   });
 
   const admin = createSupabaseAdminClient();
-  if (!admin) return evt;
+  if (!admin) {
+    demoStore.worldEvents.set(evt.id, evt);
+    return evt;
+  }
   const { error } = await admin.from("world_events").insert({
     id: evt.id,
     run_id: evt.run_id,
@@ -104,6 +226,28 @@ export async function appendWorldEvent(params: {
   });
   if (error) throw error;
   return evt;
+}
+
+export async function getWorldEventsForRun(
+  userId: string,
+  runId: string
+): Promise<WorldEvent[]> {
+  const run = await getChallengeRun(userId, runId);
+  if (!run) throw new RunNotFoundError();
+
+  const admin = createSupabaseAdminClient();
+  if (!admin) {
+    return [...demoStore.worldEvents.values()]
+      .filter((event) => event.run_id === runId)
+      .sort((a, b) => a.sequence_index - b.sequence_index);
+  }
+  const { data, error } = await admin
+    .from("world_events")
+    .select("*")
+    .eq("run_id", runId)
+    .order("sequence_index", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as WorldEvent[];
 }
 
 // ── decision events ───────────────────────────────────────────────
@@ -132,6 +276,11 @@ export async function insertDecisionEvent(params: {
       .eq("world_event_id", params.worldEventId)
       .maybeSingle();
     if (existing) throw new DuplicateDecisionError();
+  } else {
+    const duplicate = [...demoStore.decisionEvents.values()].some(
+      (item) => item.run_id === params.runId && item.world_event_id === params.worldEventId
+    );
+    if (duplicate) throw new DuplicateDecisionError();
   }
 
   const dec = createDecisionEvent({
@@ -145,7 +294,10 @@ export async function insertDecisionEvent(params: {
     evidenceBasis: params.evidenceBasis,
   });
 
-  if (!admin) return dec;
+  if (!admin) {
+    demoStore.decisionEvents.set(dec.id, dec);
+    return dec;
+  }
   const { error } = await admin.from("decision_events").insert({
     id: dec.id,
     run_id: dec.run_id,
@@ -173,20 +325,12 @@ export async function revealDecisionConsequences(
 
   const admin = createSupabaseAdminClient();
   if (!admin) {
-    // demo mode: return updated object without DB
-    return {
-      id: decisionEventId,
-      run_id: runId,
-      world_event_id: "",
-      judgment: "",
-      chosen_action: "",
-      expected_outcome: "",
-      confidence: "medium",
-      rejected_alternatives: [],
-      evidence_basis: [],
-      consequences_revealed: true,
-      created_at: new Date().toISOString(),
-    };
+    const decision = demoStore.decisionEvents.get(decisionEventId);
+    if (!decision || decision.run_id !== runId) throw new RunNotFoundError();
+    if (decision.consequences_revealed) throw new AlreadyRevealedError();
+    const revealed = { ...decision, consequences_revealed: true };
+    demoStore.decisionEvents.set(decisionEventId, revealed);
+    return revealed;
   }
 
   // 防止重复揭示
@@ -211,6 +355,29 @@ export async function revealDecisionConsequences(
   return data as DecisionEvent;
 }
 
+export async function getDecisionEvent(
+  userId: string,
+  runId: string,
+  decisionEventId: string
+): Promise<DecisionEvent | null> {
+  const run = await getChallengeRun(userId, runId);
+  if (!run) throw new RunNotFoundError();
+
+  const admin = createSupabaseAdminClient();
+  if (!admin) {
+    const decision = demoStore.decisionEvents.get(decisionEventId);
+    return decision?.run_id === runId ? decision : null;
+  }
+  const { data, error } = await admin
+    .from("decision_events")
+    .select("*")
+    .eq("id", decisionEventId)
+    .eq("run_id", runId)
+    .maybeSingle();
+  if (error) throw error;
+  return data as DecisionEvent | null;
+}
+
 // ── interventions ──────────────────────────────────────────────────
 export async function insertIntervention(params: {
   userId: string;
@@ -219,7 +386,6 @@ export async function insertIntervention(params: {
   interventionType: Intervention["intervention_type"];
   content: string;
   modelVersion: string;
-  worldVersion: string;
 }): Promise<Intervention> {
   const run = await getChallengeRun(params.userId, params.runId);
   if (!run) throw new RunNotFoundError();
@@ -230,11 +396,14 @@ export async function insertIntervention(params: {
     interventionType: params.interventionType,
     content: params.content,
     modelVersion: params.modelVersion,
-    worldVersion: params.worldVersion,
+    worldVersion: run.world_version,
   });
 
   const admin = createSupabaseAdminClient();
-  if (!admin) return intervention;
+  if (!admin) {
+    demoStore.interventions.set(intervention.id, intervention);
+    return intervention;
+  }
   const { error } = await admin.from("interventions").insert({
     id: intervention.id,
     run_id: intervention.run_id,
@@ -249,12 +418,38 @@ export async function insertIntervention(params: {
   return intervention;
 }
 
+export async function getInterventionsForRun(
+  userId: string,
+  runId: string
+): Promise<Intervention[]> {
+  const run = await getChallengeRun(userId, runId);
+  if (!run) throw new RunNotFoundError();
+
+  const admin = createSupabaseAdminClient();
+  if (!admin) {
+    return [...demoStore.interventions.values()]
+      .filter((intervention) => intervention.run_id === runId)
+      .sort((a, b) => Date.parse(a.triggered_at) - Date.parse(b.triggered_at));
+  }
+  const { data, error } = await admin
+    .from("interventions")
+    .select("*")
+    .eq("run_id", runId)
+    .order("triggered_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as Intervention[];
+}
+
 // ── judgment profile ───────────────────────────────────────────────
 export async function getJudgmentProfile(
   userId: string
 ): Promise<JudgmentHypothesis[]> {
   const admin = createSupabaseAdminClient();
-  if (!admin) return [];
+  if (!admin) {
+    return [...demoStore.hypotheses.values()]
+      .filter((hypothesis) => hypothesis.user_id === userId)
+      .sort((a, b) => Date.parse(b.last_updated_at) - Date.parse(a.last_updated_at));
+  }
   const { data, error } = await admin
     .from("judgment_hypotheses")
     .select("*")
@@ -270,7 +465,12 @@ export async function getHypothesisEvidenceForProfile(
 ): Promise<HypothesisEvidence[]> {
   if (hypothesisIds.length === 0) return [];
   const admin = createSupabaseAdminClient();
-  if (!admin) return [];
+  if (!admin) {
+    const allowed = new Set(hypothesisIds);
+    return [...demoStore.hypothesisEvidence.values()]
+      .filter((evidence) => allowed.has(evidence.hypothesis_id))
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+  }
   const { data, error } = await admin
     .from("hypothesis_evidence")
     .select("*")
@@ -280,6 +480,33 @@ export async function getHypothesisEvidenceForProfile(
   return (data ?? []) as HypothesisEvidence[];
 }
 
+export async function upsertJudgmentHypothesis(
+  hypothesis: JudgmentHypothesis
+): Promise<JudgmentHypothesis> {
+  const admin = createSupabaseAdminClient();
+  if (!admin) {
+    demoStore.hypotheses.set(hypothesis.id, hypothesis);
+    return hypothesis;
+  }
+  const { data, error } = await admin
+    .from("judgment_hypotheses")
+    .upsert({
+      id: hypothesis.id,
+      user_id: hypothesis.user_id,
+      habit_name: hypothesis.habit_name,
+      trigger_conditions: hypothesis.trigger_conditions,
+      confidence: hypothesis.confidence,
+      supporting_evidence_ids: hypothesis.supporting_evidence_ids,
+      counter_evidence_ids: hypothesis.counter_evidence_ids,
+      last_updated_at: hypothesis.last_updated_at,
+      created_at: hypothesis.created_at,
+    }, { onConflict: "user_id,habit_name" })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as JudgmentHypothesis;
+}
+
 export async function upsertHypothesisEvidence(
   evidence: HypothesisEvidence
 ): Promise<void> {
@@ -287,7 +514,10 @@ export async function upsertHypothesisEvidence(
     throw new Error("Evidence is not traceable: missing event/world/model version");
   }
   const admin = createSupabaseAdminClient();
-  if (!admin) return;
+  if (!admin) {
+    demoStore.hypothesisEvidence.set(evidence.id, evidence);
+    return;
+  }
   const { error } = await admin.from("hypothesis_evidence").upsert({
     id: evidence.id,
     hypothesis_id: evidence.hypothesis_id,

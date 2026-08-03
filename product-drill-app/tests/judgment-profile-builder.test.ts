@@ -169,6 +169,14 @@ describe("buildJudgmentProfile", () => {
     expect(evItem.model_version).toBe("gpt-4o:v2");
   });
 
+  it("exposes the governed rubric version for every hypothesis", () => {
+    const result = buildJudgmentProfile({
+      hypotheses: [makeHypothesis()],
+      evidence: [],
+    });
+    expect(result.items[0].rubric_version).toBe("0.3.0");
+  });
+
   it("identifies same-world correction (no transfer_world_id, evidence_type != transfer)", () => {
     const ev = makeEvidence("supporting", { world_id: "world-1", transfer_world_id: null });
     const result = buildJudgmentProfile({
