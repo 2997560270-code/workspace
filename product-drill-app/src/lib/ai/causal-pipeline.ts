@@ -37,6 +37,56 @@ export type HypothesisUpdate = z.infer<typeof HypothesisUpdateSchema> & {
   model_version: string;
 };
 
+const INSUFFICIENT_EVIDENCE_REASON =
+  "证据不足：决策依据未覆盖至少两个可追溯的发现维度，无法输出行为结论。";
+
+function getGovernedEvidenceById(
+  decisionEvent: DecisionEvent,
+  eventHistory: WorldEvent[]
+): Map<string, { event: WorldEvent; dimension: DiscoveryDimension }> {
+  const selectedIds = new Set(decisionEvent.evidence_basis);
+  return new Map(
+    eventHistory.flatMap((event) => {
+      const dimension = event.payload.discovery_dimension;
+      if (
+        !selectedIds.has(event.id) ||
+        event.actor !== "user" ||
+        !DISCOVERY_DIMENSIONS.includes(dimension as DiscoveryDimension)
+      ) {
+        return [];
+      }
+      return [[event.id, { event, dimension: dimension as DiscoveryDimension }]];
+    })
+  );
+}
+
+function canonicalHypothesisDirection(
+  observation: BehaviorObservation
+): HypothesisUpdate["update_direction"] {
+  if (observation.confidence === "low") return "insufficient";
+  return observation.missing_dimensions.length > 0 ? "supports" : "contradicts";
+}
+
+function canonicalUpdatedConfidence(
+  direction: HypothesisUpdate["update_direction"]
+): HypothesisUpdate["updated_confidence"] {
+  if (direction === "insufficient" || direction === "neutral") return "insufficient";
+  return direction === "supports" ? "medium" : "low";
+}
+
+function canonicalHypothesisRationale(
+  direction: HypothesisUpdate["update_direction"],
+  observation: BehaviorObservation
+): string {
+  if (direction === "insufficient") {
+    return observation.insufficient_reason ?? INSUFFICIENT_EVIDENCE_REASON;
+  }
+  if (direction === "supports") {
+    return `可追溯证据仍缺少 ${observation.missing_dimensions.join(", ")} 维度，支持过早承诺假设。`;
+  }
+  return "可追溯证据覆盖 workflow、consequence 和 alternative 三个维度，反驳本次过早承诺假设。";
+}
+
 // ── 确定性降级：World Narrator ────────────────────────────────────
 function deterministicNarration(
   worldVersion: CausalWorldVersion,
@@ -77,18 +127,10 @@ function deterministicBehaviorObservation(
   eventHistory: WorldEvent[],
   wasAssisted: boolean  // Fix: accept wasAssisted so fallback honours hint status
 ): BehaviorObservation {
-  // 简单判断：evidence_basis 是否引用了真实 event id
-  const validIds = new Set(eventHistory.map((e) => e.id));
-  const validBasis = decisionEvent.evidence_basis.filter((id) => validIds.has(id));
-
-  const eventsById = new Map(eventHistory.map((event) => [event.id, event]));
-  const structuredEvidence = validBasis.flatMap((eventId) => {
-    const event = eventsById.get(eventId);
-    if (!event) return [];
-    const dimension = event.payload.discovery_dimension;
-    if (!DISCOVERY_DIMENSIONS.includes(dimension as DiscoveryDimension)) return [];
-    return [{ event, eventId, dimension: dimension as DiscoveryDimension }];
-  });
+  const governedEvidence = getGovernedEvidenceById(decisionEvent, eventHistory);
+  const structuredEvidence = [...governedEvidence.entries()].map(
+    ([eventId, { event, dimension }]) => ({ event, eventId, dimension })
+  );
   const coveredDimensions = new Set(structuredEvidence.map((item) => item.dimension));
   const missingDimensions = DISCOVERY_DIMENSIONS.filter((dimension) => !coveredDimensions.has(dimension));
   const hasMinimumEvidence = coveredDimensions.size >= 2;
@@ -109,7 +151,7 @@ function deterministicBehaviorObservation(
     confidence: hasMinimumEvidence ? "medium" : "low",
     insufficient_reason: hasMinimumEvidence
       ? null
-      : "[确定性演示] 缺少至少两个结构化发现维度，无法输出能力结论。",
+      : INSUFFICIENT_EVIDENCE_REASON,
     model_version: "deterministic-v1",
   };
 }
@@ -119,29 +161,14 @@ function deterministicHypothesisUpdate(
   habitName: string,
   observation: BehaviorObservation
 ): HypothesisUpdate {
-  const direction =
-    observation.confidence === "low"
-      ? "insufficient"
-      : observation.missing_dimensions.length > 0
-      ? "supports"
-      : "contradicts";
+  const direction = canonicalHypothesisDirection(observation);
 
   return {
     habit_name: habitName,
     update_direction: direction,
-    // Fix (HIGH): confidence must reflect the direction, not be hardcoded 'low'.
-    // contradicts (all dims covered, medium obs confidence) → 'medium'
-    // supports (some dims missing, medium obs confidence) → 'low'
-    // insufficient → 'insufficient'
-    updated_confidence:
-      direction === "insufficient"
-        ? "insufficient"
-        : direction === "supports"
-        // Fix (CRITICAL): 'supports' = bad habit confirmed → confidence rises
-        ? "medium"
-        // Fix (CRITICAL): 'contradicts' = good behavior → confidence falls
-        : "low",
-    rationale: "[确定性演示] 基于行为观察的简单推断，不用于正式评估。",
+    // The governed direction determines the stored confidence envelope.
+    updated_confidence: canonicalUpdatedConfidence(direction),
+    rationale: canonicalHypothesisRationale(direction, observation),
     referenced_evidence_ids: observation.observations.flatMap((o) => o.evidence_event_ids),
     applicable_trigger_conditions: [],
     forbidden_inferences_confirmed: [...REQUIRED_FORBIDDEN_INFERENCES],
@@ -242,46 +269,65 @@ export async function observeBehavior(params: {
     const parsed = response.output_parsed;
     if (!parsed) throw new Error("Behavior observer response was not parsed");
 
-    // 安全校验：evidence_event_ids 只能引用真实 event id
-    const validIds = new Set(params.eventHistory.map((e) => e.id));
-    // Fix: drop entire observation when all its IDs are hallucinated, rather
-    // than keeping it with an empty array that bypasses the min(1) contract.
-    const eventsById = new Map(params.eventHistory.map((event) => [event.id, event]));
+    // Only user-selected, structured investigation events are authoritative.
+    // The model cannot promote an unrelated event into evidence or relabel its
+    // discovery dimension.
+    const governedEvidence = getGovernedEvidenceById(
+      params.decisionEvent,
+      params.eventHistory
+    );
     const safeObservations = parsed.observations
       .map((obs) => {
-        const evidenceEventIds = obs.evidence_event_ids.filter((id) => validIds.has(id));
-        const sourceTexts = evidenceEventIds.flatMap((id) => {
-          const text = eventsById.get(id)?.payload.text;
+        const evidenceEventIds = obs.evidence_event_ids.filter((id) =>
+          governedEvidence.has(id)
+        );
+        const governedDimension = evidenceEventIds
+          .map((id) => governedEvidence.get(id)?.dimension)
+          .find((dimension): dimension is DiscoveryDimension => Boolean(dimension));
+        const dimensionEventIds = governedDimension
+          ? evidenceEventIds.filter(
+              (id) => governedEvidence.get(id)?.dimension === governedDimension
+            )
+          : [];
+        const sourceTexts = dimensionEventIds.flatMap((id) => {
+          const text = governedEvidence.get(id)?.event.payload.text;
           return typeof text === "string" ? [text] : [];
         });
+        const evidenceQuotes = obs.evidence_quotes.filter(
+          (quote) => quote.length > 0 && sourceTexts.some((source) => source.includes(quote))
+        );
+        const dimensionCovered: DiscoveryDimension | "none" = governedDimension ?? "none";
         return {
           ...obs,
-          evidence_event_ids: evidenceEventIds,
-          evidence_quotes: obs.evidence_quotes.filter((quote) =>
-            sourceTexts.some((source) => source.includes(quote))
-          ),
+          evidence_event_ids: dimensionEventIds,
+          evidence_quotes: evidenceQuotes,
+          dimension_covered: dimensionCovered,
         };
       })
-      .filter((obs) => obs.evidence_event_ids.length > 0);
+      .filter(
+        (obs) => obs.evidence_event_ids.length > 0 && obs.evidence_quotes.length > 0
+      );
 
-    // 若校验后无任何有效证据，降为 low confidence
-    const hasValidEvidence = safeObservations.length > 0;
-    const confidence =
-      !hasValidEvidence && parsed.confidence !== "low" ? "low" : parsed.confidence;
-    const insufficientReason =
-      !hasValidEvidence
-        ? "AI returned evidence IDs that do not correspond to real events; downgraded to insufficient."
-        : parsed.insufficient_reason;
+    const coveredDimensions = new Set(
+      safeObservations.flatMap((obs) =>
+        obs.dimension_covered === "none" ? [] : [obs.dimension_covered]
+      )
+    );
+    const missingDimensions = DISCOVERY_DIMENSIONS.filter(
+      (dimension) => !coveredDimensions.has(dimension)
+    );
+    const hasMinimumEvidence = coveredDimensions.size >= 2;
 
     return {
       ...parsed,
-      observations: safeObservations,
+      observations: hasMinimumEvidence ? safeObservations : [],
+      missing_dimensions: missingDimensions,
       // Fix (CRITICAL): always override assisted with the authoritative
       // params.wasAssisted flag — the AI-returned value must never win,
       // because the hint-used state is system-tracked, not model-inferred.
       assisted: params.wasAssisted,
-      confidence,
-      insufficient_reason: insufficientReason,
+      confidence: hasMinimumEvidence ? "medium" : "low",
+      insufficient_reason: hasMinimumEvidence ? null : INSUFFICIENT_EVIDENCE_REASON,
       model_version: `${runtimeEnv.evaluationModel}:${runtimeEnv.modelVersion}`,
     };
   } catch (error) {
@@ -328,9 +374,9 @@ export async function updateHypothesis(params: {
     const validObsIds = new Set(
       params.behaviorObservation.observations.flatMap((o) => o.evidence_event_ids)
     );
-    const safeRefIds = parsed.referenced_evidence_ids.filter((id) =>
-      validObsIds.has(id)
-    );
+    // Direction and confidence are evidence-derived invariants. A model can
+    // explain the result, but cannot reverse it or upgrade insufficient data.
+    const direction = canonicalHypothesisDirection(params.behaviorObservation);
 
     // 确保禁止推断项被声明
     const forbiddenInferences = new Set(parsed.forbidden_inferences_confirmed);
@@ -340,7 +386,12 @@ export async function updateHypothesis(params: {
 
     return {
       ...parsed,
-      referenced_evidence_ids: safeRefIds,
+      habit_name: params.habitName,
+      update_direction: direction,
+      updated_confidence: canonicalUpdatedConfidence(direction),
+      rationale: canonicalHypothesisRationale(direction, params.behaviorObservation),
+      referenced_evidence_ids:
+        direction === "insufficient" ? [] : [...validObsIds],
       forbidden_inferences_confirmed: [...forbiddenInferences],
       model_version: `${runtimeEnv.evaluationModel}:${runtimeEnv.modelVersion}`,
     };
