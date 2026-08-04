@@ -4,6 +4,7 @@
   supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
   openaiApiKey: process.env.OPENAI_API_KEY ?? "",
+  openaiBaseUrl: process.env.OPENAI_BASE_URL ?? "",
   roleplayModel: process.env.OPENAI_ROLEPLAY_MODEL ?? "gpt-5.6-luna",
   evaluationModel: process.env.OPENAI_EVALUATION_MODEL ?? "gpt-5.6-terra",
   modelVersion: process.env.OPENAI_MODEL_VERSION ?? "unconfigured",

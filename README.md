@@ -21,6 +21,19 @@ npm ci
 npm run dev
 ```
 
+## AI API 配置
+
+在 `product-drill-app/.env.local` 中配置服务端密钥。OpenAI 官方接口只需要密钥；OpenAI 兼容服务还需要配置服务地址和该服务提供的模型 ID：
+
+```env
+OPENAI_API_KEY=
+OPENAI_BASE_URL=
+OPENAI_ROLEPLAY_MODEL=gpt-5.6-luna
+OPENAI_EVALUATION_MODEL=gpt-5.6-terra
+```
+
+`.env.local` 已被 Git 忽略，密钥不会进入仓库。修改配置后需要重启开发服务。
+
 ## 验证
 
 ```powershell
