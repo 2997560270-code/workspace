@@ -25,6 +25,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - run: npm run test:rls:local
       - run: npm run eval:golden
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high

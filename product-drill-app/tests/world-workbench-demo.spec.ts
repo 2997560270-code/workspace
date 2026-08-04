@@ -39,6 +39,9 @@ test("demo world workbench records an action without falling back to the browser
   await expect(
     page.getByRole("heading", { level: 2, name: "高权威需求方要求立即增加 AI 摘要" })
   ).toBeVisible();
+  await expect(page.getByText("独立进行", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "提示（标记辅助证据）", exact: true }).click();
+  await expect(page.getByText("提示辅助", { exact: true })).toBeVisible();
 
   const messages = page.locator(".wb-message-world");
   const initialMessageCount = await messages.count();

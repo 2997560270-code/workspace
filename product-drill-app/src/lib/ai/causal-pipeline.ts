@@ -191,7 +191,7 @@ export async function narrateWorldResponse(params: {
     const stateChangeSummary = stateChanged ? parsed.state_change_summary : null;
 
     return {
-      ...parsed,
+      narration: parsed.narration,
       revealed_fact_ids: safeRevealedIds,
       state_changed: stateChanged,
       state_change_summary: stateChangeSummary,

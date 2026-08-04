@@ -103,9 +103,13 @@ function PhaseTag({
   return (
     <span className="wb-phase-tag">
       {labels[phase]}
-      {wasAssisted && (
+      {wasAssisted ? (
         <span className="wb-assisted-badge" title="本次决策前使用了提示，证据将标记为辅助">
           提示辅助
+        </span>
+      ) : (
+        <span className="wb-independent-badge" title="本次决策前尚未使用提示">
+          独立进行
         </span>
       )}
     </span>

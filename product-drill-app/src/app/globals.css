@@ -492,6 +492,7 @@ p { color: var(--ink-2); line-height: 1.66; }
 .wb-header-left h2 { margin: 0; font-size: var(--fs-title); }
 .wb-phase-tag { display: inline-flex; align-items: center; gap: 8px; padding: 5px 13px; border-radius: 99px; background: var(--sage); color: var(--sage-strong); font-family: var(--font-mono); font-size: var(--fs-aux-sm); font-weight: 600; letter-spacing: 0.03em; white-space: nowrap; }
 .wb-assisted-badge { padding: 3px 9px; border-radius: 99px; background: var(--coral-soft); color: var(--coral-strong); font-size: var(--fs-aux-sm); font-weight: 600; }
+.wb-independent-badge { padding: 3px 9px; border-radius: 99px; background: var(--sage-soft); color: var(--sage-strong); font-size: var(--fs-aux-sm); font-weight: 600; }
 .wb-error-banner { padding: 11px 24px; background: var(--coral-soft); color: var(--coral-strong); font-size: var(--fs-body-sm); border-bottom: 1px solid rgba(217, 92, 75, 0.2); }
 .wb-body { display: grid; grid-template-columns: minmax(0, 1.4fr) 368px; gap: 0; flex: 1; min-height: 0; overflow: hidden; }
 

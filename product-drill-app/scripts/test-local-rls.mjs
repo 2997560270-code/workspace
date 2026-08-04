@@ -16,6 +16,10 @@ const approvedWorldMigration = readFileSync(
   join(migrationDir, "202608030001_approved_behavior_and_worlds.sql"),
   "utf8",
 );
+const challengeApiConcurrencyMigration = readFileSync(
+  join(migrationDir, "202608040001_challenge_api_concurrency.sql"),
+  "utf8",
+);
 
 const userA = "00000000-0000-0000-0000-00000000000a";
 const userB = "00000000-0000-0000-0000-00000000000b";
@@ -44,6 +48,7 @@ async function setupDatabase() {
 
   await db.exec(phaseOneMigration);
   await db.exec(approvedWorldMigration);
+  await db.exec(challengeApiConcurrencyMigration);
   await db.exec(`
     alter table public.causal_worlds force row level security;
     alter table public.causal_world_versions force row level security;
@@ -152,6 +157,38 @@ async function main() {
   try {
     await setupDatabase();
     const { ids, world } = await seedFixtures();
+
+    await assert.rejects(
+      admin(
+        `insert into public.decision_events
+          (id, run_id, world_event_id, judgment, chosen_action, expected_outcome, confidence)
+         values ($1, $2, $3, 'duplicate', 'duplicate', 'duplicate', 'low')`,
+        [`${ids.decision}-duplicate`, ids.run, ids.worldEvent],
+      ),
+      (error) => error?.code === "23505",
+      "decision_events must reject concurrent duplicate decisions",
+    );
+    console.log("PASS decision_events: database constraint blocks duplicate decisions");
+
+    assertRows(
+      await admin(
+        `update public.decision_events set consequences_revealed = true
+         where id = $1 and consequences_revealed = false returning id`,
+        [ids.decision],
+      ),
+      [{ id: ids.decision }],
+      "The first consequence reveal must update the decision",
+    );
+    assertRows(
+      await admin(
+        `update public.decision_events set consequences_revealed = true
+         where id = $1 and consequences_revealed = false returning id`,
+        [ids.decision],
+      ),
+      [],
+      "A repeated consequence reveal must not update the decision again",
+    );
+    console.log("PASS decision_events: consequence reveal is atomic and single-use");
 
     assertRows(
       await asUser(userA, "select id from public.causal_worlds where id = $1", [world.id]),

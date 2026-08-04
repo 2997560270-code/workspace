@@ -311,6 +311,7 @@ export async function insertDecisionEvent(params: {
     consequences_revealed: false, // 强制初始值
     created_at: dec.created_at,
   });
+  if (error?.code === "23505") throw new DuplicateDecisionError();
   if (error) throw error;
   return dec;
 }
@@ -333,25 +334,26 @@ export async function revealDecisionConsequences(
     return revealed;
   }
 
-  // 防止重复揭示
-  const { data: existing } = await admin
-    .from("decision_events")
-    .select("*")
-    .eq("id", decisionEventId)
-    .eq("run_id", runId)
-    .maybeSingle();
-
-  if (!existing) throw new RunNotFoundError();
-  if (existing.consequences_revealed) throw new AlreadyRevealedError();
-
   const { data, error } = await admin
     .from("decision_events")
     .update({ consequences_revealed: true })
     .eq("id", decisionEventId)
     .eq("run_id", runId)
+    .eq("consequences_revealed", false)
     .select("*")
-    .single();
+    .maybeSingle();
   if (error) throw error;
+  if (!data) {
+    const { data: existing, error: lookupError } = await admin
+      .from("decision_events")
+      .select("id")
+      .eq("id", decisionEventId)
+      .eq("run_id", runId)
+      .maybeSingle();
+    if (lookupError) throw lookupError;
+    if (!existing) throw new RunNotFoundError();
+    throw new AlreadyRevealedError();
+  }
   return data as DecisionEvent;
 }
 

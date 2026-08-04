@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AlreadyRevealedError,
+  DuplicateDecisionError,
   appendWorldEvent,
   completeChallengeRun,
   getChallengeDecisionContext,
@@ -38,6 +39,17 @@ describe("demo challenge repository", () => {
       rejectedAlternatives: ["Build immediately"],
       evidenceBasis: [event.id],
     });
+    await expect(insertDecisionEvent({
+      userId,
+      runId: run.id,
+      worldEventId: event.id,
+      judgment: "Duplicate decision",
+      chosenAction: "Duplicate action",
+      expectedOutcome: "Duplicate outcome",
+      confidence: "low",
+      rejectedAlternatives: [],
+      evidenceBasis: [event.id],
+    })).rejects.toBeInstanceOf(DuplicateDecisionError);
 
     const revealed = await revealDecisionConsequences(userId, run.id, decision.id);
     expect(revealed.consequences_revealed).toBe(true);
