@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CausalWorldVersion, DecisionEvent, WorldEvent } from "../src/lib/causal-world";
 
 const openaiMock = vi.hoisted(() => ({
-  client: null as null | { responses: { parse: () => Promise<unknown> } },
+  client: null as null | {
+    responses: { parse: (request?: { input?: string }) => Promise<unknown> };
+  },
 }));
 
 vi.mock("../src/lib/ai/client", () => ({
@@ -10,6 +12,7 @@ vi.mock("../src/lib/ai/client", () => ({
 }));
 
 import {
+  isAmbiguousLearnerAction,
   narrateWorldResponse,
   observeBehavior,
   updateHypothesis,
@@ -88,6 +91,119 @@ afterEach(() => {
 });
 
 describe("causal narrator failure boundaries", () => {
+  it("treats a bare numeric input as clarification without calling the model", async () => {
+    let requestCount = 0;
+    openaiMock.client = {
+      responses: {
+        parse: async () => {
+          requestCount += 1;
+          return { output_parsed: null };
+        },
+      },
+    };
+
+    const result = await narrateWorldResponse({
+      worldVersion: governedWorld(),
+      userAction: "1",
+      eventHistory: [],
+      revealedFactIds: [],
+    });
+
+    expect(isAmbiguousLearnerAction("1")).toBe(true);
+    expect(requestCount).toBe(0);
+    expect(result.response_type).toBe("clarification");
+    expect(result.narration).toContain("不够明确");
+  });
+
+  it("passes server-approved reveals into the prompt and excludes hidden governance data", async () => {
+    let capturedPrompt = "";
+    const world = governedWorld();
+    world.immutable_rules.hidden_facts.push({
+      id: "secret-fact",
+      content: "Hidden secret that must stay unavailable",
+      reveal_condition_id: "never",
+      causal_significance: "private",
+    });
+    openaiMock.client = {
+      responses: {
+        parse: async (request?: { input?: string }) => {
+          capturedPrompt = request?.input ?? "";
+          return {
+            output_parsed: {
+              response_type: "role_reply",
+              narration: "报表使用频率低。",
+              cited_fact_ids: ["fact-1"],
+            },
+          };
+        },
+      },
+    };
+
+    const result = await narrateWorldResponse({
+      worldVersion: world,
+      userAction: "inspect",
+      eventHistory: [],
+      revealedFactIds: [],
+    });
+
+    expect(result.unofficial).toBe(false);
+    expect(capturedPrompt).toContain('"id": "fact-1"');
+    expect(capturedPrompt).toContain("Governed fact");
+    expect(capturedPrompt).not.toContain("Hidden secret that must stay unavailable");
+    expect(capturedPrompt).not.toContain("reveal_conditions");
+    expect(capturedPrompt).not.toContain("target_habit");
+    expect(capturedPrompt).not.toContain("400 words");
+  });
+
+  it("falls back when the model cites a fact outside the allowed set", async () => {
+    openaiMock.client = {
+      responses: {
+        parse: async () => ({
+          output_parsed: {
+            response_type: "role_reply",
+            narration: "角色回应了你的问题。",
+            cited_fact_ids: ["fabricated-fact"],
+          },
+        }),
+      },
+    };
+
+    const result = await narrateWorldResponse({
+      worldVersion: governedWorld(),
+      userAction: "unrelated",
+      eventHistory: [],
+      revealedFactIds: [],
+    });
+
+    expect(result.unofficial).toBe(true);
+    expect(result.model_version).toBe("deterministic-v1");
+    expect(result.revealed_fact_ids).toEqual([]);
+  });
+
+  it("falls back when the model returns an overlong narration", async () => {
+    openaiMock.client = {
+      responses: {
+        parse: async () => ({
+          output_parsed: {
+            response_type: "role_reply",
+            narration: "长".repeat(121),
+            cited_fact_ids: ["scenario-trigger"],
+          },
+        }),
+      },
+    };
+
+    const result = await narrateWorldResponse({
+      worldVersion: governedWorld(),
+      userAction: "调查当前情况",
+      eventHistory: [],
+      revealedFactIds: [],
+    });
+
+    expect(result.unofficial).toBe(true);
+    expect(result.model_version).toBe("deterministic-v1");
+  });
+
   it("falls back deterministically when the model times out", async () => {
     openaiMock.client = {
       responses: {
@@ -133,10 +249,9 @@ describe("causal narrator failure boundaries", () => {
       responses: {
         parse: async () => ({
           output_parsed: {
+            response_type: "role_reply",
             narration: "Attempted override",
-            revealed_fact_ids: ["fabricated-fact"],
-            state_changed: true,
-            state_change_summary: "Attempted override",
+            cited_fact_ids: ["fabricated-fact"],
             immutable_rules: { model_forbidden_to_modify: false },
           },
         }),

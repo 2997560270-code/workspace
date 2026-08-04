@@ -9,40 +9,46 @@ import {
 describe("WorldNarratorOutputSchema", () => {
   it("accepts valid narration output", () => {
     const result = WorldNarratorOutputSchema.safeParse({
+      response_type: "role_reply",
       narration: "角色回应了你的问题。",
-      revealed_fact_ids: ["HF-1-02"],
-      state_changed: true,
-      state_change_summary: "揭示了使用率数据",
+      cited_fact_ids: ["HF-1-02"],
     });
     expect(result.success).toBe(true);
   });
 
-  it("accepts empty revealed_fact_ids", () => {
+  it("accepts a governed clarification without citations", () => {
     const result = WorldNarratorOutputSchema.safeParse({
+      response_type: "clarification",
       narration: "角色未透露新信息。",
-      revealed_fact_ids: [],
-      state_changed: false,
-      state_change_summary: null,
+      cited_fact_ids: [],
     });
     expect(result.success).toBe(true);
   });
 
   it("rejects empty narration", () => {
     const result = WorldNarratorOutputSchema.safeParse({
+      response_type: "role_reply",
       narration: "",
-      revealed_fact_ids: [],
-      state_changed: false,
-      state_change_summary: null,
+      cited_fact_ids: [],
     });
     expect(result.success).toBe(false);
   });
 
-  it("rejects more than 5 revealed fact ids", () => {
+  it("rejects more than 8 cited fact ids", () => {
     const result = WorldNarratorOutputSchema.safeParse({
+      response_type: "role_reply",
       narration: "回应",
-      revealed_fact_ids: ["a", "b", "c", "d", "e", "f"],
+      cited_fact_ids: ["a", "b", "c", "d", "e", "f", "g", "h", "i"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects the old model-controlled state fields", () => {
+    const result = WorldNarratorOutputSchema.safeParse({
+      narration: "角色回应了你的问题。",
+      revealed_fact_ids: ["HF-1-02"],
       state_changed: true,
-      state_change_summary: "too many",
+      state_change_summary: "模型试图修改状态",
     });
     expect(result.success).toBe(false);
   });

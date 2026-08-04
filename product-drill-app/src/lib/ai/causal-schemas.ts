@@ -3,14 +3,11 @@ import { z } from "zod";
 // ── World Narrator 输出 ───────────────────────────────────────────
 // 仅叙述角色和事件，严格在版本化世界规则内
 export const WorldNarratorOutputSchema = z.object({
-  // 角色回应（用版本化世界语言叙述，不创造新事实）
-  narration: z.string().min(1).max(4000),
-  // 本轮揭示的隐藏事实 id（必须来自 immutable_rules.hidden_facts）
-  revealed_fact_ids: z.array(z.string()).max(5),
-  // 世界状态是否因本轮用户动作而变化
-  state_changed: z.boolean(),
-  // 简短的状态变化描述（state_changed=true 时填写）
-  state_change_summary: z.string().max(500).nullable(),
+  response_type: z.enum(["role_reply", "clarification"]),
+  // 即时角色回复，不得写成场景续写或训练复盘
+  narration: z.string().min(1).max(160),
+  // 每个事实性回答必须引用本轮允许使用的事实 id
+  cited_fact_ids: z.array(z.string().min(1)).max(8),
 });
 
 // ── Behavior Observer 输出 ────────────────────────────────────────

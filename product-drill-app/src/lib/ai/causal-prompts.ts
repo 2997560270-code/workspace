@@ -5,6 +5,29 @@ import {
 } from "../behavior-claims";
 import type { BehaviorObservation } from "./causal-pipeline";
 
+export type NarratorAllowedFact = {
+  id: string;
+  content: string;
+};
+
+export function getNarratorAllowedFacts(
+  worldVersion: CausalWorldVersion,
+  revealedFactIds: string[]
+): NarratorAllowedFact[] {
+  const visibleFacts: NarratorAllowedFact[] = [
+    { id: "scenario-trigger", content: worldVersion.trigger_statement },
+    ...worldVersion.visible_facts.map((content, index) => ({
+      id: `visible-${index + 1}`,
+      content,
+    })),
+  ];
+  const revealedFacts = worldVersion.immutable_rules.hidden_facts
+    .filter((fact) => revealedFactIds.includes(fact.id))
+    .map((fact) => ({ id: fact.id, content: fact.content }));
+
+  return [...visibleFacts, ...revealedFacts];
+}
+
 // ── World Narrator prompt ─────────────────────────────────────────
 export function buildWorldNarratorPrompt(params: {
   worldVersion: CausalWorldVersion;
@@ -14,60 +37,45 @@ export function buildWorldNarratorPrompt(params: {
 }): string {
   const { worldVersion, userAction, eventHistory, revealedFactIds } = params;
 
-  // 只暴露已揭示事实，不暴露全部隐藏事实
-  const visibleFacts = [
-    ...worldVersion.visible_facts,
-    ...worldVersion.immutable_rules.hidden_facts
-      .filter((f) => revealedFactIds.includes(f.id))
-      .map((f) => f.content),
-  ];
+  const allowedFacts = getNarratorAllowedFacts(worldVersion, revealedFactIds);
+  const activeRole = worldVersion.immutable_rules.role_interests[0];
+  const recentLearnerActions = eventHistory
+    .filter((event) => event.actor === "user" && typeof event.payload.text === "string")
+    .slice(-4)
+    .map((event) => ({ id: event.id, text: event.payload.text }));
 
   return [
-    "You are World Narrator for a causal scenario world used in PM judgment training.",
+    "你是产品判断训练中的受约束角色回复器，不是小说作者、教练或评估者。",
     "",
-    "WORLD VERSION (immutable — you must not contradict or extend these facts):",
+    "当前角色：",
     JSON.stringify(
       {
-        world_id: worldVersion.world_id,
-        version: worldVersion.version,
-        target_habit: worldVersion.target_habit,
-        domain: worldVersion.domain,
-        governance_status: worldVersion.governance_status,
-        pressure_context: worldVersion.pressure_context,
-        model_forbidden_to_modify:
-          worldVersion.immutable_rules.model_forbidden_to_modify,
-        trigger_statement: worldVersion.trigger_statement,
-        role_interests: worldVersion.immutable_rules.role_interests.map((r) => ({
-          role: r.role,
-          stated_position: r.stated_position,
-          information_boundary: r.information_boundary,
-          // true_interest is NOT disclosed to narrator unless explicitly revealed
-        })),
-        reveal_conditions: worldVersion.immutable_rules.reveal_conditions,
-        visible_facts: visibleFacts,
+        role: activeRole?.role ?? "场景角色",
+        stated_position: activeRole?.stated_position ?? "",
+        information_boundary: activeRole?.information_boundary ?? "",
       },
       null,
       2
     ),
     "",
-    "EVENT HISTORY (most recent last):",
-    JSON.stringify(
-      eventHistory.slice(-10).map((e) => ({ type: e.event_type, actor: e.actor, payload: e.payload })),
-      null,
-      2
-    ),
+    "允许使用的事实（唯一事实来源）：",
+    JSON.stringify(allowedFacts, null, 2),
     "",
-    "LEARNER ACTION:",
+    "最近的学习者输入：",
+    JSON.stringify(recentLearnerActions, null, 2),
+    "",
+    "本轮学习者输入：",
     userAction,
     "",
-    "RULES (strictly enforced):",
-    "- model_forbidden_to_modify=true is authoritative: model output can narrate but cannot change world truth.",
-    "- Narrate only within the world version above. Never create new facts, budgets, metrics, or stakeholders.",
-    "- If the learner's action matches a reveal_condition trigger, list those hidden_fact ids in revealed_fact_ids.",
-    "- Do NOT reveal true_interest unless a matching reveal_condition was triggered.",
-    "- state_changed = true only when the learner's action meaningfully changes world state (e.g., receives new information, advances the scenario).",
-    "- Keep narration in character. Do not coach, evaluate, or score the learner.",
-    "- Maximum narration length: 400 words.",
+    "严格规则：",
+    "1. 只直接回应本轮输入，不续写会议、电话、后续执行或学习者的心理活动。",
+    "2. 只能使用允许事实中的内容，不得添加人物动作、表情、情绪、预算、排期、指标、团队反应或其他常识性细节。",
+    "3. 不得猜测学习者意图；只有学习者明确表达承诺时，才能把输入视为承诺。",
+    "4. 无法从允许事实回答时，直接说明当前信息不足，不得补写答案。",
+    "5. 不得评价、指导、总结或打分，也不得解释这次输入会造成什么训练后果。",
+    "6. 使用中文，最多 3 句话、120 个汉字，不使用 Markdown。",
+    "7. response_type 必须为 role_reply。",
+    "8. cited_fact_ids 只能引用允许使用的事实 id；每个事实性回复至少引用一个 id。",
   ].join("\n");
 }
 

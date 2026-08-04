@@ -1,6 +1,12 @@
 import { apiError, parseJsonBody, requireApiUser } from "@/lib/api/server";
-import { AppendActionBodySchema } from "@/lib/api/challenge-schemas";
-import { narrateWorldResponse } from "@/lib/ai/causal-pipeline";
+import {
+  AppendActionBodySchema,
+  prepareLearnerEventPayload,
+} from "@/lib/api/challenge-schemas";
+import {
+  isAmbiguousLearnerAction,
+  narrateWorldResponse,
+} from "@/lib/ai/causal-pipeline";
 import { isOpenAIConfigured } from "@/lib/env";
 import {
   appendWorldEvent,
@@ -24,17 +30,19 @@ export async function POST(
   if (!parsed.success) return apiError("参数无效。", 422, parsed.error.flatten());
 
   try {
+    const userAction = parsed.data.payload.text ?? "";
+    const ambiguousInput =
+      parsed.data.actor === "user" && isAmbiguousLearnerAction(userAction);
     const evt = await appendWorldEvent({
       runId,
       userId: user.id,
       eventType: parsed.data.event_type,
       sequenceIndex: parsed.data.sequence_index,
       actor: parsed.data.actor,
-      payload: parsed.data.payload,
+      payload: prepareLearnerEventPayload(parsed.data.payload, ambiguousInput),
     });
     const run = await getChallengeRun(user.id, runId);
     const world = run ? getDemoWorld(run.world_id) : undefined;
-    const userAction = parsed.data.payload.text ?? "";
     const eventHistory = await getWorldEventsForRun(user.id, runId);
     const narration = world && parsed.data.actor === "user"
       ? await narrateWorldResponse({

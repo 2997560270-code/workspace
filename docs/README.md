@@ -14,6 +14,10 @@
 
 - [产品发现评测题库研究](./research/product-discovery-assessment-item-bank.md)
 
+## 问题复盘
+
+- [World Narrator 越界叙述问题复盘（2026-08-04）](./incidents/2026-08-04-world-narrator-grounding.md)
+
 ## 协作
 
 - [Issue tracker 规范](./agents/issue-tracker.md)

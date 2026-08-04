@@ -11,6 +11,7 @@ import {
   buildBehaviorObserverPrompt,
   buildHypothesisUpdaterPrompt,
   buildWorldNarratorPrompt,
+  getNarratorAllowedFacts,
 } from "./causal-prompts";
 import type {
   CausalWorldVersion,
@@ -25,6 +26,9 @@ import {
 } from "../behavior-claims";
 
 export type WorldNarration = z.infer<typeof WorldNarratorOutputSchema> & {
+  revealed_fact_ids: string[];
+  state_changed: boolean;
+  state_change_summary: string | null;
   unofficial: boolean;
   model_version: string;
 };
@@ -39,6 +43,65 @@ export type HypothesisUpdate = z.infer<typeof HypothesisUpdateSchema> & {
 
 const INSUFFICIENT_EVIDENCE_REASON =
   "证据不足：决策依据未覆盖至少两个可追溯的发现维度，无法输出行为结论。";
+const AMBIGUOUS_ACTIONS = new Set([
+  "ok",
+  "okay",
+  "yes",
+  "no",
+  "好",
+  "好的",
+  "继续",
+  "下一步",
+]);
+
+export function isAmbiguousLearnerAction(userAction: string): boolean {
+  const normalized = userAction.trim().toLowerCase().replace(/\s+/g, "");
+  return (
+    normalized.length === 0 ||
+    !/[a-z\u3400-\u9fff]/i.test(normalized) ||
+    AMBIGUOUS_ACTIONS.has(normalized)
+  );
+}
+
+function getNewRevealedFactIds(
+  worldVersion: CausalWorldVersion,
+  userAction: string,
+  revealedFactIds: string[]
+): string[] {
+  const alreadyRevealed = new Set(revealedFactIds);
+  const validFactIds = new Set(
+    worldVersion.immutable_rules.hidden_facts.map((fact) => fact.id)
+  );
+  const newlyRevealed = worldVersion.immutable_rules.reveal_conditions.flatMap(
+    (condition) =>
+      condition.trigger === "*" ||
+      (condition.trigger.length > 0 && userAction.includes(condition.trigger))
+        ? condition.reveals
+        : []
+  );
+
+  return [...new Set(newlyRevealed)].filter(
+    (id) => validFactIds.has(id) && !alreadyRevealed.has(id)
+  );
+}
+
+function governedClarification(): WorldNarration {
+  return {
+    response_type: "clarification",
+    narration: "你的输入还不够明确。请说明你想调查的信息，或明确准备采取的行动。",
+    cited_fact_ids: [],
+    revealed_fact_ids: [],
+    state_changed: false,
+    state_change_summary: null,
+    unofficial: false,
+    model_version: "governed-clarifier-v1",
+  };
+}
+
+function isConciseNarration(narration: string): boolean {
+  const sentenceCount = narration.match(/[。！？!?]/g)?.length ?? 1;
+  return Array.from(narration).length <= 120 && sentenceCount <= 3;
+}
 
 function getGovernedEvidenceById(
   decisionEvent: DecisionEvent,
@@ -93,26 +156,24 @@ function deterministicNarration(
   userAction: string,
   revealedFactIds: string[]
 ): WorldNarration {
-  // 检查是否匹配任何揭示条件
-  const newReveals: string[] = [];
-  for (const cond of worldVersion.immutable_rules.reveal_conditions) {
-    // Fix: empty-string trigger must not match every user action
-    if (cond.trigger === "*" || (cond.trigger.length > 0 && userAction.includes(cond.trigger))) {
-      newReveals.push(...cond.reveals);
-    }
-  }
-  const allRevealed = [...new Set([...revealedFactIds, ...newReveals])];
+  const newReveals = getNewRevealedFactIds(
+    worldVersion,
+    userAction,
+    revealedFactIds
+  );
   const revealedFacts = worldVersion.immutable_rules.hidden_facts.filter((f) =>
-    allRevealed.includes(f.id)
+    newReveals.includes(f.id)
   );
 
   const narration =
     revealedFacts.length > 0
-      ? `[确定性演示模式] 角色回应中。本轮揭示信息：${revealedFacts.map((f) => f.content).join("；")}`
-      : `[确定性演示模式] 角色收到了你的问题，但需要更具体的信息才能回应。`;
+      ? `[确定性演示模式] ${revealedFacts.map((f) => f.content).join("；")}`
+      : "[确定性演示模式] 当前没有可依据的新增信息，请具体说明想核查的事实。";
 
   return {
+    response_type: revealedFacts.length > 0 ? "role_reply" : "clarification",
     narration,
+    cited_fact_ids: newReveals,
     revealed_fact_ids: newReveals,
     state_changed: newReveals.length > 0,
     state_change_summary: newReveals.length > 0 ? "揭示了新信息" : null,
@@ -183,6 +244,10 @@ export async function narrateWorldResponse(params: {
   eventHistory: WorldEvent[];
   revealedFactIds: string[];
 }): Promise<WorldNarration> {
+  if (isAmbiguousLearnerAction(params.userAction)) {
+    return governedClarification();
+  }
+
   const client = getOpenAIClient();
   // Fix: !isOpenAIConfigured() is dead code — getOpenAIClient() returns null
   // when not configured, so !client already covers that case.
@@ -194,10 +259,24 @@ export async function narrateWorldResponse(params: {
     );
   }
 
+  // Reveal state is derived by the server before the model sees the prompt.
+  // The model may cite facts, but it cannot decide which facts become true.
+  const newlyRevealedIds = getNewRevealedFactIds(
+    params.worldVersion,
+    params.userAction,
+    params.revealedFactIds
+  );
+  const allRevealedIds = [
+    ...new Set([...params.revealedFactIds, ...newlyRevealedIds]),
+  ];
+
   try {
     const response = await client.responses.parse({
       model: runtimeEnv.roleplayModel,
-      input: buildWorldNarratorPrompt(params),
+      input: buildWorldNarratorPrompt({
+        ...params,
+        revealedFactIds: allRevealedIds,
+      }),
       text: {
         format: zodTextFormat(WorldNarratorOutputSchema, "world_narration"),
       },
@@ -205,23 +284,30 @@ export async function narrateWorldResponse(params: {
     const parsed = response.output_parsed;
     if (!parsed) throw new Error("World narrator response was not parsed");
 
-    // 校验：揭示的 fact id 必须存在于 immutable_rules
-    const validFactIds = new Set(
-      params.worldVersion.immutable_rules.hidden_facts.map((f) => f.id)
+    const allowedFactIds = new Set(
+      getNarratorAllowedFacts(params.worldVersion, allRevealedIds).map(
+        (fact) => fact.id
+      )
     );
-    const safeRevealedIds = parsed.revealed_fact_ids.filter((id) => validFactIds.has(id));
+    const citedFactIds = [...new Set(parsed.cited_fact_ids)];
 
-    // Fix: if all AI-supplied fact IDs were hallucinated and filtered out,
-    // state_changed must be false — a contradictory envelope (changed=true,
-    // reveals=[]) would corrupt the caller's revealed-facts accumulator.
-    const stateChanged = safeRevealedIds.length > 0 ? parsed.state_changed : false;
-    const stateChangeSummary = stateChanged ? parsed.state_change_summary : null;
+    if (
+      parsed.response_type !== "role_reply" ||
+      citedFactIds.length === 0 ||
+      citedFactIds.some((id) => !allowedFactIds.has(id)) ||
+      !isConciseNarration(parsed.narration)
+    ) {
+      throw new Error("World narrator response violated grounding or brevity rules");
+    }
 
     return {
+      response_type: parsed.response_type,
       narration: parsed.narration,
-      revealed_fact_ids: safeRevealedIds,
-      state_changed: stateChanged,
-      state_change_summary: stateChangeSummary,
+      cited_fact_ids: citedFactIds,
+      revealed_fact_ids: newlyRevealedIds,
+      state_changed: newlyRevealedIds.length > 0,
+      state_change_summary:
+        newlyRevealedIds.length > 0 ? "揭示了受治理的新信息" : null,
       unofficial: false,
       model_version: `${runtimeEnv.roleplayModel}:${runtimeEnv.modelVersion}`,
     };

@@ -15,6 +15,19 @@ export const AppendActionBodySchema = z.object({
   payload: z.record(z.string(), z.string().max(8000)).default({}),
 });
 
+/**
+ * Ambiguous learner input is retained for audit, but cannot be promoted to
+ * structured discovery evidence by carrying a discovery dimension.
+ */
+export function prepareLearnerEventPayload(
+  payload: Record<string, string>,
+  ambiguous: boolean
+): Record<string, string> {
+  if (!ambiguous) return payload;
+  const { discovery_dimension: _discoveryDimension, ...rest } = payload;
+  return { ...rest, input_status: "ambiguous" };
+}
+
 // ── 提交决策事件（后果揭示前）────────────────────────────────────
 export const CreateDecisionBodySchema = z.object({
   world_event_id: z.string().min(1).max(100),
