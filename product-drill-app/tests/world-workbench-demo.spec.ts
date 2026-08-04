@@ -56,6 +56,28 @@ test("demo world workbench records an action without falling back to the browser
   await expect(page.getByRole("alert")).not.toContainText("离线演示模式：动作已记录，叙述由本地规则生成。");
 });
 
+test("short learner messages keep a content-sized bubble", async ({ page }) => {
+  await enterApp(page);
+  await page.getByRole("button", { name: "进入世界工作台" }).click();
+
+  await page
+    .getByPlaceholder("提出调查问题或采取行动，Enter 发送，Shift+Enter 换行")
+    .fill("1");
+  await page.getByRole("button", { name: "发送", exact: true }).click();
+
+  const userMessage = page.locator(".wb-message-user");
+  await expect(userMessage).toHaveCount(1);
+  const dimensions = await userMessage.evaluate((element) => ({
+    bubbleWidth: element.getBoundingClientRect().width,
+    contentWidth: element.querySelector("p")?.getBoundingClientRect().width ?? 0,
+    timelineWidth: element.parentElement?.getBoundingClientRect().width ?? 0,
+  }));
+
+  expect(dimensions.bubbleWidth).toBeLessThan(dimensions.timelineWidth);
+  expect(dimensions.bubbleWidth).toBeLessThan(200);
+  expect(Math.abs(dimensions.bubbleWidth - dimensions.contentWidth)).toBeLessThan(1);
+});
+
 test("desktop completes world 1 to 2 to 3 and opens the judgment profile", async ({ page }) => {
   await enterApp(page);
   await page.getByRole("button", { name: "进入世界工作台" }).click();
