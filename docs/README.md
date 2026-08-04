@@ -4,6 +4,7 @@
 
 - [AI 原生重构方案](./product/ai-native-refactor-plan.md)
 - [方向 A 产品优化方案](./product/direction-a-product-optimization.md)
+- [全项目测试待优化清单（2026-08-04）](./product/full-project-test-optimization-backlog-2026-08-04.md)
 
 ## 架构与领域
 
