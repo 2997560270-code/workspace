@@ -17,6 +17,14 @@ export async function getCurrentUser(): Promise<ProductDrillUser | null> {
   }
 
   if (!isDemoAuthAllowed(process.env.NODE_ENV, process.env.ALLOW_DEMO_AUTH)) return null;
-  const session = (await cookies()).get(SESSION_COOKIE)?.value;
-  return isLoggedIn(session) ? { ...DEV_USER, source: "demo" } : null;
+  const cookieStore = await cookies();
+  const session = cookieStore.get(SESSION_COOKIE)?.value;
+  if (!isLoggedIn(session)) return null;
+  const isolatedUserId = process.env.E2E_ISOLATED_USERS === "true"
+    ? cookieStore.get("product_drill_e2e_user")?.value
+    : undefined;
+  const userId = isolatedUserId && /^e2e-[a-z0-9-]{8,80}$/i.test(isolatedUserId)
+    ? isolatedUserId
+    : DEV_USER.id;
+  return { ...DEV_USER, id: userId, source: "demo" };
 }

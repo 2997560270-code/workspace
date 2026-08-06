@@ -336,6 +336,9 @@ p { color: var(--ink-2); line-height: 1.66; }
 .message.user { align-self: flex-end; }
 .message.user > span { text-align: right; }
 .message.user p { color: var(--on-dark-title); background: var(--navy); border-radius: 12px 4px 12px 12px; }
+.message-thinking { align-self: flex-start; max-width: 78%; }
+.message-thinking > span { display: block; margin-bottom: 7px; }
+.message-thinking p { display: inline-block; margin: 0; padding: 12px 16px; color: var(--ink-2); background: #f7f6f2; border: 1px dashed #cbc8bf; border-radius: 4px 12px 12px 12px; font-size: var(--fs-body-sm); line-height: 1.6; }
 .composer { margin-top: auto; padding: 18px 20px; border-top: 1px solid var(--line); background: #faf9f5; }
 .composer textarea, .judgment textarea, .retry-form textarea {
   width: 100%;

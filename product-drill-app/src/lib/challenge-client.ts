@@ -59,7 +59,13 @@ export async function appendAction(
     event_type: "user_action" | "world_response" | "reveal" | "intervention";
     payload: Record<string, string>;
   }
-): Promise<{ event_id: string; narration?: string; unofficial: boolean }> {
+): Promise<{
+  event_id: string;
+  evidence_eligible: boolean;
+  discovery_dimension: "workflow" | "consequence" | "alternative" | null;
+  narration?: string;
+  unofficial: boolean;
+}> {
   return apiPost(`/api/challenge-runs/${runId}/actions`, params);
 }
 
@@ -113,6 +119,12 @@ export type InterventionApiResponse = {
     confidence: "high" | "medium" | "low";
     update_direction: "supports" | "contradicts" | "insufficient" | "neutral";
     evidence_type: "supporting" | "counter" | "assisted" | "transfer" | null;
+    covered_dimensions: Array<"workflow" | "consequence" | "alternative">;
+    missing_dimensions: Array<"workflow" | "consequence" | "alternative">;
+    feedback_content: string;
+    formal: boolean;
+    degraded: boolean;
+    duration_ms: number;
   } | null;
   next_challenge: NextChallengeSelection | null;
 };

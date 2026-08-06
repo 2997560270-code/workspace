@@ -215,6 +215,24 @@ describe("buildJudgmentProfile", () => {
     expect(item.assisted_evidence).toHaveLength(1);
     expect(item.transfer_evidence).toHaveLength(1);
     expect(item.total_evidence_count).toBe(4);
+    expect(item.independent_evidence_count).toBe(3);
+  });
+
+  it("counts every independent evidence type and excludes assisted evidence", () => {
+    const cases = [
+      { evidence: [makeEvidence("supporting")], expected: 1 },
+      { evidence: [makeEvidence("counter")], expected: 1 },
+      { evidence: [makeEvidence("transfer", { transfer_world_id: "world-3" })], expected: 1 },
+      { evidence: [makeEvidence("assisted")], expected: 0 },
+    ];
+
+    for (const testCase of cases) {
+      const result = buildJudgmentProfile({
+        hypotheses: [makeHypothesis()],
+        evidence: testCase.evidence,
+      });
+      expect(result.items[0].independent_evidence_count).toBe(testCase.expected);
+    }
   });
 });
 

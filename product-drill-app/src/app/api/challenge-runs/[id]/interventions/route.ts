@@ -23,14 +23,6 @@ export async function POST(
   const modelVersion = isOpenAIConfigured() ? runtimeEnv.modelVersion : "deterministic-v1";
 
   try {
-    const intervention = await insertIntervention({
-      userId: user.id,
-      runId,
-      decisionEventId: parsed.data.decision_event_id,
-      interventionType: parsed.data.intervention_type,
-      content: parsed.data.content,
-      modelVersion,
-    });
     const evaluation =
       parsed.data.intervention_type === "feedback" && parsed.data.decision_event_id
         ? await evaluateChallengeDecision({
@@ -39,8 +31,16 @@ export async function POST(
             decisionEventId: parsed.data.decision_event_id,
           })
         : null;
+    const intervention = await insertIntervention({
+      userId: user.id,
+      runId,
+      decisionEventId: parsed.data.decision_event_id,
+      interventionType: parsed.data.intervention_type,
+      content: evaluation?.feedback_content ?? parsed.data.content,
+      modelVersion: evaluation?.degraded ? "deterministic-v1" : modelVersion,
+    });
     const nextChallenge = evaluation
-      ? await selectNextChallengeForUser(user.id)
+      ? await selectNextChallengeForUser(user.id, evaluation.progression_confidence)
       : null;
     return Response.json({
       intervention,
@@ -49,6 +49,12 @@ export async function POST(
             confidence: evaluation.observation.confidence,
             update_direction: evaluation.update.update_direction,
             evidence_type: evaluation.evidence?.evidence_type ?? null,
+            covered_dimensions: evaluation.covered_dimensions,
+            missing_dimensions: evaluation.missing_dimensions,
+            feedback_content: evaluation.feedback_content,
+            formal: evaluation.formal,
+            degraded: evaluation.degraded,
+            duration_ms: evaluation.duration_ms,
           }
         : null,
       next_challenge: nextChallenge,

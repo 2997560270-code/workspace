@@ -58,6 +58,20 @@ describe("approved Phase 1 world seeds", () => {
     }
   });
 
+  it("accepts governed natural-language aliases for investigation intent", () => {
+    const worldOneConditions = DEMO_WORLDS[0].version.immutable_rules.reveal_conditions;
+    const goalCondition = worldOneConditions.find((condition) => condition.id === "RC-1-05");
+
+    expect(goalCondition?.aliases).toContain("希望达到怎样的效果");
+    for (const world of DEMO_WORLDS) {
+      expect(
+        world.version.immutable_rules.reveal_conditions.some(
+          (condition) => (condition.aliases?.length ?? 0) > 0
+        )
+      ).toBe(true);
+    }
+  });
+
   it("keeps the transfer world unprompted and surface-different", () => {
     const transferWorld = DEMO_WORLDS.find(
       (world) => world.transfer_role === "transfer_test"

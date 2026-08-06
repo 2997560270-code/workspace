@@ -39,6 +39,7 @@ export type RoleInterest = {
 export type RevealCondition = {
   id: string;
   trigger: string;
+  aliases?: string[];
   reveals: string[];
 };
 
@@ -73,6 +74,7 @@ export type CausalWorldVersion = {
   transfer_role: TransferRole;
   trigger_statement: string;
   visible_facts: string[];
+  relevance_terms?: string[];
   available_actions: WorldAction[];
   pressure_context: string;
   immutable_rules: ImmutableRules;
@@ -96,6 +98,7 @@ export const CausalWorldVersionSchema: z.ZodType<CausalWorldVersion> = z.object(
   transfer_role: z.enum(["calibration", "intervention", "transfer_test"]),
   trigger_statement: z.string().min(1),
   visible_facts: z.array(z.string().min(1)),
+  relevance_terms: z.array(z.string().min(1)).optional(),
   available_actions: z.array(
     z.object({
       id: z.string().min(1),
@@ -137,6 +140,7 @@ export const CausalWorldVersionSchema: z.ZodType<CausalWorldVersion> = z.object(
       z.object({
         id: z.string().min(1),
         trigger: z.string().min(1),
+        aliases: z.array(z.string().min(1)).optional(),
         reveals: z.array(z.string().min(1)).min(1),
       })
     ),
@@ -166,6 +170,81 @@ export const CausalWorldVersionSchema: z.ZodType<CausalWorldVersion> = z.object(
   source_references: z.array(z.string().min(1)),
   created_at: z.string().min(1),
 });
+
+export function normalizeInvestigationText(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[\s\p{P}\p{S}]+/gu, "");
+}
+
+export function getMatchedRevealFactIds(
+  worldVersion: CausalWorldVersion,
+  userAction: string
+): string[] {
+  const normalizedAction = normalizeInvestigationText(userAction);
+  const validFactIds = new Set(
+    worldVersion.immutable_rules.hidden_facts.map((fact) => fact.id)
+  );
+  const matchedFactIds = worldVersion.immutable_rules.reveal_conditions.flatMap(
+    (condition) => {
+      const phrases = [condition.trigger, ...(condition.aliases ?? [])];
+      const matched = phrases.some((phrase) => {
+        if (phrase === "*") return true;
+        const normalizedPhrase = normalizeInvestigationText(phrase);
+        return normalizedPhrase.length > 0 && normalizedAction.includes(normalizedPhrase);
+      });
+      return matched ? condition.reveals : [];
+    }
+  );
+
+  return [...new Set(matchedFactIds)].filter((id) => validFactIds.has(id));
+}
+
+export function isWorldRelevantAction(
+  worldVersion: CausalWorldVersion,
+  userAction: string
+): boolean {
+  if (getMatchedRevealFactIds(worldVersion, userAction).length > 0) return true;
+
+  const normalizedAction = normalizeInvestigationText(userAction);
+  return (worldVersion.relevance_terms ?? []).some((term) => {
+    const normalizedTerm = normalizeInvestigationText(term);
+    return normalizedTerm.length > 0 && normalizedAction.includes(normalizedTerm);
+  });
+}
+
+export function getInvestigationSuggestion(worldVersion: CausalWorldVersion): string {
+  return `这个问题与当前的${worldVersion.domain}场景没有直接关系。请围绕当前需求、用户、使用现状、风险或替代方案继续提问。`;
+}
+
+export function getRelevantInformationGapReply(
+  worldVersion: CausalWorldVersion,
+  userAction: string
+): string {
+  const normalizedAction = normalizeInvestigationText(userAction);
+  const asksAboutScope = ["多少", "程度", "范围", "标准", "要求", "做到什么"].some(
+    (term) => normalizedAction.includes(normalizeInvestigationText(term))
+  );
+  const investigationActions = worldVersion.available_actions.filter(
+    (action) => action.category !== "commit"
+  );
+
+  if (asksAboutScope) {
+    const goalAction = investigationActions.find((action) =>
+      /目标|问题|诉求/.test(action.label)
+    );
+    const dataAction = investigationActions.find((action) =>
+      /数据|使用/.test(action.label)
+    );
+    const nextSteps = [goalAction?.label, dataAction?.label].filter(Boolean);
+    return `目前的信息还不能确定具体范围或做到什么程度。${
+      nextSteps.length > 0 ? `先${nextSteps.join("，再")}，才能给出准确判断。` : "请继续澄清目标和判断标准。"
+    }`;
+  }
+
+  return "这个问题与当前场景有关，但现有信息还不足以给出准确答案。请继续补充想核查的对象或判断标准，我会结合已确认信息直接回应。";
+}
 
 // ── 世界身份 ─────────────────────────────────────────────────────
 export type CausalWorld = {

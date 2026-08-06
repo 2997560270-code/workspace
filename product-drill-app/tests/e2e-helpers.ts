@@ -1,6 +1,13 @@
 ﻿import type { Page } from "@playwright/test";
 
 export async function enterApp(page: Page) {
+  await page.context().addCookies([{
+    name: "product_drill_e2e_user",
+    value: `e2e-${crypto.randomUUID()}`,
+    domain: "127.0.0.1",
+    path: "/",
+    sameSite: "Lax",
+  }]);
   await page.goto("/");
   const loginButton = page.getByRole("button", { name: "开始首次诊断", exact: true });
   if (await loginButton.isVisible().catch(() => false)) {

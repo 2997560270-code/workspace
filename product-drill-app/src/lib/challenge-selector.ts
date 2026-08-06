@@ -24,6 +24,8 @@ export type ChallengeSelectorResult = {
   is_transfer_test: boolean;
   /** 同一世界修正轮次（理解性反馈，不产生迁移证据）*/
   is_remediation: boolean;
+  /** 所有受治理世界均已完成，不再自动选择下一轮 */
+  loop_complete: boolean;
   reason: string;
 };
 
@@ -79,6 +81,7 @@ export function selectNextChallenge(
       transfer_role: first.transfer_role,
       is_transfer_test: false,
       is_remediation: false,
+      loop_complete: false,
       reason: "尚未完成任何世界，从校准世界（calibration）开始建立行为基线。",
     };
   }
@@ -87,6 +90,21 @@ export function selectNextChallenge(
     [...calibrationWorlds, ...interventionWorlds].every((w) =>
       completedSet.has(w.world_id)
     );
+
+  // 完整闭环优先于低置信度修正规则。后续巩固可以推荐，但不再
+  // 把已经完成的迁移测试重新解释成未完成状态。
+  const allWorldsDone = ordered.every((world) => completedSet.has(world.world_id));
+  if (allWorldsDone) {
+    const first = ordered[0];
+    return {
+      world_id: first.world_id,
+      transfer_role: first.transfer_role,
+      is_transfer_test: false,
+      is_remediation: false,
+      loop_complete: true,
+      reason: "三个世界均已完成，已形成闭环证据。可在判断画像中查看结果。",
+    };
+  }
 
   // ── 规则 2：所有前置世界已完成，但置信度不足 → 修正轮次 ─────────
   if (allPreTransferDone && !TRANSFER_ELIGIBLE_CONFIDENCE.has(hypothesis.confidence)) {
@@ -104,6 +122,7 @@ export function selectNextChallenge(
       transfer_role: remediationTarget.transfer_role,
       is_transfer_test: false,
       is_remediation: true,
+      loop_complete: false,
       reason:
         `假设置信度为 "${hypothesis.confidence}"，未达到迁移测试门槛。` +
         `返回 ${remediationTarget.world_id} 进行修正练习（同世界理解反馈，不产生迁移证据）。`,
@@ -124,6 +143,7 @@ export function selectNextChallenge(
         transfer_role: world.transfer_role,
         is_transfer_test: true,
         is_remediation: false,
+        loop_complete: false,
         reason:
           `已完成前置世界，假设置信度为 "${hypothesis.confidence}"，` +
           `满足迁移测试条件，进入陌生领域世界 ${world.world_id}。`,
@@ -135,17 +155,19 @@ export function selectNextChallenge(
       transfer_role: world.transfer_role,
       is_transfer_test: false,
       is_remediation: false,
+      loop_complete: false,
       reason: `已完成 ${completedSet.size} 个世界，下一个按顺序进入 ${world.transfer_role} 世界 ${world.world_id}。`,
     };
   }
 
-  // ── 规则 4：所有世界均已完成，round-robin 从第一个开始 ──────────
+  // 无候选世界时保留确定性兜底。
   const first = ordered[0];
   return {
     world_id: first.world_id,
     transfer_role: first.transfer_role,
     is_transfer_test: false,
     is_remediation: false,
-    reason: "所有候选世界均已完成，重新从第一个世界开始（循环）。",
+    loop_complete: false,
+    reason: "暂时没有可进入的新世界。",
   };
 }

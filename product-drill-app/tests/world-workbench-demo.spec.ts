@@ -47,12 +47,19 @@ test("demo world workbench records an action without falling back to the browser
   const initialMessageCount = await messages.count();
   await page
     .getByPlaceholder("提出调查问题或采取行动，Enter 发送，Shift+Enter 换行")
-    .fill("现有摘要功能的使用率是多少？");
+    .fill("CEO 希望这个 AI 摘要可以达到怎样的效果？");
   await page.getByRole("button", { name: "发送", exact: true }).click();
 
   await expect(messages).toHaveCount(initialMessageCount + 1);
-  await expect(messages.filter({ hasText: "[确定性演示模式]" })).toHaveCount(1);
-  await expect(messages.filter({ hasText: "12%" })).toHaveCount(1);
+  await expect(messages.filter({ hasText: "[确定性演示模式]" })).toHaveCount(0);
+  await page
+    .getByPlaceholder("提出调查问题或采取行动，Enter 发送，Shift+Enter 换行")
+    .fill("我想了解这个摘要要展示多少信息，我才能知道要做到什么程度");
+  await page.getByRole("button", { name: "发送", exact: true }).click();
+
+  await expect(messages).toHaveCount(initialMessageCount + 2);
+  await expect(messages.filter({ hasText: "你可以继续调查" })).toHaveCount(0);
+  await expect(messages.filter({ hasText: "没有直接关系" })).toHaveCount(0);
   await expect(page.getByRole("alert")).not.toContainText("离线演示模式：动作已记录，叙述由本地规则生成。");
 });
 
@@ -76,6 +83,9 @@ test("short learner messages keep a content-sized bubble", async ({ page }) => {
   expect(dimensions.bubbleWidth).toBeLessThan(dimensions.timelineWidth);
   expect(dimensions.bubbleWidth).toBeLessThan(200);
   expect(Math.abs(dimensions.bubbleWidth - dimensions.contentWidth)).toBeLessThan(1);
+
+  await page.getByRole("button", { name: "完成调查，提交决策", exact: true }).click();
+  await expect(page.getByText("尚无调查事件可引用", { exact: true })).toBeVisible();
 });
 
 test("desktop completes world 1 to 2 to 3 and opens the judgment profile", async ({ page }) => {
@@ -85,6 +95,12 @@ test("desktop completes world 1 to 2 to 3 and opens the judgment profile", async
   for (let index = 0; index < WORLD_TITLES.length; index += 1) {
     await expect(page.getByRole("heading", { level: 2, name: WORLD_TITLES[index] })).toBeVisible();
     await completeCurrentWorld(page, "请核查当前使用数据、真实问题和现有替代方案");
+    if (index === 0) {
+      await expect(page.locator(".wb-reflect")).toContainText("已有替代方案");
+    }
+    if (index === 2) {
+      await expect(page.locator(".wb-reflect")).toContainText("三个维度");
+    }
     const finishButton = page.locator(".wb-reflect .button-primary");
     await expect(finishButton).toHaveCount(1);
     await finishButton.click();
@@ -93,21 +109,8 @@ test("desktop completes world 1 to 2 to 3 and opens the judgment profile", async
   await expect(page.getByRole("heading", { level: 1, name: "我的能力" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 3, name: "premature_solution_commitment" })).toBeVisible();
   await expect(page.getByText("Rubric 0.3.0", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: /查看证据/ })).toBeVisible();
-
-  await page.locator(".jp-expand-btn").click();
-  await page.locator(".ev-open-decision").first().click();
-  const profileTimeline = page.locator(".decision-timeline");
-  await expect(profileTimeline).toBeFocused();
-  await expect
-    .poll(async () => profileTimeline.evaluate((element) => element.getBoundingClientRect().top >= 0))
-    .toBe(true);
-  await page.locator(".ev-open-decision").first().click();
-  await expect(profileTimeline).toBeFocused();
-  await expect
-    .poll(async () => profileTimeline.evaluate((element) => element.getBoundingClientRect().top >= 0))
-    .toBe(true);
-  await page.locator(".decision-timeline-close").click();
+  await expect(page.getByText("尚无证据，完成世界工作台训练后自动更新。", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /查看证据/ })).toHaveCount(0);
 
   await page.getByRole("button", { name: /复盘与复练/ }).click();
   await expect(page.getByRole("heading", { level: 2, name: "世界决策记录" })).toBeVisible();

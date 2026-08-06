@@ -5,7 +5,7 @@ import { z } from "zod";
 export const WorldNarratorOutputSchema = z.object({
   response_type: z.enum(["role_reply", "clarification"]),
   // 即时角色回复，不得写成场景续写或训练复盘
-  narration: z.string().min(1).max(160),
+  narration: z.string().min(1).max(240),
   // 每个事实性回答必须引用本轮允许使用的事实 id
   cited_fact_ids: z.array(z.string().min(1)).max(8),
 });

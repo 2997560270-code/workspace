@@ -19,6 +19,25 @@ describe("AI pipeline fallback and evidence validation", () => {
     expect(next.messages.at(-1)?.content).toContain("三个系统导出 Excel");
   });
 
+  it("accepts prefixed JSON from an OpenAI-compatible roleplay model", async () => {
+    const session = createTrainingSession({ scenarioId: "dashboard-request", mode: "独立" });
+    openaiMock.client = {
+      responses: {
+        parse: async () => ({
+          output_text: `reply, revealedSkill, coveredSkills.\n${JSON.stringify({
+            reply: "区域运营专员每天使用报表。",
+            revealedSkill: "role",
+            coveredSkills: ["role"],
+          })}`,
+        }),
+      },
+    };
+
+    const next = await generateRoleplayTurn(session, "谁每天使用报表？");
+    expect(next.engine).toBe("openai");
+    expect(next.messages.at(-1)?.content).toBe("区域运营专员每天使用报表。");
+  });
+
   it("discards model evidence that does not reference a real verbatim message span", async () => {
     const base = createTrainingSession({ scenarioId: "dashboard-request", mode: "独立" });
     const session = applyRoleplayReply(base, {

@@ -11,5 +11,5 @@ test("completes the direction A diagnosis-feedback-retry loop", async ({ page })
   await page.getByRole("button", { name: "完成并返回今日训练", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "复盘与复练" })).toBeVisible();
   await page.getByRole("button", { name: "04 我的能力 查看掌握状态和证据", exact: true }).click();
-  await expect(page.getByText("观察到改善", { exact: true })).toBeVisible();
+  await expect(page.getByText("专项练习改善", { exact: true })).toBeVisible();
 });

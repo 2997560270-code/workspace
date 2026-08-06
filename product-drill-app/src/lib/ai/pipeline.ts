@@ -7,6 +7,7 @@ import { runtimeEnv } from "../env";
 import { getOpenAIClient } from "./client";
 import { buildEvaluationPrompt, buildRetryPrompt, buildRoleplayPrompt } from "./prompts";
 import { EvaluationOutputSchema, RetryOutputSchema, RoleplayOutputSchema } from "./schemas";
+import { requestStructuredResponse } from "./structured-response";
 
 const SCORE_BY_LEVEL = { "未体现": 0, "在提示下体现": 2, "独立体现": 3, "稳定且深入": 4 } as const;
 
@@ -14,13 +15,13 @@ export async function generateRoleplayTurn(session: TrainingSession, content: st
   const client = getOpenAIClient();
   if (!client) return { ...sendTrainingMessage(session, content), engine: "deterministic", modelVersion: DETERMINISTIC_ENGINE_VERSION };
   try {
-    const response = await client.responses.parse({
+    const parsed = await requestStructuredResponse({
+      client,
       model: runtimeEnv.roleplayModel,
       input: buildRoleplayPrompt(session, content),
-      text: { format: zodTextFormat(RoleplayOutputSchema, "product_drill_roleplay") }
+      schema: RoleplayOutputSchema,
+      schemaName: "product_drill_roleplay",
     });
-    const parsed = response.output_parsed;
-    if (!parsed) throw new Error("OpenAI roleplay response was not parsed");
     return applyRoleplayReply(session, {
       userMessage: content,
       reply: parsed.reply,
@@ -38,13 +39,13 @@ export async function generateStructuredEvaluation(session: TrainingSession): Pr
   const client = getOpenAIClient();
   if (!client || session.engine !== "openai") return generateEvaluation(session);
   try {
-    const response = await client.responses.parse({
+    const parsed = await requestStructuredResponse({
+      client,
       model: runtimeEnv.evaluationModel,
       input: buildEvaluationPrompt(session),
-      text: { format: zodTextFormat(EvaluationOutputSchema, "product_drill_evaluation") }
+      schema: EvaluationOutputSchema,
+      schemaName: "product_drill_evaluation",
     });
-    const parsed = response.output_parsed;
-    if (!parsed) throw new Error("OpenAI evaluation response was not parsed");
     const messageMap = new Map(session.messages.map((message) => [message.id, message.content]));
     const dimensions: EvidenceDimension[] = parsed.dimensions.map((item) => {
       const validEvidence = item.evidenceMessageIds
@@ -109,13 +110,13 @@ export async function evaluateRetryTurn(input: { targetSkill: SkillId; originalI
   const client = getOpenAIClient();
   if (!client) return { ...evaluateRetry(input.answer, input.targetSkill), engine: "deterministic" as const, modelVersion: "deterministic-v1" };
   try {
-    const response = await client.responses.parse({
+    const parsed = await requestStructuredResponse({
+      client,
       model: runtimeEnv.evaluationModel,
       input: buildRetryPrompt(input),
-      text: { format: zodTextFormat(RetryOutputSchema, "product_drill_retry") }
+      schema: RetryOutputSchema,
+      schemaName: "product_drill_retry",
     });
-    const parsed = response.output_parsed;
-    if (!parsed) throw new Error("OpenAI retry response was not parsed");
     return { improved: parsed.improved, feedback: parsed.feedback, engine: "openai" as const, modelVersion: `${runtimeEnv.evaluationModel}:${runtimeEnv.modelVersion}` };
   } catch (error) {
     captureServerException(error, { area: "retry" });

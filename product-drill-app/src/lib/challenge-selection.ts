@@ -19,7 +19,8 @@ export type NextChallengeSelection = ChallengeSelectorResult & {
 };
 
 export async function selectNextChallengeForUser(
-  userId: string
+  userId: string,
+  progressionConfidence?: HypothesisSummary["confidence"]
 ): Promise<NextChallengeSelection> {
   const [hypotheses, decisionRecords] = await Promise.all([
     getJudgmentProfile(userId),
@@ -34,7 +35,7 @@ export async function selectNextChallengeForUser(
     .map((world) => world.world_id);
   const summary: HypothesisSummary = {
     habit_name: PREMATURE_SOLUTION_COMMITMENT_CLAIM.id,
-    confidence: hypothesis?.confidence ?? "insufficient",
+    confidence: progressionConfidence ?? hypothesis?.confidence ?? "insufficient",
     supporting_evidence_count: hypothesis?.supporting_evidence_ids.length ?? 0,
     counter_evidence_count: hypothesis?.counter_evidence_ids.length ?? 0,
     completed_world_ids: completedWorldIds,

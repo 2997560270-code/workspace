@@ -29,8 +29,8 @@ describe("OpenAI-compatible client", () => {
       {
         apiKey: "test-key",
         baseURL: "https://api.example.test",
-        timeout: 20_000,
-        maxRetries: 1,
+        timeout: 30_000,
+        maxRetries: 0,
       },
     ]);
   });

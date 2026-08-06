@@ -108,15 +108,19 @@ function TodayPanel({
   onStart,
   onOpenReview,
   onStartWorkbench,
+  onOpenAbility,
   nextWorldTitle,
   nextWorldReason,
+  workbenchComplete,
 }: {
   records: TrainingHistoryRecord[];
   onStart: (scenarioId: string, mode?: TrainingSession["mode"]) => void;
   onOpenReview: () => void;
   onStartWorkbench: (worldId?: string) => void;
+  onOpenAbility: () => void;
   nextWorldTitle: string;
   nextWorldReason: string;
+  workbenchComplete: boolean;
 }) {
   const profile = buildAbilityProfile(records);
   const recommended = records.length ? TRAINING_SCENARIOS[0] : TRAINING_SCENARIOS[2];
@@ -139,10 +143,16 @@ function TodayPanel({
             <button className="button button-light" onClick={() => onStart(recommended.id)} type="button">
               {records.length ? "开始今日训练" : "开始 3 分钟诊断"} <ArrowIcon />
             </button>
-            <button className="button button-secondary" onClick={() => onStartWorkbench()} type="button">
-              进入世界工作台 <ArrowIcon />
+            <button
+              className="button button-secondary"
+              onClick={() => workbenchComplete ? onOpenAbility() : onStartWorkbench()}
+              type="button"
+            >
+              {workbenchComplete ? "查看判断画像" : "进入世界工作台"} <ArrowIcon />
             </button>
-            <span title={nextWorldReason}>下一挑战：{nextWorldTitle}</span>
+            <span title={nextWorldReason}>
+              {workbenchComplete ? "世界闭环已完成" : `下一挑战：${nextWorldTitle}`}
+            </span>
           </div>
         </div>
         <div className="hero-proof">
@@ -430,6 +440,7 @@ function TrainingWorkspace({
 }) {
   const [session, setSession] = useState(() => createTrainingSession({ scenarioId, mode: initialMode }));
   const [reply, setReply] = useState("");
+  const [pendingReply, setPendingReply] = useState<string | null>(null);
   const [judgment, setJudgment] = useState<ProductJudgment>(EMPTY_JUDGMENT);
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [record, setRecord] = useState<TrainingHistoryRecord | null>(null);
@@ -438,8 +449,15 @@ function TrainingWorkspace({
   const [busy, setBusy] = useState(true);
   const [runtimeStatus, setRuntimeStatus] = useState<"connecting" | "online" | "fallback">("connecting");
   const [actionError, setActionError] = useState("");
+  const messageListRef = useRef<HTMLDivElement>(null);
   const scenario = getScenario(session.scenarioId);
   const coverage = getCoveragePercent(session);
+
+  useEffect(() => {
+    const messageList = messageListRef.current;
+    if (!messageList) return;
+    messageList.scrollTop = messageList.scrollHeight;
+  }, [session.messages, pendingReply]);
 
   useEffect(() => {
     let cancelled = false;
@@ -468,6 +486,7 @@ function TrainingWorkspace({
     setActionError("");
     setEvaluation(null);
     setRecord(null);
+    setPendingReply(null);
     setJudgment(EMPTY_JUDGMENT);
     try {
       const remoteSession = await createRemoteSession(scenarioId, mode);
@@ -486,6 +505,7 @@ function TrainingWorkspace({
     const content = reply.trim();
     if (!content || busy) return;
     setReply("");
+    setPendingReply(content);
     setBusy(true);
     setActionError("");
     try {
@@ -497,6 +517,7 @@ function TrainingWorkspace({
       setRuntimeStatus("fallback");
       setActionError("本次追问由离线演示引擎回应，不会写入正式能力证据。");
     } finally {
+      setPendingReply(null);
       setBusy(false);
     }
   }
@@ -651,13 +672,25 @@ function TrainingWorkspace({
             </div>
             <span className="quiet">{busy ? "处理中…" : `${session.mode}模式`}</span>
           </div>
-          <div className="message-list">
+          <div className="message-list" data-testid="message-list" ref={messageListRef}>
             {session.messages.map((message) => (
               <article className={`message ${message.role}`} key={message.id}>
                 <span>{message.role === "ai" ? "AI 用户" : "你"}</span>
                 <p>{message.content}</p>
               </article>
             ))}
+            {pendingReply ? (
+              <>
+                <article className="message user message-pending" data-testid="pending-user-message">
+                  <span>你</span>
+                  <p>{pendingReply}</p>
+                </article>
+                <div aria-live="polite" className="message-thinking" data-testid="thinking-indicator" role="status">
+                  <span>AI 用户</span>
+                  <p>正在思考…</p>
+                </div>
+              </>
+            ) : null}
           </div>
           <div className="composer">
             <textarea
@@ -791,21 +824,30 @@ function ReviewPanel({
   );
 }
 
-function AbilityPanel({ records }: { records: TrainingHistoryRecord[] }) {
+function AbilityPanel({
+  records,
+  onOpenReview,
+}: {
+  records: TrainingHistoryRecord[];
+  onOpenReview: () => void;
+}) {
   const formalProfile = buildAbilityProfile(records.filter((record) => record.engine === "openai"), { formalEvidenceOnly: true });
   const practiceProfile = buildAbilityProfile(records);
   return (
     <div className="ability-layout">
       <section className="ability-summary surface-dark">
         <div>
-          <span className="section-kicker light">能力证据，不是装饰性雷达图</span>
-          <h2>{practiceProfile.completedCount ? `你已经留下 ${practiceProfile.completedCount} 条训练记录，其中 ${formalProfile.completedCount} 条进入正式能力趋势` : "完成首次训练，建立能力基线"}</h2>
-          <p>{formalProfile.completedCount ? formalProfile.nextTraining : "离线或降级训练只作为练习反馈。完成真实模型评估后，能力状态才会更新。"}</p>
+          <span className="section-kicker light">专项训练证据</span>
+          <h2>{practiceProfile.completedCount ? `专项训练已留下 ${practiceProfile.completedCount} 条记录，其中 ${formalProfile.completedCount} 条进入正式能力趋势` : "完成首次专项训练，建立能力基线"}</h2>
+          <p>{formalProfile.completedCount ? formalProfile.nextTraining : "这里仅统计今日训练和训练地图中的专项练习，不包含上方的世界工作台判断证据。离线或降级结果只作为练习反馈。"}</p>
+          <button className="button button-light" onClick={onOpenReview} type="button">
+            查看全部训练记录
+          </button>
         </div>
         <div className="summary-stats">
-          <div><strong>{practiceProfile.completedCount}</strong><span>全部练习</span></div>
-          <div><strong>{formalProfile.completedCount}</strong><span>正式证据</span></div>
-          <div><strong>{formalProfile.improvedCount}</strong><span>观察到改善</span></div>
+          <div><strong>{practiceProfile.completedCount}</strong><span>专项练习记录</span></div>
+          <div><strong>{formalProfile.completedCount}</strong><span>进入正式趋势</span></div>
+          <div><strong>{formalProfile.improvedCount}</strong><span>专项练习改善</span></div>
         </div>
       </section>
       <section className="surface ability-table">
@@ -959,7 +1001,7 @@ export function AppShell({
   function completeWorkbenchWorld(worldId: string, nextChallenge?: NextChallengeSelection) {
     setCompletedWorldIds((current) => current.includes(worldId) ? current : [...current, worldId]);
     setNextChallengeSelection(nextChallenge ?? null);
-    if (nextChallenge && nextChallenge.completed_world_ids.length >= 3) {
+    if (nextChallenge?.loop_complete) {
       setActiveWorkbenchWorldId(null);
       setView("ability");
       return;
@@ -1074,8 +1116,10 @@ export function AppShell({
               onOpenReview={() => setView("review")}
               onStart={startTraining}
               onStartWorkbench={(worldId) => setActiveWorkbenchWorldId(worldId ?? displayedNextChallenge.world_id ?? DEFAULT_WORLD_ID)}
+              onOpenAbility={() => setView("ability")}
               nextWorldTitle={displayedNextChallenge.world_title}
               nextWorldReason={displayedNextChallenge.reason}
+              workbenchComplete={nextChallengeSelection?.loop_complete ?? false}
               records={historyRecords}
             />
           ) : view === "map" ? (
@@ -1090,7 +1134,7 @@ export function AppShell({
             // 旧 AbilityPanel 保留供旧训练链路使用
             <div className="ability-layout">
               <JudgmentProfilePanel />
-              <AbilityPanel records={historyRecords} />
+              <AbilityPanel onOpenReview={() => setView("review")} records={historyRecords} />
             </div>
           ) : null}
         </div>

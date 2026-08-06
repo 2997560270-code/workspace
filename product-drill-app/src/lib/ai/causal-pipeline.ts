@@ -1,4 +1,3 @@
-import { zodTextFormat } from "openai/helpers/zod";
 import { captureServerException } from "../monitoring/server";
 import { runtimeEnv } from "../env";
 import { getOpenAIClient } from "./client";
@@ -18,12 +17,19 @@ import type {
   DecisionEvent,
   WorldEvent,
 } from "../causal-world";
+import {
+  getInvestigationSuggestion,
+  getMatchedRevealFactIds,
+  getRelevantInformationGapReply,
+  isWorldRelevantAction,
+} from "../causal-world";
 import { z } from "zod";
 import {
   DISCOVERY_DIMENSIONS,
   REQUIRED_FORBIDDEN_INFERENCES,
   type DiscoveryDimension,
 } from "../behavior-claims";
+import { requestStructuredResponse } from "./structured-response";
 
 export type WorldNarration = z.infer<typeof WorldNarratorOutputSchema> & {
   revealed_fact_ids: string[];
@@ -69,19 +75,8 @@ function getNewRevealedFactIds(
   revealedFactIds: string[]
 ): string[] {
   const alreadyRevealed = new Set(revealedFactIds);
-  const validFactIds = new Set(
-    worldVersion.immutable_rules.hidden_facts.map((fact) => fact.id)
-  );
-  const newlyRevealed = worldVersion.immutable_rules.reveal_conditions.flatMap(
-    (condition) =>
-      condition.trigger === "*" ||
-      (condition.trigger.length > 0 && userAction.includes(condition.trigger))
-        ? condition.reveals
-        : []
-  );
-
-  return [...new Set(newlyRevealed)].filter(
-    (id) => validFactIds.has(id) && !alreadyRevealed.has(id)
+  return getMatchedRevealFactIds(worldVersion, userAction).filter(
+    (id) => !alreadyRevealed.has(id)
   );
 }
 
@@ -100,7 +95,7 @@ function governedClarification(): WorldNarration {
 
 function isConciseNarration(narration: string): boolean {
   const sentenceCount = narration.match(/[。！？!?]/g)?.length ?? 1;
-  return Array.from(narration).length <= 120 && sentenceCount <= 3;
+  return Array.from(narration).length <= 220 && sentenceCount <= 5;
 }
 
 function getGovernedEvidenceById(
@@ -156,24 +151,31 @@ function deterministicNarration(
   userAction: string,
   revealedFactIds: string[]
 ): WorldNarration {
+  const matchedFactIds = getMatchedRevealFactIds(worldVersion, userAction);
   const newReveals = getNewRevealedFactIds(
     worldVersion,
     userAction,
     revealedFactIds
   );
   const revealedFacts = worldVersion.immutable_rules.hidden_facts.filter((f) =>
-    newReveals.includes(f.id)
+    matchedFactIds.includes(f.id)
   );
 
   const narration =
     revealedFacts.length > 0
-      ? `[确定性演示模式] ${revealedFacts.map((f) => f.content).join("；")}`
-      : "[确定性演示模式] 当前没有可依据的新增信息，请具体说明想核查的事实。";
+      ? revealedFacts.map((f) => f.content).join("；")
+      : isWorldRelevantAction(worldVersion, userAction)
+        ? getRelevantInformationGapReply(worldVersion, userAction)
+        : getInvestigationSuggestion(worldVersion);
+  const responseType =
+    revealedFacts.length > 0 || isWorldRelevantAction(worldVersion, userAction)
+      ? "role_reply"
+      : "clarification";
 
   return {
-    response_type: revealedFacts.length > 0 ? "role_reply" : "clarification",
+    response_type: responseType,
     narration,
-    cited_fact_ids: newReveals,
+    cited_fact_ids: matchedFactIds,
     revealed_fact_ids: newReveals,
     state_changed: newReveals.length > 0,
     state_change_summary: newReveals.length > 0 ? "揭示了新信息" : null,
@@ -271,18 +273,16 @@ export async function narrateWorldResponse(params: {
   ];
 
   try {
-    const response = await client.responses.parse({
+    const parsed = await requestStructuredResponse({
+      client,
       model: runtimeEnv.roleplayModel,
       input: buildWorldNarratorPrompt({
         ...params,
         revealedFactIds: allRevealedIds,
       }),
-      text: {
-        format: zodTextFormat(WorldNarratorOutputSchema, "world_narration"),
-      },
+      schema: WorldNarratorOutputSchema,
+      schemaName: "world_narration",
     });
-    const parsed = response.output_parsed;
-    if (!parsed) throw new Error("World narrator response was not parsed");
 
     const allowedFactIds = new Set(
       getNarratorAllowedFacts(params.worldVersion, allRevealedIds).map(
@@ -290,24 +290,49 @@ export async function narrateWorldResponse(params: {
       )
     );
     const citedFactIds = [...new Set(parsed.cited_fact_ids)];
+    const locallyRelevant = isWorldRelevantAction(
+      params.worldVersion,
+      params.userAction
+    );
+    const incorrectlyRejectsRelevantInput =
+      locallyRelevant &&
+      parsed.response_type === "clarification" &&
+      /无关|没有直接关系|偏离|回到当前/.test(parsed.narration);
+    if (incorrectlyRejectsRelevantInput) {
+      throw new Error("World narrator incorrectly rejected a relevant input");
+    }
+    const resolvedResponseType = locallyRelevant
+      ? "role_reply"
+      : parsed.response_type;
+    const resolvedCitedFactIds =
+      locallyRelevant && citedFactIds.length === 0
+        ? ["scenario-trigger"]
+        : citedFactIds;
+    const validRoleReply =
+      resolvedResponseType === "role_reply" && resolvedCitedFactIds.length > 0;
+    const validClarification =
+      resolvedResponseType === "clarification" &&
+      resolvedCitedFactIds.length === 0 &&
+      !locallyRelevant;
 
     if (
-      parsed.response_type !== "role_reply" ||
-      citedFactIds.length === 0 ||
-      citedFactIds.some((id) => !allowedFactIds.has(id)) ||
+      (!validRoleReply && !validClarification) ||
+      resolvedCitedFactIds.some((id) => !allowedFactIds.has(id)) ||
       !isConciseNarration(parsed.narration)
     ) {
       throw new Error("World narrator response violated grounding or brevity rules");
     }
 
     return {
-      response_type: parsed.response_type,
+      response_type: resolvedResponseType,
       narration: parsed.narration,
-      cited_fact_ids: citedFactIds,
-      revealed_fact_ids: newlyRevealedIds,
-      state_changed: newlyRevealedIds.length > 0,
+      cited_fact_ids: resolvedCitedFactIds,
+      revealed_fact_ids: validRoleReply ? newlyRevealedIds : [],
+      state_changed: validRoleReply && newlyRevealedIds.length > 0,
       state_change_summary:
-        newlyRevealedIds.length > 0 ? "揭示了受治理的新信息" : null,
+        validRoleReply && newlyRevealedIds.length > 0
+          ? "揭示了受治理的新信息"
+          : null,
       unofficial: false,
       model_version: `${runtimeEnv.roleplayModel}:${runtimeEnv.modelVersion}`,
     };
@@ -327,6 +352,7 @@ export async function observeBehavior(params: {
   decisionEvent: DecisionEvent;
   eventHistory: WorldEvent[];
   wasAssisted: boolean;
+  signal?: AbortSignal;
 }): Promise<BehaviorObservation> {
   const client = getOpenAIClient();
   if (!client) {
@@ -339,7 +365,8 @@ export async function observeBehavior(params: {
   }
 
   try {
-    const response = await client.responses.parse({
+    const parsed = await requestStructuredResponse({
+      client,
       model: runtimeEnv.evaluationModel,
       input: buildBehaviorObserverPrompt({
         worldVersion: params.worldVersion,
@@ -348,12 +375,10 @@ export async function observeBehavior(params: {
         behaviorAnchors: params.worldVersion.behavior_anchors,
         wasAssisted: params.wasAssisted,
       }),
-      text: {
-        format: zodTextFormat(BehaviorObservationSchema, "behavior_observation"),
-      },
+      schema: BehaviorObservationSchema,
+      schemaName: "behavior_observation",
+      signal: params.signal,
     });
-    const parsed = response.output_parsed;
-    if (!parsed) throw new Error("Behavior observer response was not parsed");
 
     // Only user-selected, structured investigation events are authoritative.
     // The model cannot promote an unrelated event into evidence or relabel its
@@ -394,10 +419,28 @@ export async function observeBehavior(params: {
         (obs) => obs.evidence_event_ids.length > 0 && obs.evidence_quotes.length > 0
       );
 
-    const coveredDimensions = new Set(
-      safeObservations.flatMap((obs) =>
-        obs.dimension_covered === "none" ? [] : [obs.dimension_covered]
+    // Coverage is a governed fact derived from selected structured events.
+    // The model may explain those events, but cannot omit or relabel them.
+    const authoritativeObservation = deterministicBehaviorObservation(
+      params.decisionEvent,
+      params.eventHistory,
+      params.wasAssisted
+    );
+    const modelObservationByDimension = new Map(
+      safeObservations.flatMap((observation) =>
+        observation.dimension_covered === "none"
+          ? []
+          : [[observation.dimension_covered, observation] as const]
       )
+    );
+    const authoritativeObservations = authoritativeObservation.observations.map(
+      (observation) =>
+        observation.dimension_covered === "none"
+          ? observation
+          : modelObservationByDimension.get(observation.dimension_covered) ?? observation
+    );
+    const coveredDimensions = new Set(
+      [...governedEvidence.values()].map(({ dimension }) => dimension)
     );
     const missingDimensions = DISCOVERY_DIMENSIONS.filter(
       (dimension) => !coveredDimensions.has(dimension)
@@ -406,7 +449,7 @@ export async function observeBehavior(params: {
 
     return {
       ...parsed,
-      observations: hasMinimumEvidence ? safeObservations : [],
+      observations: hasMinimumEvidence ? authoritativeObservations : [],
       missing_dimensions: missingDimensions,
       // Fix (CRITICAL): always override assisted with the authoritative
       // params.wasAssisted flag — the AI-returned value must never win,
@@ -436,6 +479,7 @@ export async function updateHypothesis(params: {
   worldId: string;
   worldVersion: string;
   isTransferWorld: boolean;
+  signal?: AbortSignal;
 }): Promise<HypothesisUpdate> {
   const client = getOpenAIClient();
   if (!client) {
@@ -446,15 +490,14 @@ export async function updateHypothesis(params: {
   }
 
   try {
-    const response = await client.responses.parse({
+    const parsed = await requestStructuredResponse({
+      client,
       model: runtimeEnv.evaluationModel,
       input: buildHypothesisUpdaterPrompt(params),
-      text: {
-        format: zodTextFormat(HypothesisUpdateSchema, "hypothesis_update"),
-      },
+      schema: HypothesisUpdateSchema,
+      schemaName: "hypothesis_update",
+      signal: params.signal,
     });
-    const parsed = response.output_parsed;
-    if (!parsed) throw new Error("Hypothesis updater response was not parsed");
 
     // 安全校验：referenced_evidence_ids 只能来自 observation
     const validObsIds = new Set(

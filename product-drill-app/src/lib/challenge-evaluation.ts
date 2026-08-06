@@ -6,7 +6,8 @@ import {
   type HypothesisEvidence,
   type JudgmentHypothesis,
 } from "./causal-world";
-import { classifyInterventionTiming } from "./intervention-generator";
+import { buildInterventionContent, classifyInterventionTiming } from "./intervention-generator";
+import { DISCOVERY_DIMENSIONS, type DiscoveryDimension } from "./behavior-claims";
 import {
   completeChallengeRun,
   getChallengeDecisionRecords,
@@ -22,11 +23,20 @@ import {
 import { judgeTransferEvidence } from "./transfer-judge";
 import { DEMO_WORLDS, getDemoWorld } from "./world-seeds";
 
+const CHALLENGE_EVALUATION_TIMEOUT_MS = 60_000;
+
 export type ChallengeEvaluationResult = {
   observation: BehaviorObservation;
   update: HypothesisUpdate;
   hypothesis: JudgmentHypothesis;
   evidence: HypothesisEvidence | null;
+  covered_dimensions: DiscoveryDimension[];
+  missing_dimensions: DiscoveryDimension[];
+  feedback_content: string;
+  formal: boolean;
+  progression_confidence: "high" | "medium" | "low" | "insufficient";
+  degraded: boolean;
+  duration_ms: number;
 };
 
 function appendUnique(values: string[], value: string): string[] {
@@ -47,6 +57,7 @@ export async function evaluateChallengeDecision(params: {
   runId: string;
   decisionEventId: string;
 }): Promise<ChallengeEvaluationResult> {
+  const startedAt = Date.now();
   const run = await getChallengeRun(params.userId, params.runId);
   if (!run) throw new RunNotFoundError();
 
@@ -73,11 +84,30 @@ export async function evaluateChallengeDecision(params: {
     habitName,
   });
 
+  const controller = new AbortController();
+  // Behavior observation and hypothesis update are separate model calls. Give
+  // each call room to finish while retaining one bounded end-to-end deadline.
+  const deadline = setTimeout(
+    () => controller.abort(),
+    CHALLENGE_EVALUATION_TIMEOUT_MS
+  );
   const observation = await observeBehavior({
     worldVersion: world.version,
     decisionEvent: decision,
     eventHistory,
     wasAssisted: timing.was_assisted,
+    signal: controller.signal,
+  });
+  const missingDimensions = [...observation.missing_dimensions];
+  const missingSet = new Set(missingDimensions);
+  const coveredDimensions = DISCOVERY_DIMENSIONS.filter(
+    (dimension) => !missingSet.has(dimension)
+  );
+  const feedbackContent = buildInterventionContent({
+    decision,
+    missing_dimensions: missingDimensions,
+    world_trigger: world.version.trigger_statement,
+    intervention_type: "feedback",
   });
   const update = await updateHypothesis({
     habitName,
@@ -87,14 +117,19 @@ export async function evaluateChallengeDecision(params: {
     worldId: world.world_id,
     worldVersion: world.version.version,
     isTransferWorld: world.transfer_role === "transfer_test",
+    signal: controller.signal,
   });
+  clearTimeout(deadline);
+  const formal =
+    observation.model_version !== "deterministic-v1" &&
+    update.model_version !== "deterministic-v1";
 
   if (!current) {
     hypothesis = await upsertJudgmentHypothesis(hypothesis);
   }
 
   let evidence: HypothesisEvidence | null = null;
-  if (canCreateEvidence(observation, update)) {
+  if (formal && canCreateEvidence(observation, update)) {
     const baseType = timing.was_assisted
       ? "assisted"
       : update.update_direction === "supports"
@@ -161,5 +196,17 @@ export async function evaluateChallengeDecision(params: {
   hypothesis = await upsertJudgmentHypothesis(hypothesis);
   await completeChallengeRun(params.userId, params.runId);
 
-  return { observation, update, hypothesis, evidence };
+  return {
+    observation,
+    update,
+    hypothesis,
+    evidence,
+    covered_dimensions: coveredDimensions,
+    missing_dimensions: missingDimensions,
+    feedback_content: feedbackContent,
+    formal,
+    progression_confidence: update.updated_confidence,
+    degraded: !formal,
+    duration_ms: Date.now() - startedAt,
+  };
 }

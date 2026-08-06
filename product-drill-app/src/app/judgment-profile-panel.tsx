@@ -271,14 +271,16 @@ function HypothesisCard({
             {item.confidence_label}
           </span>
         </div>
-        <button
-          aria-expanded={expanded}
-          className="text-button jp-expand-btn"
-          onClick={() => setExpanded((v) => !v)}
-          type="button"
-        >
-          {expanded ? "收起" : `查看证据 (${item.total_evidence_count})`}
-        </button>
+        {hasAnyEvidence ? (
+          <button
+            aria-expanded={expanded}
+            className="text-button jp-expand-btn"
+            onClick={() => setExpanded((v) => !v)}
+            type="button"
+          >
+            {expanded ? "收起" : `查看证据 (${item.total_evidence_count})`}
+          </button>
+        ) : null}
       </div>
 
       {item.trigger_conditions.length > 0 && (
@@ -398,9 +400,10 @@ export function JudgmentProfilePanel() {
     return (
       <section className="jp-empty surface">
         <span className="empty-number">01</span>
-        <h2>还没有判断习惯证据</h2>
+        <h2>还没有世界判断证据</h2>
         <p>
-          进入世界工作台，完成一次调查与决策，系统会自动构建你的判断证据画像。
+          这里仅统计世界工作台中的结构化调查与决策，不包含专项训练记录。
+          完成一次世界调查与决策后，系统会自动构建你的判断证据画像。
           画像里每一条结论都可以追溯到具体的决策事件，不是模糊总分。
         </p>
         <ul className="jp-empty-facts">
@@ -425,21 +428,21 @@ export function JudgmentProfilePanel() {
 
       <section className="jp-summary surface-dark">
         <div>
-          <span className="section-kicker light">判断习惯画像</span>
-          <h2>每条结论都可以追溯到具体决策事件</h2>
+          <span className="section-kicker light">世界判断证据</span>
+          <h2>世界工作台的每条结论都可追溯到具体决策</h2>
           <p>
-            置信度不是分数，它反映了相同条件下行为的一致性。
-            证据不足时不会显示伪精确结论。
+            本区域只统计世界工作台中的结构化调查与决策，不包含下方的专项训练记录。
+            置信度反映相同条件下行为的一致性，证据不足时不会显示伪精确结论。
           </p>
         </div>
         <div className="jp-summary-stats">
           <div>
             <strong>{items.length}</strong>
-            <span>追踪的判断习惯</span>
+            <span>世界判断习惯</span>
           </div>
           <div>
-            <strong>{items.reduce((n, i) => n + i.supporting_evidence.length, 0)}</strong>
-            <span>独立支持证据</span>
+            <strong>{items.reduce((n, i) => n + i.independent_evidence_count, 0)}</strong>
+            <span>世界独立证据</span>
           </div>
           <div>
             <strong>{items.reduce((n, i) => n + i.transfer_evidence.length, 0)}</strong>

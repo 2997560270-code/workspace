@@ -59,6 +59,8 @@ export type HypothesisDisplayItem = {
   transfer_evidence: EvidenceDisplayItem[];
   /** 所有证据总数（含辅助） */
   total_evidence_count: number;
+  /** 独立证据总数（支持 + 反证 + 迁移，不含辅助） */
+  independent_evidence_count: number;
   last_updated_at: string;
 };
 
@@ -121,6 +123,7 @@ export function buildJudgmentProfile(
       assisted_evidence: assisted,
       transfer_evidence: transfer,
       total_evidence_count: hypEvidence.length,
+      independent_evidence_count: supporting.length + counter.length + transfer.length,
       last_updated_at: hyp.last_updated_at,
     };
   });

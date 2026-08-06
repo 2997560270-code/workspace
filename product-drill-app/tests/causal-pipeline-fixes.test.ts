@@ -6,6 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { narrateWorldResponse, observeBehavior } from "../src/lib/ai/causal-pipeline";
+import { DEMO_WORLDS } from "../src/lib/world-seeds";
 import type {
   CausalWorldVersion,
   DecisionEvent,
@@ -36,7 +37,12 @@ function makeWorldVersion(
       causal_rules: [],
       role_interests: [],
       reveal_conditions: [
-        { id: "rc-1", trigger: "使用频率", reveals: ["fact-1"] },
+        {
+          id: "rc-1",
+          trigger: "使用频率",
+          aliases: ["用得怎么样", "当前使用情况", "使用情况"],
+          reveals: ["fact-1"],
+        },
         { id: "rc-wildcard", trigger: "*", reveals: [] },
         ...(overrides.reveal_conditions ?? []),
       ],
@@ -152,6 +158,66 @@ describe("narrateWorldResponse — state_changed coherence fix", () => {
     } else {
       expect(result.state_change_summary).toBeNull();
     }
+  });
+});
+
+describe("deterministicNarration — natural investigation language", () => {
+  it("reveals the same governed fact for a natural-language alias", async () => {
+    const result = await narrateWorldResponse({
+      worldVersion: makeWorldVersion(),
+      userAction: "我想先了解一下用户现在用得怎么样？",
+      eventHistory: [],
+      revealedFactIds: [],
+    });
+
+    expect(result.response_type).toBe("role_reply");
+    expect(result.revealed_fact_ids).toEqual(["fact-1"]);
+    expect(result.narration).toContain("报表使用频率低");
+    expect(result.narration).not.toContain("确定性演示模式");
+  });
+
+  it("answers a matched question again after the fact was already revealed", async () => {
+    const result = await narrateWorldResponse({
+      worldVersion: makeWorldVersion(),
+      userAction: "当前使用情况到底如何？",
+      eventHistory: [],
+      revealedFactIds: ["fact-1"],
+    });
+
+    expect(result.response_type).toBe("role_reply");
+    expect(result.cited_fact_ids).toEqual(["fact-1"]);
+    expect(result.revealed_fact_ids).toEqual([]);
+    expect(result.state_changed).toBe(false);
+    expect(result.narration).toContain("报表使用频率低");
+  });
+
+  it("prompts the learner only when the input is unrelated to the world", async () => {
+    const world = makeWorldVersion();
+
+    const result = await narrateWorldResponse({
+      worldVersion: world,
+      userAction: "今天天气怎么样",
+      eventHistory: [],
+      revealedFactIds: [],
+    });
+
+    expect(result.response_type).toBe("clarification");
+    expect(result.narration).toContain("没有直接关系");
+    expect(result.narration).not.toContain("当前没有可依据的新增信息");
+  });
+
+  it("treats a scope question as relevant without requiring a reveal phrase", async () => {
+    const result = await narrateWorldResponse({
+      worldVersion: DEMO_WORLDS[0].version,
+      userAction: "我想了解这个摘要要展示多少信息，我才能知道要做到什么程度",
+      eventHistory: [],
+      revealedFactIds: ["HF-1-01"],
+    });
+
+    expect(result.response_type).toBe("role_reply");
+    expect(result.narration).toContain("还不能确定具体范围");
+    expect(result.narration).not.toContain("你可以继续调查");
+    expect(result.narration).not.toContain("没有直接关系");
   });
 });
 

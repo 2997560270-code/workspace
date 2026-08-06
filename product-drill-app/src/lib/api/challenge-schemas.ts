@@ -21,11 +21,12 @@ export const AppendActionBodySchema = z.object({
  */
 export function prepareLearnerEventPayload(
   payload: Record<string, string>,
-  ambiguous: boolean
+  ineligible: boolean,
+  status: "ambiguous" | "ineligible" = "ambiguous"
 ): Record<string, string> {
-  if (!ambiguous) return payload;
+  if (!ineligible) return payload;
   const { discovery_dimension: _discoveryDimension, ...rest } = payload;
-  return { ...rest, input_status: "ambiguous" };
+  return { ...rest, input_status: status };
 }
 
 // ── 提交决策事件（后果揭示前）────────────────────────────────────

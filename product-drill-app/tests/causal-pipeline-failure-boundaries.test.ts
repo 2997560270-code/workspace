@@ -3,7 +3,10 @@ import type { CausalWorldVersion, DecisionEvent, WorldEvent } from "../src/lib/c
 
 const openaiMock = vi.hoisted(() => ({
   client: null as null | {
-    responses: { parse: (request?: { input?: string }) => Promise<unknown> };
+    responses: {
+      create?: (request?: { input?: string }) => Promise<unknown>;
+      parse?: (request?: { input?: string }) => Promise<unknown>;
+    };
   },
 }));
 
@@ -28,6 +31,7 @@ function governedWorld(): CausalWorldVersion {
     transfer_role: "calibration",
     trigger_statement: "A governed test world",
     visible_facts: [],
+    relevance_terms: ["inspect", "scope", "summary"],
     available_actions: [],
     pressure_context: "test",
     immutable_rules: {
@@ -40,7 +44,12 @@ function governedWorld(): CausalWorldVersion {
       }],
       causal_rules: [],
       role_interests: [],
-      reveal_conditions: [{ id: "condition-1", trigger: "inspect", reveals: ["fact-1"] }],
+      reveal_conditions: [{
+        id: "condition-1",
+        trigger: "inspect",
+        aliases: ["what should this achieve"],
+        reveals: ["fact-1"],
+      }],
     },
     behavior_anchors: {
       premature_commitment: { level: 1, description: "test", observable_indicators: [], anti_examples: [] },
@@ -186,7 +195,7 @@ describe("causal narrator failure boundaries", () => {
         parse: async () => ({
           output_parsed: {
             response_type: "role_reply",
-            narration: "长".repeat(121),
+            narration: "长".repeat(221),
             cited_fact_ids: ["scenario-trigger"],
           },
         }),
@@ -240,6 +249,121 @@ describe("causal narrator failure boundaries", () => {
 
     expect(result.unofficial).toBe(true);
     expect(result.model_version).toBe("deterministic-v1");
+  });
+
+  it("returns a governed fact for an alias when model parsing fails", async () => {
+    openaiMock.client = {
+      responses: { parse: async () => ({ output_parsed: null }) },
+    };
+
+    const result = await narrateWorldResponse({
+      worldVersion: governedWorld(),
+      userAction: "Can you explain what should this achieve?",
+      eventHistory: [],
+      revealedFactIds: [],
+    });
+
+    expect(result.unofficial).toBe(true);
+    expect(result.response_type).toBe("role_reply");
+    expect(result.revealed_fact_ids).toEqual(["fact-1"]);
+    expect(result.narration).toBe("Governed fact");
+  });
+
+  it("accepts prefixed JSON from an OpenAI-compatible provider", async () => {
+    openaiMock.client = {
+      responses: {
+        create: async () => ({
+          output_text: `_type="role_reply", narration, cited_fact_ids.\n${JSON.stringify({
+            response_type: "role_reply",
+            narration: "The current scope is not defined yet.",
+            cited_fact_ids: ["scenario-trigger"],
+          })}`,
+        }),
+      },
+    };
+
+    const result = await narrateWorldResponse({
+      worldVersion: governedWorld(),
+      userAction: "What scope should the summary cover?",
+      eventHistory: [],
+      revealedFactIds: [],
+    });
+
+    expect(result.unofficial).toBe(false);
+    expect(result.response_type).toBe("role_reply");
+    expect(result.narration).toContain("scope");
+  });
+
+  it("keeps a relevant information-gap answer even if the provider labels it clarification", async () => {
+    openaiMock.client = {
+      responses: {
+        create: async () => ({
+          output_text: JSON.stringify({
+            response_type: "clarification",
+            narration: "目前还没有明确范围。你希望先确认展示目标还是使用场景？",
+            cited_fact_ids: [],
+          }),
+        }),
+      },
+    };
+
+    const result = await narrateWorldResponse({
+      worldVersion: governedWorld(),
+      userAction: "What scope should the summary cover?",
+      eventHistory: [],
+      revealedFactIds: [],
+    });
+
+    expect(result.unofficial).toBe(false);
+    expect(result.response_type).toBe("role_reply");
+    expect(result.cited_fact_ids).toEqual(["scenario-trigger"]);
+    expect(result.narration).toContain("还没有明确范围");
+  });
+
+  it("gives a targeted information-gap reply for a relevant unmatched question", async () => {
+    openaiMock.client = null;
+    const world = governedWorld();
+    world.available_actions = [
+      { id: "goal", label: "澄清最终目标", category: "investigate" },
+      { id: "data", label: "查看使用数据", category: "request_data" },
+    ];
+
+    const result = await narrateWorldResponse({
+      worldVersion: world,
+      userAction: "summary scope should include how much information?",
+      eventHistory: [],
+      revealedFactIds: [],
+    });
+
+    expect(result.response_type).toBe("role_reply");
+    expect(result.narration).not.toContain("你可以继续调查");
+    expect(result.narration).toContain("现有信息还不足");
+  });
+
+  it("accepts a concise clarification only for an unrelated question", async () => {
+    openaiMock.client = {
+      responses: {
+        parse: async () => ({
+          output_parsed: {
+            response_type: "clarification",
+            narration: "这个问题与当前产品场景无关，请回到当前需求。",
+            cited_fact_ids: [],
+          },
+        }),
+      },
+    };
+
+    const result = await narrateWorldResponse({
+      worldVersion: governedWorld(),
+      userAction: "今天天气怎么样",
+      eventHistory: [],
+      revealedFactIds: [],
+    });
+
+    expect(result.unofficial).toBe(false);
+    expect(result.response_type).toBe("clarification");
+    expect(result.revealed_fact_ids).toEqual([]);
+    expect(result.state_changed).toBe(false);
   });
 
   it("does not expose model-supplied world rule overrides", async () => {
@@ -308,7 +432,7 @@ describe("behavior observer evidence governance", () => {
     expect(result.observations).toEqual([]);
   });
 
-  it("does not accept unselected events or fabricated quotes as evidence", async () => {
+  it("rejects model-fabricated quotes while preserving structured event coverage", async () => {
     const workflow = governedEvent("event-workflow", "workflow", "先梳理当前工作流");
     const consequence = governedEvent("event-consequence", "consequence", "再确认业务后果");
     openaiMock.client = {
@@ -349,7 +473,7 @@ describe("behavior observer evidence governance", () => {
 
     expect(result.confidence).toBe("low");
     expect(result.observations).toEqual([]);
-    expect(result.missing_dimensions).toEqual(["workflow", "consequence", "alternative"]);
+    expect(result.missing_dimensions).toEqual(["workflow", "alternative"]);
   });
 });
 

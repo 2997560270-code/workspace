@@ -15,6 +15,8 @@
 
 ## 本地开发
 
+最方便的 Windows 测试入口是双击仓库根目录的 `start-test.cmd`。它会自动检查依赖、启动开发服务器，并在服务就绪后打开浏览器。
+
 ```powershell
 cd product-drill-app
 npm ci

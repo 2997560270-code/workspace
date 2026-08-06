@@ -34,6 +34,7 @@ import {
   recordIntervention,
 } from "../lib/challenge-client";
 import { buildInterventionContent } from "../lib/intervention-generator";
+import { isAmbiguousLearnerAction } from "../lib/ai/causal-pipeline";
 import {
   DEMO_WORLDS,
   allowsPreDecisionHint,
@@ -44,6 +45,12 @@ import {
 import { DISCOVERY_DIMENSIONS, type DiscoveryDimension } from "../lib/behavior-claims";
 import type { NextChallengeSelection } from "../lib/challenge-selection";
 import type { InterventionApiResponse } from "../lib/challenge-client";
+import {
+  getInvestigationSuggestion,
+  getMatchedRevealFactIds,
+  getRelevantInformationGapReply,
+  isWorldRelevantAction,
+} from "../lib/causal-world";
 import { trackClientEvent } from "../lib/analytics/client";
 import {
   CAUSAL_EVENTS,
@@ -266,7 +273,10 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
   const [reflectContent, setReflectContent] = useState("");
   const [nextChallenge, setNextChallenge] = useState<NextChallengeSelection | null>(null);
   const [evaluation, setEvaluation] = useState<InterventionApiResponse["evaluation"]>(null);
+  const [feedbackStatus, setFeedbackStatus] = useState("");
   const [userEventIds, setUserEventIds] = useState<string[]>([]);
+  const [eligibleEvidenceEventIds, setEligibleEvidenceEventIds] = useState<string[]>([]);
+  const [evidenceDimensions, setEvidenceDimensions] = useState<Record<string, DiscoveryDimension>>({});
   const [seqIndex, setSeqIndex] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -363,9 +373,16 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
         }
         return next;
       });
-      setDraft((current) => current.evidence_basis.includes(result.event_id)
-        ? current
-        : { ...current, evidence_basis: [...current.evidence_basis, result.event_id] });
+      if (result.evidence_eligible && result.discovery_dimension) {
+        setEligibleEvidenceEventIds((prev) => [...prev, result.event_id]);
+        setEvidenceDimensions((prev) => ({
+          ...prev,
+          [result.event_id]: result.discovery_dimension!,
+        }));
+        setDraft((current) => current.evidence_basis.includes(result.event_id)
+          ? current
+          : { ...current, evidence_basis: [...current.evidence_basis, result.event_id] });
+      }
 
       // 更新消息（含 narration）
       setMessages((prev) =>
@@ -382,25 +399,30 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
     } catch {
       // 离线降级：生成本地 event id，确保决策表单可引用
       const localEventId = `local-evt-${Date.now()}-${userIdx}`;
-      // Fix (CRITICAL): register the local event ID so the decision form's
-      // evidence-basis checkbox list is non-empty in offline mode.
       setUserEventIds((prev) => [...prev, localEventId]);
-      setDraft((current) => current.evidence_basis.includes(localEventId)
-        ? current
-        : { ...current, evidence_basis: [...current.evidence_basis, localEventId] });
+      const localEvidenceEligible =
+        !isAmbiguousLearnerAction(content) && isWorldRelevantAction(world.version, content);
+      if (localEvidenceEligible) {
+        setEligibleEvidenceEventIds((prev) => [...prev, localEventId]);
+        setEvidenceDimensions((prev) => ({ ...prev, [localEventId]: discoveryDimension }));
+        setDraft((current) => current.evidence_basis.includes(localEventId)
+          ? current
+          : { ...current, evidence_basis: [...current.evidence_basis, localEventId] });
+      }
       setMessages((prev) =>
         prev.map((m) => m.id === tmpUserId ? { ...m, event_id: localEventId } : m)
       );
 
       const seed = world.version;
-      const matchedFact = seed.immutable_rules.reveal_conditions.find(
-        (rc) => rc.trigger.length > 0 && content.includes(rc.trigger)
+      const matchedFactIds = getMatchedRevealFactIds(seed, content);
+      const matchedFacts = seed.immutable_rules.hidden_facts.filter((fact) =>
+        matchedFactIds.includes(fact.id)
       );
-      const narration = matchedFact
-        ? `[演示模式] 发现了新信息：${matchedFact.reveals.map((id) =>
-            seed.immutable_rules.hidden_facts.find((f) => f.id === id)?.content ?? id
-          ).join("；")}`
-        : "[演示模式] 角色收到了你的问题，需要更具体的信息才能回应。";
+      const narration = matchedFacts.length > 0
+        ? matchedFacts.map((fact) => fact.content).join("；")
+        : isWorldRelevantAction(seed, content)
+          ? getRelevantInformationGapReply(seed, content)
+          : getInvestigationSuggestion(seed);
 
       setMessages((prev) => [...prev, worldMessage(narration)]);
       setError("离线演示模式：动作已记录，叙述由本地规则生成。");
@@ -529,12 +551,8 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
     setBusy(true);
     setError("");
 
-    // Fix (MEDIUM): use userEventIds.length (actual investigation events sent to
-    // the world) rather than draft.evidence_basis.length (checkbox UI state) to
-    // determine whether the learner investigated. A learner may forget to tick
-    // checkboxes after genuine investigation; the event record is authoritative.
     const rules = world?.version.immutable_rules.causal_rules ?? [];
-    const isPrematurePath = userEventIds.length === 0;
+    const isPrematurePath = eligibleEvidenceEventIds.length === 0;
     const rule =
       rules.find((r) => r.consequence_path === (isPrematurePath ? "premature" : "investigated"))
       ?? rules[0];
@@ -584,11 +602,26 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
   async function handleAdvanceToReflect() {
     if (!state?.run_id || busy || !world) return;
     setBusy(true);
+    setError("");
+    setFeedbackStatus("正在核对调查证据…");
+    const profileTimer = window.setTimeout(
+      () => setFeedbackStatus("正在更新判断画像…"),
+      4_000
+    );
+    const selectionTimer = window.setTimeout(
+      () => setFeedbackStatus("正在确定闭环状态…"),
+      9_000
+    );
 
-    const missingDims: Array<"workflow" | "consequence" | "alternative"> = [];
-    if (!draft.evidence_basis.length) {
-      missingDims.push("workflow", "consequence", "alternative");
-    }
+    const coveredDimensions = new Set(
+      draft.evidence_basis.flatMap((eventId) => {
+        const dimension = evidenceDimensions[eventId];
+        return dimension ? [dimension] : [];
+      })
+    );
+    const missingDims = DISCOVERY_DIMENSIONS.filter(
+      (dimension) => !coveredDimensions.has(dimension)
+    );
 
     const feedbackContent = buildInterventionContent({
       decision: {
@@ -619,7 +652,14 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
         });
       }
     } catch {
-      // ignore recording errors in offline mode
+      if (!state.run_id.startsWith("demo-run-")) {
+        window.clearTimeout(profileTimer);
+        window.clearTimeout(selectionTimer);
+        setFeedbackStatus("");
+        setError("证据反馈生成失败，请点击“查看证据反馈”重试。");
+        setBusy(false);
+        return;
+      }
     }
 
     setEvaluation(response?.evaluation ?? null);
@@ -631,8 +671,11 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
         // Keep the deterministic local fallback when the selection endpoint is unavailable.
       }
     }
-    setReflectContent(feedbackContent);
+    setReflectContent(response?.intervention.content ?? feedbackContent);
     setState((prev) => prev ? advanceToReflect(prev) : prev);
+    window.clearTimeout(profileTimer);
+    window.clearTimeout(selectionTimer);
+    setFeedbackStatus("");
     setBusy(false);
   }
 
@@ -671,7 +714,7 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
   const worldNumber = DEMO_WORLDS.findIndex((item) => item.world_id === world.world_id) + 1;
   const fallbackNextWorld = getNextDemoWorld(world.world_id);
   const nextWorld = nextChallenge ? getDemoWorld(nextChallenge.world_id) : fallbackNextWorld;
-  const loopComplete = (nextChallenge?.completed_world_ids.length ?? 0) >= DEMO_WORLDS.length;
+  const loopComplete = nextChallenge?.loop_complete ?? false;
 
   return (
     <div className="world-workbench">
@@ -785,7 +828,7 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
             <DecisionForm
               busy={busy}
               draft={draft}
-              eventIds={userEventIds}
+              eventIds={eligibleEvidenceEventIds}
               onChange={setDraft}
               onSubmit={() => { void handleSubmitDecision(); }}
             />
@@ -816,6 +859,9 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
               >
                 {busy ? "生成反馈…" : "查看证据反馈"}
               </button>
+              {feedbackStatus && (
+                <p className="wb-feedback-status" role="status">{feedbackStatus}</p>
+              )}
             </div>
           )}
 
@@ -824,16 +870,28 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
             <div className="wb-reflect surface">
               <span className="section-kicker">证据反馈</span>
               <p>{reflectContent}</p>
-              {nextChallenge && (
+              {nextChallenge && !loopComplete && (
                 <div className="wb-next-challenge">
                   <span className="detail-label">下一挑战</span>
                   <strong>{nextChallenge.world_title}</strong>
                   <p>{nextChallenge.reason}</p>
                 </div>
               )}
+              {loopComplete && (
+                <div className="wb-next-challenge" role="status">
+                  <span className="detail-label">世界闭环已完成</span>
+                  <strong>三个世界的判断证据已保存</strong>
+                  <p>{nextChallenge?.reason}</p>
+                </div>
+              )}
               {state.was_assisted && (
                 <p className="wb-assisted-notice">
                   ⚠ 本轮使用了提示，决策证据标记为辅助，不计入独立能力趋势。
+                </p>
+              )}
+              {evaluation?.degraded && (
+                <p className="wb-assisted-notice" role="status">
+                  模型响应超时或不可用，本次反馈已由受治理的本地规则完成。
                 </p>
               )}
               <button

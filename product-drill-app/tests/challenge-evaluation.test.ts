@@ -53,7 +53,7 @@ async function createDecisionWithDimensions(
 }
 
 describe("challenge decision evaluation integration", () => {
-  it("persists traceable counter evidence and completes the run", async () => {
+  it("does not persist deterministic fallback as formal counter evidence", async () => {
     const userId = `evaluation-user-${crypto.randomUUID()}`;
     const { run, decision } = await createDecisionWithDimensions(userId, [
       "workflow",
@@ -68,21 +68,21 @@ describe("challenge decision evaluation integration", () => {
     });
 
     expect(result.observation.confidence).toBe("medium");
+    expect(result.covered_dimensions).toEqual(["workflow", "consequence", "alternative"]);
+    expect(result.missing_dimensions).toEqual([]);
+    expect(result.feedback_content).toContain("三个维度");
     expect(result.update.update_direction).toBe("contradicts");
-    expect(result.evidence).toMatchObject({
-      decision_event_id: decision.id,
-      evidence_type: "counter",
-      world_id: WORLD_ID,
-      model_version: "deterministic-v1",
-    });
-    expect(result.hypothesis.counter_evidence_ids).toContain(result.evidence!.id);
+    expect(result.formal).toBe(false);
+    expect(result.degraded).toBe(true);
+    expect(result.progression_confidence).toBe("low");
+    expect(result.evidence).toBeNull();
+    expect(result.hypothesis.counter_evidence_ids).toEqual([]);
     await expect(getChallengeRun(userId, run.id)).resolves.toMatchObject({ status: "completed" });
 
     const profile = await getJudgmentProfile(userId);
     const evidence = await getHypothesisEvidenceForProfile(profile.map((item) => item.id));
     expect(profile).toHaveLength(1);
-    expect(evidence).toHaveLength(1);
-    expect(evidence[0].decision_event_id).toBe(decision.id);
+    expect(evidence).toEqual([]);
   });
 
   it("records an insufficient hypothesis without fabricating evidence", async () => {
@@ -96,11 +96,39 @@ describe("challenge decision evaluation integration", () => {
     });
 
     expect(result.observation.confidence).toBe("low");
+    expect(result.covered_dimensions).toEqual([]);
+    expect(result.missing_dimensions).toEqual(["workflow", "consequence", "alternative"]);
+    expect(result.feedback_content).toContain("当前工作流程");
     expect(result.update.update_direction).toBe("insufficient");
     expect(result.evidence).toBeNull();
     expect(result.hypothesis.confidence).toBe("insufficient");
     const evidence = await getHypothesisEvidenceForProfile([result.hypothesis.id]);
     expect(evidence).toEqual([]);
+  });
+
+  it("reports the exact missing dimensions for one and two selected dimensions", async () => {
+    const oneUserId = `one-dimension-${crypto.randomUUID()}`;
+    const one = await createDecisionWithDimensions(oneUserId, ["workflow"]);
+    const oneResult = await evaluateChallengeDecision({
+      userId: oneUserId,
+      runId: one.run.id,
+      decisionEventId: one.decision.id,
+    });
+    expect(oneResult.covered_dimensions).toEqual(["workflow"]);
+    expect(oneResult.missing_dimensions).toEqual(["consequence", "alternative"]);
+    expect(oneResult.feedback_content).toContain("问题影响与代价");
+    expect(oneResult.feedback_content).toContain("已有替代方案");
+
+    const twoUserId = `two-dimensions-${crypto.randomUUID()}`;
+    const two = await createDecisionWithDimensions(twoUserId, ["workflow", "alternative"]);
+    const twoResult = await evaluateChallengeDecision({
+      userId: twoUserId,
+      runId: two.run.id,
+      decisionEventId: two.decision.id,
+    });
+    expect(twoResult.covered_dimensions).toEqual(["workflow", "alternative"]);
+    expect(twoResult.missing_dimensions).toEqual(["consequence"]);
+    expect(twoResult.update.update_direction).toBe("supports");
   });
 
   it("reuses the same evidence identity when the same decision is analyzed again", async () => {
@@ -111,12 +139,13 @@ describe("challenge decision evaluation integration", () => {
     const second = await evaluateChallengeDecision({ userId, runId: run.id, decisionEventId: decision.id });
 
     expect(second.update.update_direction).toBe(first.update.update_direction);
-    expect(second.evidence?.id).toBe(first.evidence?.id);
+    expect(first.evidence).toBeNull();
+    expect(second.evidence).toBeNull();
     const evidence = await getHypothesisEvidenceForProfile([second.hypothesis.id]);
-    expect(evidence).toHaveLength(1);
+    expect(evidence).toEqual([]);
   });
 
-  it("persists transfer evidence only after the two governed training worlds are complete", async () => {
+  it("does not promote a deterministic transfer result into formal evidence", async () => {
     const userId = `transfer-evaluation-${crypto.randomUUID()}`;
     const first = await createDecisionWithDimensions(userId, ["workflow", "consequence"]);
     await evaluateChallengeDecision({ userId, runId: first.run.id, decisionEventId: first.decision.id });
@@ -134,10 +163,7 @@ describe("challenge decision evaluation integration", () => {
       decisionEventId: transfer.decision.id,
     });
 
-    expect(result.evidence).toMatchObject({
-      decision_event_id: transfer.decision.id,
-      evidence_type: "transfer",
-      transfer_world_id: "world-3-growth-decline",
-    });
+    expect(result.formal).toBe(false);
+    expect(result.evidence).toBeNull();
   });
 });

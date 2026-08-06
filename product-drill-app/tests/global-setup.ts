@@ -19,9 +19,25 @@ async function waitForServer(child: ChildProcess) {
 }
 
 export default async function globalSetup(_config: FullConfig) {
+  const useLiveModel = process.env.E2E_USE_LIVE_MODEL === "true";
+  const modelEnv = useLiveModel
+    ? {}
+    : {
+        OPENAI_API_KEY: "",
+        OPENAI_BASE_URL: "",
+        OPENAI_ROLEPLAY_MODEL: "",
+        OPENAI_EVALUATION_MODEL: "",
+        OPENAI_MODEL_VERSION: "deterministic-e2e",
+      };
   const child = spawn(process.execPath, ["scripts/start-test-server.cjs"], {
     cwd: process.cwd(),
-    env: { ...process.env, ALLOW_DEMO_AUTH: "true", PORT: "3100" },
+    env: {
+      ...process.env,
+      ...modelEnv,
+      ALLOW_DEMO_AUTH: "true",
+      E2E_ISOLATED_USERS: "true",
+      PORT: "3100",
+    },
     stdio: "inherit",
     windowsHide: true
   });
