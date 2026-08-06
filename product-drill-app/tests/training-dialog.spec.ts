@@ -9,6 +9,7 @@ test("runs an evidence-led interview and opens the judgment canvas", async ({ pa
   await input.fill("谁每天使用报表，谁负责最终决策？");
   await page.getByRole("button", { name: "发送追问", exact: true }).click();
   await expect(page.locator(".message.ai").last()).toContainText("财务分析师");
+  await expect(page.locator(".message.user p").last()).toHaveCSS("text-align", "left");
   await expect(page.getByText("20%", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "结束访谈，整理判断", exact: true }).click();
   await expect(page.getByRole("heading", { name: "把对话信息转成一个可以验证的判断" })).toBeVisible();
@@ -67,4 +68,33 @@ test("shows the submitted question and thinking state before the AI reply arrive
   releaseResponse();
   await expect(page.getByTestId("thinking-indicator")).toHaveCount(0);
   await page.unroute("**/api/training/sessions/*/messages");
+});
+
+test("shows submission progress while judgment feedback is being generated", async ({ page }) => {
+  await enterApp(page);
+  await page.getByRole("button", { name: "开始 3 分钟诊断", exact: true }).click();
+  const input = page.getByRole("textbox", { name: "你的追问", exact: true });
+  await input.fill("谁每天使用报表，谁负责最终决策？");
+  await page.getByRole("button", { name: "发送追问", exact: true }).click();
+  await expect(page.locator(".message.ai").last()).toBeVisible();
+  await page.getByRole("button", { name: "结束访谈，整理判断", exact: true }).click();
+  await page.getByRole("textbox", { name: "核心问题", exact: true }).fill("还没有确认真实使用者和失败环节");
+  await page.getByRole("textbox", { name: "建议行动", exact: true }).fill("先还原当前流程，再决定优化范围");
+
+  let releaseEvaluation!: () => void;
+  const evaluationReleased = new Promise<void>((resolve) => {
+    releaseEvaluation = resolve;
+  });
+  await page.route("**/api/training/sessions/*/evaluation", async (route) => {
+    await evaluationReleased;
+    await route.continue();
+  });
+
+  await page.getByRole("button", { name: "提交判断并查看反馈", exact: true }).click();
+  await expect(page.getByTestId("judgment-submit-status")).toContainText(/正在(保存你的判断|生成证据反馈)/);
+  await expect(page.getByRole("button", { name: /正在(提交判断|生成反馈)/ })).toBeDisabled();
+
+  releaseEvaluation();
+  await expect(page.getByRole("heading", { name: "系统为什么做出这个判断" })).toBeVisible();
+  await page.unroute("**/api/training/sessions/*/evaluation");
 });

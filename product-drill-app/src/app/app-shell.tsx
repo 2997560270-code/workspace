@@ -269,11 +269,13 @@ function TrainingMap({ onStart }: { onStart: (scenarioId: string, mode?: Trainin
 function JudgmentForm({
   value,
   onChange,
-  onSubmit
+  onSubmit,
+  submissionStage,
 }: {
   value: ProductJudgment;
   onChange: (next: ProductJudgment) => void;
   onSubmit: () => void;
+  submissionStage: "idle" | "submitting" | "evaluating";
 }) {
   const fields: Array<{ key: keyof ProductJudgment; label: string; placeholder: string; wide?: boolean }> = [
     { key: "targetUser", label: "核心用户", placeholder: "谁真正经历这个问题？" },
@@ -286,6 +288,12 @@ function JudgmentForm({
     { key: "biggestAssumption", label: "最大假设", placeholder: "下一步最需要验证什么？" }
   ];
   const completeEnough = value.coreProblem.trim() && value.recommendation.trim();
+  const isSubmitting = submissionStage !== "idle";
+  const submissionLabel = submissionStage === "submitting"
+    ? "正在提交判断…"
+    : submissionStage === "evaluating"
+      ? "正在生成反馈…"
+      : "提交判断并查看反馈";
 
   return (
     <section className="judgment surface">
@@ -301,6 +309,7 @@ function JudgmentForm({
           <label className={field.wide ? "wide" : ""} key={field.key}>
             <span>{field.label}</span>
             <textarea
+              disabled={isSubmitting}
               onChange={(event) => onChange({ ...value, [field.key]: event.target.value })}
               placeholder={field.placeholder}
               rows={field.wide ? 3 : 2}
@@ -310,9 +319,23 @@ function JudgmentForm({
         ))}
       </div>
       <div className="judgment-actions">
-        <p>“信息不足，暂不做决定”也是合理判断，只要说明还缺少什么证据。</p>
-        <button className="button button-primary" disabled={!completeEnough} onClick={onSubmit} type="button">
-          提交判断并查看反馈
+        {isSubmitting ? (
+          <p aria-live="polite" data-testid="judgment-submit-status" role="status">
+            {submissionStage === "submitting"
+              ? "正在保存你的判断，请稍候…"
+              : "判断已保存，正在生成证据反馈…"}
+          </p>
+        ) : (
+          <p>“信息不足，暂不做决定”也是合理判断，只要说明还缺少什么证据。</p>
+        )}
+        <button
+          aria-busy={isSubmitting}
+          className="button button-primary"
+          disabled={!completeEnough || isSubmitting}
+          onClick={onSubmit}
+          type="button"
+        >
+          {submissionLabel}
         </button>
       </div>
     </section>
@@ -447,6 +470,7 @@ function TrainingWorkspace({
   const [retryAnswer, setRetryAnswer] = useState("");
   const [retryResult, setRetryResult] = useState<RetryResult | null>(null);
   const [busy, setBusy] = useState(true);
+  const [judgmentSubmissionStage, setJudgmentSubmissionStage] = useState<"idle" | "submitting" | "evaluating">("idle");
   const [runtimeStatus, setRuntimeStatus] = useState<"connecting" | "online" | "fallback">("connecting");
   const [actionError, setActionError] = useState("");
   const messageListRef = useRef<HTMLDivElement>(null);
@@ -487,6 +511,7 @@ function TrainingWorkspace({
     setEvaluation(null);
     setRecord(null);
     setPendingReply(null);
+    setJudgmentSubmissionStage("idle");
     setJudgment(EMPTY_JUDGMENT);
     try {
       const remoteSession = await createRemoteSession(scenarioId, mode);
@@ -532,11 +557,13 @@ function TrainingWorkspace({
   async function submitCurrentJudgment() {
     if (busy) return;
     setBusy(true);
+    setJudgmentSubmissionStage("submitting");
     setActionError("");
     let nextSession = submitJudgment(session, judgment);
     try {
       const judgmentResult = await submitRemoteJudgment(session, judgment);
       nextSession = judgmentResult.session;
+      setJudgmentSubmissionStage("evaluating");
       const result = await requestRemoteEvaluation(nextSession);
       setSession(nextSession);
       setEvaluation(result.evaluation);
@@ -544,6 +571,7 @@ function TrainingWorkspace({
       setRuntimeStatus(result.fallback ? "fallback" : "online");
       onRecord(result.record);
     } catch {
+      setJudgmentSubmissionStage("evaluating");
       const nextEvaluation = generateEvaluation(nextSession);
       const nextRecord = createTrainingHistoryRecord(nextSession, nextEvaluation);
       setSession(nextSession);
@@ -553,6 +581,7 @@ function TrainingWorkspace({
       setActionError("服务端评估不可用，已生成本地练习反馈；该结果不会进入正式能力趋势。");
       onRecord(nextRecord);
     } finally {
+      setJudgmentSubmissionStage("idle");
       setBusy(false);
     }
   }
@@ -631,7 +660,12 @@ function TrainingWorkspace({
     return (
       <>
         {notice}
-        <JudgmentForm onChange={setJudgment} onSubmit={() => { void submitCurrentJudgment(); }} value={judgment} />
+        <JudgmentForm
+          onChange={setJudgment}
+          onSubmit={() => { void submitCurrentJudgment(); }}
+          submissionStage={judgmentSubmissionStage}
+          value={judgment}
+        />
       </>
     );
   }

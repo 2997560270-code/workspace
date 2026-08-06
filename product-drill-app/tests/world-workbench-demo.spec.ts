@@ -78,11 +78,13 @@ test("short learner messages keep a content-sized bubble", async ({ page }) => {
     bubbleWidth: element.getBoundingClientRect().width,
     contentWidth: element.querySelector("p")?.getBoundingClientRect().width ?? 0,
     timelineWidth: element.parentElement?.getBoundingClientRect().width ?? 0,
+    textAlign: window.getComputedStyle(element.querySelector("p")!).textAlign,
   }));
 
   expect(dimensions.bubbleWidth).toBeLessThan(dimensions.timelineWidth);
   expect(dimensions.bubbleWidth).toBeLessThan(200);
   expect(Math.abs(dimensions.bubbleWidth - dimensions.contentWidth)).toBeLessThan(1);
+  expect(dimensions.textAlign).toBe("left");
 
   await page.getByRole("button", { name: "完成调查，提交决策", exact: true }).click();
   await expect(page.getByText("尚无调查事件可引用", { exact: true })).toBeVisible();

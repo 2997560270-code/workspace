@@ -335,7 +335,7 @@ p { color: var(--ink-2); line-height: 1.66; }
 .message p { max-width: 65ch; margin: 0; padding: 14px 16px; white-space: pre-line; color: var(--ink-2); background: #f1efe9; border-radius: 4px 12px 12px 12px; font-size: var(--fs-body-sm); line-height: 1.6; }
 .message.user { align-self: flex-end; }
 .message.user > span { text-align: right; }
-.message.user p { color: var(--on-dark-title); background: var(--navy); border-radius: 12px 4px 12px 12px; }
+.message.user p { color: var(--on-dark-title); background: var(--navy); border-radius: 12px 4px 12px 12px; text-align: left; }
 .message-thinking { align-self: flex-start; max-width: 78%; }
 .message-thinking > span { display: block; margin-bottom: 7px; }
 .message-thinking p { display: inline-block; margin: 0; padding: 12px 16px; color: var(--ink-2); background: #f7f6f2; border: 1px dashed #cbc8bf; border-radius: 4px 12px 12px 12px; font-size: var(--fs-body-sm); line-height: 1.6; }
@@ -374,6 +374,7 @@ p { color: var(--ink-2); line-height: 1.66; }
 .judgment textarea, .retry-form textarea { padding: 12px; }
 .judgment-actions { margin-top: 28px; padding-top: 24px; display: flex; align-items: center; justify-content: space-between; gap: 24px; border-top: 1px solid var(--line); }
 .judgment-actions p { margin: 0; font-size: var(--fs-body-sm); }
+.judgment-actions .button { min-width: 210px; }
 
 /* ══════════════════════════ FEEDBACK ═══════════════════════════════════ */
 .feedback-layout { display: grid; gap: 18px; }
@@ -507,7 +508,7 @@ p { color: var(--ink-2); line-height: 1.66; }
 .wb-message-user { align-self: flex-end; text-align: right; }
 .wb-message-role { text-transform: uppercase; letter-spacing: 0.08em; }
 .wb-message p { margin: 0; background: var(--surface-strong); color: var(--ink-2); padding: 13px 17px; border-radius: var(--radius-sm); font-size: var(--fs-body-sm); line-height: 1.6; white-space: pre-line; }
-.wb-message-user p { background: var(--navy); color: var(--on-dark-title); }
+.wb-message-user p { background: var(--navy); color: var(--on-dark-title); text-align: left; }
 .wb-composer { padding: 16px 24px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; }
 .wb-dimension-picker { display: flex; flex-direction: column; gap: 7px; }
 .wb-dimension-options { display: flex; gap: 7px; flex-wrap: wrap; }
