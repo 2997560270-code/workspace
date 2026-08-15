@@ -1,4 +1,10 @@
-import { observeBehavior, updateHypothesis, type BehaviorObservation, type HypothesisUpdate } from "./ai/causal-pipeline";
+import {
+  observeBehavior,
+  updateHypothesis,
+  type BehaviorObservation,
+  type CausalFallbackReason,
+  type HypothesisUpdate,
+} from "./ai/causal-pipeline";
 import { PREMATURE_SOLUTION_COMMITMENT_CLAIM } from "./behavior-claims";
 import {
   createHypothesisEvidence,
@@ -36,6 +42,7 @@ export type ChallengeEvaluationResult = {
   formal: boolean;
   progression_confidence: "high" | "medium" | "low" | "insufficient";
   degraded: boolean;
+  degraded_reason: CausalFallbackReason | null;
   duration_ms: number;
 };
 
@@ -207,6 +214,7 @@ export async function evaluateChallengeDecision(params: {
     formal,
     progression_confidence: update.updated_confidence,
     degraded: !formal,
+    degraded_reason: observation.fallback_reason ?? update.fallback_reason,
     duration_ms: Date.now() - startedAt,
   };
 }

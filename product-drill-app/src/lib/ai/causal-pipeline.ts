@@ -29,7 +29,18 @@ import {
   REQUIRED_FORBIDDEN_INFERENCES,
   type DiscoveryDimension,
 } from "../behavior-claims";
-import { requestStructuredResponse } from "./structured-response";
+import {
+  requestStructuredResponse,
+  StructuredResponseError,
+  type StructuredResponseFailureReason,
+} from "./structured-response";
+
+export type CausalFallbackReason =
+  | "model_not_configured"
+  | "request_failed"
+  | "response_parse_failed"
+  | "schema_validation_failed"
+  | "grounding_validation_failed";
 
 export type WorldNarration = z.infer<typeof WorldNarratorOutputSchema> & {
   revealed_fact_ids: string[];
@@ -37,15 +48,31 @@ export type WorldNarration = z.infer<typeof WorldNarratorOutputSchema> & {
   state_change_summary: string | null;
   unofficial: boolean;
   model_version: string;
+  fallback_reason: CausalFallbackReason | null;
 };
 
 export type BehaviorObservation = z.infer<typeof BehaviorObservationSchema> & {
   model_version: string;
+  fallback_reason: CausalFallbackReason | null;
 };
 
 export type HypothesisUpdate = z.infer<typeof HypothesisUpdateSchema> & {
   model_version: string;
+  fallback_reason: CausalFallbackReason | null;
 };
+
+function getFallbackReason(error: unknown): CausalFallbackReason {
+  if (error instanceof StructuredResponseError) {
+    const reason: StructuredResponseFailureReason = error.reason;
+    if (reason === "schema_validation_failed") return reason;
+    if (reason === "response_parse_failed") return reason;
+    return "request_failed";
+  }
+  if (error instanceof Error && /grounding|fact|narrator/i.test(error.message)) {
+    return "grounding_validation_failed";
+  }
+  return "request_failed";
+}
 
 const INSUFFICIENT_EVIDENCE_REASON =
   "证据不足：决策依据未覆盖至少两个可追溯的发现维度，无法输出行为结论。";
@@ -90,6 +117,7 @@ function governedClarification(): WorldNarration {
     state_change_summary: null,
     unofficial: false,
     model_version: "governed-clarifier-v1",
+    fallback_reason: null,
   };
 }
 
@@ -149,7 +177,8 @@ function canonicalHypothesisRationale(
 function deterministicNarration(
   worldVersion: CausalWorldVersion,
   userAction: string,
-  revealedFactIds: string[]
+  revealedFactIds: string[],
+  fallbackReason: CausalFallbackReason = "model_not_configured"
 ): WorldNarration {
   const matchedFactIds = getMatchedRevealFactIds(worldVersion, userAction);
   const newReveals = getNewRevealedFactIds(
@@ -181,6 +210,7 @@ function deterministicNarration(
     state_change_summary: newReveals.length > 0 ? "揭示了新信息" : null,
     unofficial: true,
     model_version: "deterministic-v1",
+    fallback_reason: fallbackReason,
   };
 }
 
@@ -188,7 +218,8 @@ function deterministicNarration(
 function deterministicBehaviorObservation(
   decisionEvent: DecisionEvent,
   eventHistory: WorldEvent[],
-  wasAssisted: boolean  // Fix: accept wasAssisted so fallback honours hint status
+  wasAssisted: boolean, // Fix: accept wasAssisted so fallback honours hint status
+  fallbackReason: CausalFallbackReason = "model_not_configured"
 ): BehaviorObservation {
   const governedEvidence = getGovernedEvidenceById(decisionEvent, eventHistory);
   const structuredEvidence = [...governedEvidence.entries()].map(
@@ -216,13 +247,15 @@ function deterministicBehaviorObservation(
       ? null
       : INSUFFICIENT_EVIDENCE_REASON,
     model_version: "deterministic-v1",
+    fallback_reason: fallbackReason,
   };
 }
 
 // ── 确定性降级：Hypothesis Updater ───────────────────────────────
 function deterministicHypothesisUpdate(
   habitName: string,
-  observation: BehaviorObservation
+  observation: BehaviorObservation,
+  fallbackReason: CausalFallbackReason = "model_not_configured"
 ): HypothesisUpdate {
   const direction = canonicalHypothesisDirection(observation);
 
@@ -236,6 +269,7 @@ function deterministicHypothesisUpdate(
     applicable_trigger_conditions: [],
     forbidden_inferences_confirmed: [...REQUIRED_FORBIDDEN_INFERENCES],
     model_version: "deterministic-v1",
+    fallback_reason: fallbackReason,
   };
 }
 
@@ -257,7 +291,8 @@ export async function narrateWorldResponse(params: {
     return deterministicNarration(
       params.worldVersion,
       params.userAction,
-      params.revealedFactIds
+      params.revealedFactIds,
+      "model_not_configured"
     );
   }
 
@@ -335,13 +370,15 @@ export async function narrateWorldResponse(params: {
           : null,
       unofficial: false,
       model_version: `${runtimeEnv.roleplayModel}:${runtimeEnv.modelVersion}`,
+      fallback_reason: null,
     };
   } catch (error) {
     captureServerException(error, { area: "world_narrator" });
     return deterministicNarration(
       params.worldVersion,
       params.userAction,
-      params.revealedFactIds
+      params.revealedFactIds,
+      getFallbackReason(error)
     );
   }
 }
@@ -360,7 +397,8 @@ export async function observeBehavior(params: {
     return deterministicBehaviorObservation(
       params.decisionEvent,
       params.eventHistory,
-      params.wasAssisted
+      params.wasAssisted,
+      "model_not_configured"
     );
   }
 
@@ -458,6 +496,7 @@ export async function observeBehavior(params: {
       confidence: hasMinimumEvidence ? "medium" : "low",
       insufficient_reason: hasMinimumEvidence ? null : INSUFFICIENT_EVIDENCE_REASON,
       model_version: `${runtimeEnv.evaluationModel}:${runtimeEnv.modelVersion}`,
+      fallback_reason: null,
     };
   } catch (error) {
     captureServerException(error, { area: "behavior_observer" });
@@ -465,7 +504,8 @@ export async function observeBehavior(params: {
     return deterministicBehaviorObservation(
       params.decisionEvent,
       params.eventHistory,
-      params.wasAssisted
+      params.wasAssisted,
+      getFallbackReason(error)
     );
   }
 }
@@ -485,7 +525,8 @@ export async function updateHypothesis(params: {
   if (!client) {
     return deterministicHypothesisUpdate(
       params.habitName,
-      params.behaviorObservation
+      params.behaviorObservation,
+      "model_not_configured"
     );
   }
 
@@ -523,12 +564,14 @@ export async function updateHypothesis(params: {
         direction === "insufficient" ? [] : [...validObsIds],
       forbidden_inferences_confirmed: [...forbiddenInferences],
       model_version: `${runtimeEnv.evaluationModel}:${runtimeEnv.modelVersion}`,
+      fallback_reason: null,
     };
   } catch (error) {
     captureServerException(error, { area: "hypothesis_updater" });
     return deterministicHypothesisUpdate(
       params.habitName,
-      params.behaviorObservation
+      params.behaviorObservation,
+      getFallbackReason(error)
     );
   }
 }

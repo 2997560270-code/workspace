@@ -22,7 +22,7 @@ export const AppendActionBodySchema = z.object({
 export function prepareLearnerEventPayload(
   payload: Record<string, string>,
   ineligible: boolean,
-  status: "ambiguous" | "ineligible" = "ambiguous"
+  status: "ambiguous" | "ineligible" | "no_new_fact" = "ambiguous"
 ): Record<string, string> {
   if (!ineligible) return payload;
   const { discovery_dimension: _discoveryDimension, ...rest } = payload;

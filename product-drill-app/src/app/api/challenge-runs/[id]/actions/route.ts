@@ -39,23 +39,11 @@ export async function POST(
     const ambiguousInput =
       parsed.data.actor === "user" && isAmbiguousLearnerAction(userAction);
     const requestedDimension = parsed.data.payload.discovery_dimension;
-    const evidenceEligible =
+    const relevantAction =
       parsed.data.actor === "user" &&
       !ambiguousInput &&
       Boolean(world && isWorldRelevantAction(world.version, userAction)) &&
       DISCOVERY_DIMENSIONS.includes(requestedDimension as DiscoveryDimension);
-    const evt = await appendWorldEvent({
-      runId,
-      userId: user.id,
-      eventType: parsed.data.event_type,
-      sequenceIndex: parsed.data.sequence_index,
-      actor: parsed.data.actor,
-      payload: prepareLearnerEventPayload(
-        parsed.data.payload,
-        !evidenceEligible,
-        ambiguousInput ? "ambiguous" : "ineligible"
-      ),
-    });
     const eventHistory = await getWorldEventsForRun(user.id, runId);
     const narration = world && parsed.data.actor === "user"
       ? await narrateWorldResponse({
@@ -65,6 +53,28 @@ export async function POST(
           revealedFactIds: [],
         })
       : null;
+    const evidenceEligible =
+      relevantAction &&
+      Boolean(narration && narration.revealed_fact_ids.length > 0);
+    const evidenceReason = ambiguousInput
+      ? "ambiguous_input"
+      : !relevantAction
+        ? "irrelevant_input"
+        : !narration || narration.revealed_fact_ids.length === 0
+          ? "no_new_fact"
+          : "eligible";
+    const evt = await appendWorldEvent({
+      runId,
+      userId: user.id,
+      eventType: parsed.data.event_type,
+      sequenceIndex: parsed.data.sequence_index,
+      actor: parsed.data.actor,
+      payload: prepareLearnerEventPayload(
+        parsed.data.payload,
+        !evidenceEligible,
+        ambiguousInput ? "ambiguous" : evidenceEligible ? "ineligible" : "no_new_fact"
+      ),
+    });
 
     return Response.json(
       {
@@ -72,6 +82,8 @@ export async function POST(
         evidence_eligible: evidenceEligible,
         discovery_dimension: evidenceEligible ? requestedDimension : null,
         narration: narration?.narration,
+        evidence_reason: evidenceReason,
+        fallback_reason: narration?.fallback_reason ?? null,
         unofficial: narration?.unofficial ?? !isOpenAIConfigured(),
       },
       { status: 201 }

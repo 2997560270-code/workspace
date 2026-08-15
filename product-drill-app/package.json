@@ -7,11 +7,13 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
+    "test:local-runtime": "vitest run tests/local-runtime-api.integration.test.ts",
     "test:rls": "node scripts/test-local-rls.mjs",
     "test:rls:local": "node scripts/test-local-rls.mjs",
     "test:rls:supabase": "node --env-file-if-exists=.env.local scripts/test-supabase-rls.mjs",
     "e2e": "npm run build && playwright test",
     "eval:golden": "node scripts/validate-golden.cjs && vitest run tests/golden-evals.test.ts",
+    "knowledge:import": "node --env-file-if-exists=.env.local scripts/import-knowledge.mjs",
     "typecheck": "tsc --noEmit",
     "e2e:run": "playwright test"
   },

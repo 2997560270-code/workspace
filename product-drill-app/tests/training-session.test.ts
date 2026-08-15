@@ -26,6 +26,12 @@ describe("direction A training session", () => {
     expect(getCoveragePercent(updated)).toBe(20);
   });
 
+  it("adds time pressure to strict-mode roleplay replies", () => {
+    const session = createTrainingSession({ scenarioId: "dashboard-request", mode: "严格" });
+    const updated = sendTrainingMessage(session, "现在的完整流程是怎么完成的？");
+    expect(updated.messages.at(-1)?.content).toContain("时间有限");
+  });
+
   it("records hint use in practice mode", () => {
     const session = createTrainingSession({ scenarioId: "dashboard-request", mode: "练习" });
     const updated = useTrainingHint(session);

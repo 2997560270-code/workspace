@@ -13,6 +13,23 @@ export const TrainingMessageSchema = z.object({
   revealedSkill: SkillIdSchema.optional()
 });
 
+export const TrainingScenarioSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  shortTitle: z.string().min(1),
+  industry: z.string().min(1),
+  skillId: SkillIdSchema,
+  difficulty: z.enum(["基础", "标准", "严格"]),
+  duration: z.number().positive(),
+  role: z.string(),
+  context: z.string(),
+  opening: z.string(),
+  hiddenFacts: z.object({
+    role: z.string(), workflow: z.string(), impact: z.string(), alternative: z.string(), metric: z.string()
+  }),
+  briefing: z.array(z.string())
+});
+
 export const ProductJudgmentSchema = z.object({
   targetUser: z.string().max(4000),
   currentWorkflow: z.string().max(4000),
@@ -27,6 +44,7 @@ export const ProductJudgmentSchema = z.object({
 export const TrainingSessionSchema = z.object({
   id: z.string().min(1),
   scenarioId: z.string().min(1),
+  scenarioSnapshot: TrainingScenarioSchema.optional(),
   scenarioVersion: z.number().int().positive(),
   rubricVersion: z.string().min(1),
   modelVersion: z.string().min(1),
@@ -87,10 +105,17 @@ export const RetryResultSchema = z.object({
   modelVersion: z.string().optional()
 });
 
+export const MentorNoteSchema = z.object({
+  author: z.string().min(1).max(120),
+  content: z.string().min(1).max(4000),
+  createdAt: z.string().datetime()
+});
+
 export const TrainingHistoryRecordSchema = z.object({
   id: z.string().min(1),
   sessionId: z.string().min(1),
   scenarioId: z.string().min(1),
+  scenarioSnapshot: TrainingScenarioSchema.optional(),
   scenarioVersion: z.number().int().positive(),
   rubricVersion: z.string().min(1),
   modelVersion: z.string().min(1),
@@ -101,7 +126,8 @@ export const TrainingHistoryRecordSchema = z.object({
   messages: z.array(TrainingMessageSchema).max(100),
   judgment: ProductJudgmentSchema.optional(),
   evaluation: EvaluationSchema,
-  retry: RetryResultSchema.optional()
+  retry: RetryResultSchema.optional(),
+  mentorNote: MentorNoteSchema.optional()
 });
 
 export const StoredHistorySchema = z.object({

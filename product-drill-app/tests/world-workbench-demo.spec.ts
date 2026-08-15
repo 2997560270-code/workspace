@@ -72,6 +72,8 @@ test("short learner messages keep a content-sized bubble", async ({ page }) => {
     .fill("1");
   await page.getByRole("button", { name: "发送", exact: true }).click();
 
+  await expect(page.locator(".wb-notice-banner")).toBeVisible();
+
   const userMessage = page.locator(".wb-message-user");
   await expect(userMessage).toHaveCount(1);
   const dimensions = await userMessage.evaluate((element) => ({

@@ -29,4 +29,48 @@ describe("structured response compatibility", () => {
     expect(createChat).toHaveBeenCalledOnce();
     expect(createResponses).not.toHaveBeenCalled();
   });
+
+  it("classifies provider request failures", async () => {
+    const client = {
+      chat: { completions: { create: async () => { throw new Error("timeout"); } } },
+      responses: {},
+    } as never;
+
+    await expect(requestStructuredResponse({
+      client,
+      model: "test-model",
+      input: "Return the probe result.",
+      schema: z.object({ ok: z.boolean() }),
+      schemaName: "probe",
+    })).rejects.toMatchObject({
+      name: "StructuredResponseError",
+      reason: "request_failed",
+    });
+  });
+
+  it("classifies malformed JSON and schema failures separately", async () => {
+    const malformedClient = {
+      chat: { completions: { create: async () => ({ choices: [{ message: { content: "not json" } }] }) } },
+      responses: {},
+    } as never;
+    await expect(requestStructuredResponse({
+      client: malformedClient,
+      model: "test-model",
+      input: "Return the probe result.",
+      schema: z.object({ ok: z.boolean() }),
+      schemaName: "probe",
+    })).rejects.toMatchObject({ reason: "response_parse_failed" });
+
+    const invalidSchemaClient = {
+      chat: { completions: { create: async () => ({ choices: [{ message: { content: JSON.stringify({ ok: "yes" }) } }] }) } },
+      responses: {},
+    } as never;
+    await expect(requestStructuredResponse({
+      client: invalidSchemaClient,
+      model: "test-model",
+      input: "Return the probe result.",
+      schema: z.object({ ok: z.boolean() }),
+      schemaName: "probe",
+    })).rejects.toMatchObject({ reason: "schema_validation_failed" });
+  });
 });

@@ -11,6 +11,7 @@ import type {
 import type { DecisionDraft } from "./workbench-state";
 import type { ChallengeDecisionSummary, ChallengeDecisionTimeline } from "./challenge-history";
 import type { NextChallengeSelection } from "./challenge-selection";
+import type { CausalFallbackReason } from "./ai/causal-pipeline";
 
 // ── 通用 fetch 工具 ───────────────────────────────────────────────
 async function apiPost<T>(path: string, body: unknown): Promise<T> {
@@ -63,6 +64,8 @@ export async function appendAction(
   event_id: string;
   evidence_eligible: boolean;
   discovery_dimension: "workflow" | "consequence" | "alternative" | null;
+  evidence_reason: "eligible" | "ambiguous_input" | "irrelevant_input" | "no_new_fact";
+  fallback_reason: CausalFallbackReason | null;
   narration?: string;
   unofficial: boolean;
 }> {
@@ -124,6 +127,7 @@ export type InterventionApiResponse = {
     feedback_content: string;
     formal: boolean;
     degraded: boolean;
+    degraded_reason: CausalFallbackReason | null;
     duration_ms: number;
   } | null;
   next_challenge: NextChallengeSelection | null;

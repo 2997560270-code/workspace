@@ -7,8 +7,8 @@ import {
 } from "../src/lib/training-config";
 
 describe("direction A training configuration", () => {
-  it("ships six focused scenarios for the first training map", () => {
-    expect(TRAINING_SCENARIOS).toHaveLength(6);
+  it("ships twelve focused scenarios for the training map", () => {
+    expect(TRAINING_SCENARIOS).toHaveLength(12);
     expect(TRAINING_SCENARIOS.map((scenario) => scenario.id)).toContain("dashboard-request");
     expect(TRAINING_SCENARIOS.every((scenario) => scenario.opening && scenario.hiddenFacts.workflow)).toBe(true);
   });

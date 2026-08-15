@@ -15,6 +15,14 @@ test("runs an evidence-led interview and opens the judgment canvas", async ({ pa
   await expect(page.getByRole("heading", { name: "把对话信息转成一个可以验证的判断" })).toBeVisible();
 });
 
+test("shows a voice input fallback without blocking text training", async ({ page }) => {
+  await enterApp(page);
+  await page.getByRole("button", { name: "开始 3 分钟诊断", exact: true }).click();
+  await expect(page.getByRole("button", { name: "语音输入", exact: true })).toBeVisible();
+  await page.getByRole("textbox", { name: "你的追问", exact: true }).fill("谁每天使用这个流程？");
+  await expect(page.getByRole("button", { name: "发送追问", exact: true })).toBeEnabled();
+});
+
 test("shows the submitted question and thinking state before the AI reply arrives", async ({ page }) => {
   await enterApp(page);
   await page.getByRole("button", { name: "开始 3 分钟诊断", exact: true }).click();
@@ -68,6 +76,15 @@ test("shows the submitted question and thinking state before the AI reply arrive
   releaseResponse();
   await expect(page.getByTestId("thinking-indicator")).toHaveCount(0);
   await page.unroute("**/api/training/sessions/*/messages");
+});
+
+test("strict mode shows a countdown and disables hints", async ({ page }) => {
+  await enterApp(page);
+  await page.getByRole("button", { name: "开始 3 分钟诊断", exact: true }).click();
+  await page.getByRole("button", { name: "严格", exact: true }).click();
+  await expect(page.getByTestId("strict-timer")).toContainText("剩余");
+  await expect(page.getByRole("button", { name: "给我一个轻提示", exact: true })).toBeDisabled();
+  await expect(page.getByRole("textbox", { name: "你的追问", exact: true })).toBeEnabled();
 });
 
 test("shows submission progress while judgment feedback is being generated", async ({ page }) => {

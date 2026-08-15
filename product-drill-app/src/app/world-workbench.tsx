@@ -34,7 +34,10 @@ import {
   recordIntervention,
 } from "../lib/challenge-client";
 import { buildInterventionContent } from "../lib/intervention-generator";
-import { isAmbiguousLearnerAction } from "../lib/ai/causal-pipeline";
+import {
+  isAmbiguousLearnerAction,
+  type CausalFallbackReason,
+} from "../lib/ai/causal-pipeline";
 import {
   DEMO_WORLDS,
   allowsPreDecisionHint,
@@ -90,6 +93,26 @@ function worldMessage(content: string, eventId?: string): Message {
 
 function userMessage(content: string, eventId?: string): Message {
   return { id: nextMsgId(), role: "user", content, event_id: eventId };
+}
+
+function getFallbackNotice(reason: CausalFallbackReason): string {
+  const notices: Record<CausalFallbackReason, string> = {
+    model_not_configured: "\u5f53\u524d\u672a\u914d\u7f6e\u6a21\u578b\uff0c\u672c\u6b21\u56de\u590d\u7531\u53d7\u6cbb\u7406\u7684\u672c\u5730\u89c4\u5219\u5b8c\u6210\u3002",
+    request_failed: "\u6a21\u578b\u8bf7\u6c42\u5931\u8d25\uff0c\u672c\u6b21\u56de\u590d\u5df2\u5207\u6362\u4e3a\u53d7\u6cbb\u7406\u7684\u672c\u5730\u89c4\u5219\u3002",
+    response_parse_failed: "\u6a21\u578b\u8fd4\u56de\u65e0\u6cd5\u89e3\u6790\uff0c\u672c\u6b21\u56de\u590d\u5df2\u5207\u6362\u4e3a\u53d7\u6cbb\u7406\u7684\u672c\u5730\u89c4\u5219\u3002",
+    schema_validation_failed: "\u6a21\u578b\u8fd4\u56de\u672a\u901a\u8fc7\u7ed3\u6784\u6821\u9a8c\uff0c\u672c\u6b21\u56de\u590d\u5df2\u5207\u6362\u4e3a\u53d7\u6cbb\u7406\u7684\u672c\u5730\u89c4\u5219\u3002",
+    grounding_validation_failed: "\u6a21\u578b\u56de\u590d\u672a\u901a\u8fc7\u4e16\u754c\u4e8b\u5b9e\u6821\u9a8c\uff0c\u672c\u6b21\u56de\u590d\u5df2\u5207\u6362\u4e3a\u53d7\u6cbb\u7406\u7684\u672c\u5730\u89c4\u5219\u3002",
+  };
+  return notices[reason];
+}
+
+function getEvidenceNotice(reason: "ambiguous_input" | "irrelevant_input" | "no_new_fact"): string {
+  const notices = {
+    ambiguous_input: "\u8fd9\u6b21\u8f93\u5165\u8fd8\u4e0d\u8db3\u4ee5\u5f62\u6210\u8c03\u67e5\u8bc1\u636e\uff0c\u8bf7\u8865\u5145\u5177\u4f53\u95ee\u9898\u6216\u884c\u52a8\u3002",
+    irrelevant_input: "\u8fd9\u6b21\u8f93\u5165\u4e0e\u5f53\u524d\u4e16\u754c\u5173\u8054\u4e0d\u8db3\uff0c\u672a\u8ba1\u5165\u6b63\u5f0f\u8bc1\u636e\u3002",
+    no_new_fact: "\u8fd9\u6b21\u8c03\u67e5\u6ca1\u6709\u63ed\u793a\u65b0\u7684\u4e16\u754c\u4e8b\u5b9e\uff0c\u6682\u4e0d\u8ba1\u5165\u6b63\u5f0f\u8bc1\u636e\u3002\u53ef\u6362\u4e00\u4e2a\u80fd\u786e\u8ba4\u6d41\u7a0b\u3001\u5f71\u54cd\u6216\u66ff\u4ee3\u65b9\u6848\u7684\u95ee\u9898\u3002",
+  } as const;
+  return notices[reason];
 }
 
 // ── 子组件：阶段标签 ──────────────────────────────────────────────
@@ -269,6 +292,7 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
   const [draft, setDraft] = useState<DecisionDraft>(EMPTY_DRAFT);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [actionNotice, setActionNotice] = useState("");
   const [revealContent, setRevealContent] = useState("");
   const [reflectContent, setReflectContent] = useState("");
   const [nextChallenge, setNextChallenge] = useState<NextChallengeSelection | null>(null);
@@ -339,6 +363,7 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
     setInput("");
     setBusy(true);
     setError("");
+    setActionNotice("");
 
     const userIdx = seqIndex;
     // Fix (MEDIUM): increment by 1 per event — the world-response slot is
@@ -393,15 +418,27 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
         )
       );
 
+      const fallbackNotice = result.fallback_reason
+        ? getFallbackNotice(result.fallback_reason)
+        : "";
+      const evidenceNotice = result.evidence_reason !== "eligible"
+        ? getEvidenceNotice(result.evidence_reason)
+        : "";
+      setActionNotice([fallbackNotice, evidenceNotice].filter(Boolean).join("\n"));
+
       if (result.narration) {
         setMessages((prev) => [...prev, worldMessage(result.narration!, result.event_id)]);
       }
     } catch {
       // 离线降级：生成本地 event id，确保决策表单可引用
       const localEventId = `local-evt-${Date.now()}-${userIdx}`;
+      const seed = world.version;
+      const matchedFactIds = getMatchedRevealFactIds(seed, content);
       setUserEventIds((prev) => [...prev, localEventId]);
       const localEvidenceEligible =
-        !isAmbiguousLearnerAction(content) && isWorldRelevantAction(world.version, content);
+        !isAmbiguousLearnerAction(content) &&
+        isWorldRelevantAction(seed, content) &&
+        matchedFactIds.length > 0;
       if (localEvidenceEligible) {
         setEligibleEvidenceEventIds((prev) => [...prev, localEventId]);
         setEvidenceDimensions((prev) => ({ ...prev, [localEventId]: discoveryDimension }));
@@ -413,8 +450,6 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
         prev.map((m) => m.id === tmpUserId ? { ...m, event_id: localEventId } : m)
       );
 
-      const seed = world.version;
-      const matchedFactIds = getMatchedRevealFactIds(seed, content);
       const matchedFacts = seed.immutable_rules.hidden_facts.filter((fact) =>
         matchedFactIds.includes(fact.id)
       );
@@ -425,6 +460,7 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
           : getInvestigationSuggestion(seed);
 
       setMessages((prev) => [...prev, worldMessage(narration)]);
+      setActionNotice(getFallbackNotice("request_failed"));
       setError("离线演示模式：动作已记录，叙述由本地规则生成。");
     } finally {
       setBusy(false);
@@ -733,6 +769,11 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
       {error && (
         <div className="wb-error-banner" role="alert">{error}</div>
       )}
+      {actionNotice && (
+        <div aria-live="polite" className="wb-notice-banner" role="status">
+          {actionNotice.split("\n").map((line) => <span key={line}>{line}</span>)}
+        </div>
+      )}
 
       {/* 主体：对话 + 工具栏 */}
       <div className="wb-body">
@@ -891,7 +932,9 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
               )}
               {evaluation?.degraded && (
                 <p className="wb-assisted-notice" role="status">
-                  模型响应超时或不可用，本次反馈已由受治理的本地规则完成。
+                  {evaluation.degraded_reason
+                    ? getFallbackNotice(evaluation.degraded_reason)
+                    : "本次反馈已由受治理的本地规则完成。"}
                 </p>
               )}
               <button

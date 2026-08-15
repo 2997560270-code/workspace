@@ -54,6 +54,7 @@ export async function POST(
             feedback_content: evaluation.feedback_content,
             formal: evaluation.formal,
             degraded: evaluation.degraded,
+            degraded_reason: evaluation.degraded_reason,
             duration_ms: evaluation.duration_ms,
           }
         : null,

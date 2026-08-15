@@ -186,6 +186,7 @@ describe("causal narrator failure boundaries", () => {
 
     expect(result.unofficial).toBe(true);
     expect(result.model_version).toBe("deterministic-v1");
+    expect(result.fallback_reason).toBe("grounding_validation_failed");
     expect(result.revealed_fact_ids).toEqual([]);
   });
 
@@ -211,6 +212,7 @@ describe("causal narrator failure boundaries", () => {
 
     expect(result.unofficial).toBe(true);
     expect(result.model_version).toBe("deterministic-v1");
+    expect(result.fallback_reason).toBe("grounding_validation_failed");
   });
 
   it("falls back deterministically when the model times out", async () => {
@@ -233,6 +235,7 @@ describe("causal narrator failure boundaries", () => {
 
     expect(result.unofficial).toBe(true);
     expect(result.model_version).toBe("deterministic-v1");
+    expect(result.fallback_reason).toBe("request_failed");
   });
 
   it("falls back deterministically when the model refuses or returns no parsed output", async () => {
@@ -249,6 +252,7 @@ describe("causal narrator failure boundaries", () => {
 
     expect(result.unofficial).toBe(true);
     expect(result.model_version).toBe("deterministic-v1");
+    expect(result.fallback_reason).toBe("schema_validation_failed");
   });
 
   it("returns a governed fact for an alias when model parsing fails", async () => {
@@ -265,6 +269,7 @@ describe("causal narrator failure boundaries", () => {
 
     expect(result.unofficial).toBe(true);
     expect(result.response_type).toBe("role_reply");
+    expect(result.fallback_reason).toBe("schema_validation_failed");
     expect(result.revealed_fact_ids).toEqual(["fact-1"]);
     expect(result.narration).toBe("Governed fact");
   });
@@ -291,6 +296,7 @@ describe("causal narrator failure boundaries", () => {
 
     expect(result.unofficial).toBe(false);
     expect(result.response_type).toBe("role_reply");
+    expect(result.fallback_reason).toBe(null);
     expect(result.narration).toContain("scope");
   });
 
@@ -528,6 +534,7 @@ describe("hypothesis updater evidence governance", () => {
         confidence: "medium",
         insufficient_reason: null,
         model_version: "test-model",
+        fallback_reason: null,
       },
       worldId: "world-test",
       worldVersion: "1.0.0",

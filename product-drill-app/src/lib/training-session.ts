@@ -1,5 +1,7 @@
 ﻿import { getScenario, type SkillId } from "./training-config";
 
+import type { TrainingScenario } from "./training-config";
+
 export const DETERMINISTIC_ENGINE_VERSION = "deterministic-v1";
 export const DEFAULT_RUBRIC_VERSION = "direction-a-v1";
 export const TRAINING_MODE_OPTIONS = ["练习", "独立", "严格"] as const;
@@ -30,6 +32,8 @@ export type ProductJudgment = {
 export type TrainingSession = {
   id: string;
   scenarioId: string;
+  /** Custom scenarios travel with the session for deterministic local training. */
+  scenarioSnapshot?: TrainingScenario;
   scenarioVersion: number;
   rubricVersion: string;
   modelVersion: string;
@@ -64,6 +68,7 @@ export function detectSkills(content: string): SkillId[] {
 }
 
 function coachResponse(coveredSkills: SkillId[], mode: TrainingSession["mode"]): string {
+  if (mode === "严格") return "时间有限。请优先确认仍未覆盖的关键信息，再整理你的判断。";
   if (mode !== "练习") return "我已经回答了你的问题。你可以继续追问，也可以在信息足够时整理产品判断。";
   const missing = SKILL_ORDER.find((skill) => !coveredSkills.includes(skill));
   const prompts: Record<SkillId, string> = {
@@ -78,14 +83,16 @@ function coachResponse(coveredSkills: SkillId[], mode: TrainingSession["mode"]):
 
 export function createTrainingSession(input: {
   scenarioId: string;
+  scenario?: TrainingScenario;
   mode?: TrainingSession["mode"];
   scenarioVersion?: number;
   rubricVersion?: string;
 }): TrainingSession {
-  const scenario = getScenario(input.scenarioId);
+  const scenario = input.scenario ?? getScenario(input.scenarioId);
   return {
     id: id("session"),
     scenarioId: scenario.id,
+    scenarioSnapshot: input.scenario,
     scenarioVersion: input.scenarioVersion ?? 1,
     rubricVersion: input.rubricVersion ?? DEFAULT_RUBRIC_VERSION,
     modelVersion: DETERMINISTIC_ENGINE_VERSION,
@@ -101,7 +108,7 @@ export function createTrainingSession(input: {
 export function sendTrainingMessage(session: TrainingSession, content: string): TrainingSession {
   const trimmed = content.trim();
   if (!trimmed || session.stage !== "interview") return session;
-  const scenario = getScenario(session.scenarioId);
+  const scenario = session.scenarioSnapshot ?? getScenario(session.scenarioId);
   const detected = detectSkills(trimmed);
   const newlyCovered = detected.filter((skill) => !session.coveredSkills.includes(skill));
   const revealedSkill = newlyCovered[0] ?? detected[0];

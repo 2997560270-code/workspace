@@ -1,5 +1,5 @@
 ﻿import type { Evaluation } from "./evaluation";
-import type { SkillId } from "./training-config";
+import type { SkillId, TrainingScenario } from "./training-config";
 import type { ProductJudgment, TrainingEngine, TrainingMessage, TrainingSession } from "./training-session";
 
 export type RetryResult = {
@@ -11,6 +11,12 @@ export type RetryResult = {
   feedback: string;
   engine?: TrainingEngine;
   modelVersion?: string;
+};
+
+export type MentorNote = {
+  author: string;
+  content: string;
+  createdAt: string;
 };
 
 export function isFormalRetryImprovement(retry: RetryResult | undefined, targetSkill?: SkillId): boolean {
@@ -25,6 +31,7 @@ export type TrainingHistoryRecord = {
   id: string;
   sessionId: string;
   scenarioId: string;
+  scenarioSnapshot?: TrainingScenario;
   scenarioVersion: number;
   rubricVersion: string;
   modelVersion: string;
@@ -36,6 +43,7 @@ export type TrainingHistoryRecord = {
   judgment?: ProductJudgment;
   evaluation: Evaluation;
   retry?: RetryResult;
+  mentorNote?: MentorNote;
 };
 
 export function createTrainingHistoryRecord(session: TrainingSession, evaluation: Evaluation): TrainingHistoryRecord {
@@ -43,6 +51,7 @@ export function createTrainingHistoryRecord(session: TrainingSession, evaluation
     id: `history-${session.id}`,
     sessionId: session.id,
     scenarioId: session.scenarioId,
+    scenarioSnapshot: session.scenarioSnapshot,
     scenarioVersion: session.scenarioVersion,
     rubricVersion: evaluation.rubricVersion,
     modelVersion: evaluation.modelVersion,

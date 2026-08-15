@@ -23,6 +23,16 @@ import {
 } from "../lib/api/training-client";
 import type { NextChallengeSelection } from "../lib/challenge-selection";
 import { buildAbilityProfile } from "../lib/ability-profile";
+import { selectTodayScenario } from "../lib/today-recommendation";
+import { compareScenarioRecords } from "../lib/scenario-comparison";
+import { buildWeeklyTrainingSummary } from "../lib/weekly-summary";
+import { ProductMaterialExperiment } from "./product-material-experiment";
+import { CustomScenarioBuilder } from "./custom-scenario-builder";
+import { TeamWorkspacePanel } from "./team-workspace-panel";
+import { CoursePanel } from "./course-panel";
+import { VoiceInputButton } from "./voice-input-button";
+import { MultiRolePanel } from "./multi-role-panel";
+import { ResourceHubPanel } from "./resource-hub-panel";
 import {
   evaluateRetry,
   generateEvaluation,
@@ -32,6 +42,7 @@ import { NAV_ITEMS, getViewMeta, type ViewId } from "../lib/navigation";
 import {
   addRetryToHistory,
   createTrainingHistoryRecord,
+  type MentorNote,
   type RetryResult,
   type TrainingHistoryRecord
 } from "../lib/training-history";
@@ -55,6 +66,8 @@ import {
   type ProductJudgment,
   type TrainingSession
 } from "../lib/training-session";
+import { loadCustomScenarios } from "../lib/custom-scenarios";
+import type { TrainingScenario } from "../lib/training-config";
 
 const STORAGE_KEY = "product-drill-direction-a-v1";
 const WORLD_PROGRESS_STORAGE_KEY = "product-drill-world-progress-v1";
@@ -68,6 +81,12 @@ const EMPTY_JUDGMENT: ProductJudgment = {
   successMetric: "",
   biggestAssumption: ""
 };
+
+function formatCountdown(seconds: number): string {
+  const minutes = Math.floor(seconds / 60).toString().padStart(2, "0");
+  const remainder = (seconds % 60).toString().padStart(2, "0");
+  return `${minutes}:${remainder}`;
+}
 
 function ArrowIcon() {
   return <span aria-hidden="true">↗</span>;
@@ -123,8 +142,9 @@ function TodayPanel({
   workbenchComplete: boolean;
 }) {
   const profile = buildAbilityProfile(records);
-  const recommended = records.length ? TRAINING_SCENARIOS[0] : TRAINING_SCENARIOS[2];
-  const weeklyDone = Math.min(records.length, profile.weeklyTarget);
+  const recommended = selectTodayScenario(records);
+  const weeklySummary = buildWeeklyTrainingSummary(records);
+  const weeklyDone = Math.min(weeklySummary.totalSessions, profile.weeklyTarget);
   const latestIssue = records[0]?.evaluation.issues[0];
 
   return (
@@ -175,7 +195,8 @@ function TodayPanel({
             <span className={index < weeklyDone ? "done" : ""} key={index} />
           ))}
         </div>
-        <p>{weeklyDone ? "保持节奏，比一次练很久更重要。" : "完成第一轮训练，建立你的能力基线。"}</p>
+        <p data-testid="weekly-summary">{weeklyDone ? `本周平均证据分 ${weeklySummary.averageScore}，改善 ${weeklySummary.improvedCount} 次。` : "完成第一轮训练，建立你的能力基线。"}</p>
+        {weeklySummary.focusSkill ? <span className="weekly-focus">本周重点：{weeklySummary.focusSkill}</span> : null}
       </aside>
 
       <section className="focus-card surface">
@@ -230,7 +251,23 @@ function TodayPanel({
   );
 }
 
-function TrainingMap({ onStart }: { onStart: (scenarioId: string, mode?: TrainingSession["mode"]) => void }) {
+function TrainingMap({
+  onStart,
+  onOpenProductExperiment,
+  customScenarios,
+  onCreateCustomScenario,
+  onOpenCourses,
+  onOpenMultiRole,
+  onOpenResourceHub
+}: {
+  onStart: (scenarioId: string, mode?: TrainingSession["mode"]) => void;
+  onOpenProductExperiment: () => void;
+  customScenarios: TrainingScenario[];
+  onCreateCustomScenario: () => void;
+  onOpenCourses: () => void;
+  onOpenMultiRole: () => void;
+  onOpenResourceHub: () => void;
+}) {
   return (
     <div className="stack-lg">
       <section className="surface map-intro">
@@ -241,13 +278,13 @@ function TrainingMap({ onStart }: { onStart: (scenarioId: string, mode?: Trainin
         <p>每个任务只突出一个主要能力；完成后，你会得到可追溯的证据，而不是一个模糊总分。</p>
       </section>
       <div className="scenario-grid">
-        {TRAINING_SCENARIOS.map((scenario) => {
+        {[...TRAINING_SCENARIOS, ...customScenarios].map((scenario) => {
           const skill = getSkill(scenario.skillId);
           return (
             <article className="scenario-card surface" key={scenario.id}>
               <div className="scenario-topline">
                 <span>{scenario.industry}</span>
-                <span>{scenario.duration} 分钟 · {scenario.difficulty}</span>
+                <span>{scenario.id.startsWith("custom-") ? "本地场景" : `${scenario.duration} 分钟 · ${scenario.difficulty}`}</span>
               </div>
               <h2>{scenario.shortTitle}</h2>
               <p>{scenario.title}</p>
@@ -262,6 +299,34 @@ function TrainingMap({ onStart }: { onStart: (scenarioId: string, mode?: Trainin
           );
         })}
       </div>
+      <section className="surface custom-scenario-entry" data-testid="custom-scenario-entry">
+        <div>
+          <span className="section-kicker">本地扩展</span>
+          <h2>创建自定义场景</h2>
+          <p>把你正在面对的真实问题变成一次可复盘的产品发现练习。</p>
+        </div>
+        <button className="button button-secondary" onClick={onCreateCustomScenario} type="button">创建本地场景</button>
+      </section>
+      <section className="surface course-entry" data-testid="course-entry">
+        <div><span className="section-kicker">结构化学习</span><h2>课程内容</h2><p>用短知识点和行动练习补足场景训练之外的基础。</p></div>
+        <button className="button button-secondary" onClick={onOpenCourses} type="button">查看课程</button>
+      </section>
+      <section className="surface multi-role-entry" data-testid="multi-role-entry">
+        <div><span className="section-kicker">多视角练习</span><h2>多人角色训练</h2><p>在同一业务问题中切换运营、财务和一线角色，练习处理利益差异。</p></div>
+        <button className="button button-secondary" onClick={onOpenMultiRole} type="button">开始多人角色训练</button>
+      </section>
+      <section className="surface resource-hub-entry" data-testid="resource-hub-entry">
+        <div><span className="section-kicker">开放资料</span><h2>社区与行业知识库</h2><p>浏览案例、检索行业资料，并预览内容审核流程。</p></div>
+        <button className="button button-secondary" onClick={onOpenResourceHub} type="button">打开资源中心</button>
+      </section>
+      <section className="surface experiment-entry" data-testid="product-material-experiment-entry">
+        <div>
+          <span className="section-kicker">后续实验</span>
+          <h2>产品资料生成练习</h2>
+          <p>把一次产品判断整理成可讨论的资料草稿，明确证据边界和下一步验证。</p>
+        </div>
+        <button className="button button-secondary" onClick={onOpenProductExperiment} type="button">开始资料生成实验</button>
+      </section>
     </div>
   );
 }
@@ -450,18 +515,20 @@ function FeedbackPanel({
 
 function TrainingWorkspace({
   scenarioId,
+  scenarioDefinition,
   initialMode,
   onClose,
   onRecord,
   onRetry
 }: {
   scenarioId: string;
+  scenarioDefinition?: TrainingScenario;
   initialMode: TrainingSession["mode"];
   onClose: () => void;
   onRecord: (record: TrainingHistoryRecord) => void;
   onRetry: (recordId: string, retry: RetryResult) => void;
 }) {
-  const [session, setSession] = useState(() => createTrainingSession({ scenarioId, mode: initialMode }));
+  const [session, setSession] = useState(() => createTrainingSession({ scenarioId, scenario: scenarioDefinition, mode: initialMode }));
   const [reply, setReply] = useState("");
   const [pendingReply, setPendingReply] = useState<string | null>(null);
   const [judgment, setJudgment] = useState<ProductJudgment>(EMPTY_JUDGMENT);
@@ -473,9 +540,18 @@ function TrainingWorkspace({
   const [judgmentSubmissionStage, setJudgmentSubmissionStage] = useState<"idle" | "submitting" | "evaluating">("idle");
   const [runtimeStatus, setRuntimeStatus] = useState<"connecting" | "online" | "fallback">("connecting");
   const [actionError, setActionError] = useState("");
+  const [strictDeadline, setStrictDeadline] = useState<number | null>(() => {
+    if (initialMode !== "严格") return null;
+    return Date.now() + (scenarioDefinition?.duration ?? getScenario(scenarioId).duration) * 60 * 1000;
+  });
+  const [clockMs, setClockMs] = useState(() => Date.now());
   const messageListRef = useRef<HTMLDivElement>(null);
-  const scenario = getScenario(session.scenarioId);
+  const scenario = session.scenarioSnapshot ?? getScenario(session.scenarioId);
   const coverage = getCoveragePercent(session);
+  const strictRemaining = strictDeadline === null
+    ? null
+    : Math.max(0, Math.ceil((strictDeadline - clockMs) / 1000));
+  const strictExpired = session.mode === "严格" && session.stage === "interview" && strictRemaining === 0;
 
   useEffect(() => {
     const messageList = messageListRef.current;
@@ -484,25 +560,45 @@ function TrainingWorkspace({
   }, [session.messages, pendingReply]);
 
   useEffect(() => {
+    if (session.mode !== "严格" || session.stage !== "interview" || strictDeadline === null) return;
+    const timer = window.setInterval(() => setClockMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [session.mode, session.stage, strictDeadline]);
+
+  useEffect(() => {
     let cancelled = false;
     setBusy(true);
     setRuntimeStatus("connecting");
     setActionError("");
+    if (scenarioDefinition) {
+      setSession(createTrainingSession({ scenarioId, scenario: scenarioDefinition, mode: initialMode }));
+      setStrictDeadline(initialMode === "严格" ? Date.now() + scenarioDefinition.duration * 60 * 1000 : null);
+      setRuntimeStatus("fallback");
+      setActionError("这是本地自定义场景，反馈由本地练习引擎生成，不计入正式能力趋势。");
+      setBusy(false);
+      return () => { cancelled = true; };
+    }
     createRemoteSession(scenarioId, initialMode)
       .then((remoteSession) => {
         if (cancelled) return;
         setSession(remoteSession);
+        setStrictDeadline(remoteSession.mode === "严格"
+          ? Date.now() + (remoteSession.scenarioSnapshot?.duration ?? getScenario(remoteSession.scenarioId).duration) * 60 * 1000
+          : null);
         setRuntimeStatus("online");
       })
       .catch(() => {
         if (cancelled) return;
         setSession(createTrainingSession({ scenarioId, mode: initialMode }));
+        setStrictDeadline(initialMode === "严格"
+          ? Date.now() + getScenario(scenarioId).duration * 60 * 1000
+          : null);
         setRuntimeStatus("fallback");
         setActionError("训练服务暂时不可用，已保留本地练习能力。");
       })
       .finally(() => { if (!cancelled) setBusy(false); });
     return () => { cancelled = true; };
-  }, [scenarioId, initialMode]);
+  }, [scenarioId, initialMode, scenarioDefinition]);
 
   async function resetMode(mode: TrainingSession["mode"]) {
     if (busy) return;
@@ -513,12 +609,27 @@ function TrainingWorkspace({
     setPendingReply(null);
     setJudgmentSubmissionStage("idle");
     setJudgment(EMPTY_JUDGMENT);
+    setStrictDeadline(null);
+    if (scenarioDefinition) {
+      setSession(createTrainingSession({ scenarioId, scenario: scenarioDefinition, mode }));
+      setStrictDeadline(mode === "严格" ? Date.now() + scenarioDefinition.duration * 60 * 1000 : null);
+      setRuntimeStatus("fallback");
+      setActionError("这是本地自定义场景，反馈由本地练习引擎生成，不计入正式能力趋势。");
+      setBusy(false);
+      return;
+    }
     try {
       const remoteSession = await createRemoteSession(scenarioId, mode);
       setSession(remoteSession);
+      setStrictDeadline(remoteSession.mode === "严格"
+        ? Date.now() + (remoteSession.scenarioSnapshot?.duration ?? getScenario(remoteSession.scenarioId).duration) * 60 * 1000
+        : null);
       setRuntimeStatus("online");
     } catch {
       setSession(createTrainingSession({ scenarioId, mode }));
+      setStrictDeadline(mode === "严格"
+        ? Date.now() + getScenario(scenarioId).duration * 60 * 1000
+        : null);
       setRuntimeStatus("fallback");
       setActionError("模式已在本地切换，当前结果不会计入正式能力趋势。");
     } finally {
@@ -528,11 +639,19 @@ function TrainingWorkspace({
 
   async function sendReply() {
     const content = reply.trim();
-    if (!content || busy) return;
+    if (!content || busy || strictExpired) return;
     setReply("");
     setPendingReply(content);
     setBusy(true);
     setActionError("");
+    if (scenarioDefinition) {
+      setSession((current) => sendTrainingMessage(current, content));
+      setRuntimeStatus("fallback");
+      setActionError("这是本地自定义场景，反馈由本地练习引擎生成，不计入正式能力趋势。");
+      setPendingReply(null);
+      setBusy(false);
+      return;
+    }
     try {
       const result = await sendRemoteMessage(session, content);
       setSession(result.session);
@@ -560,6 +679,19 @@ function TrainingWorkspace({
     setJudgmentSubmissionStage("submitting");
     setActionError("");
     let nextSession = submitJudgment(session, judgment);
+    if (scenarioDefinition) {
+      const nextEvaluation = generateEvaluation(nextSession);
+      const nextRecord = createTrainingHistoryRecord(nextSession, nextEvaluation);
+      setSession(nextSession);
+      setEvaluation(nextEvaluation);
+      setRecord(nextRecord);
+      setRuntimeStatus("fallback");
+      setActionError("自定义场景已完成本地评估，不会进入正式能力趋势。");
+      onRecord(nextRecord);
+      setJudgmentSubmissionStage("idle");
+      setBusy(false);
+      return;
+    }
     try {
       const judgmentResult = await submitRemoteJudgment(session, judgment);
       nextSession = judgmentResult.session;
@@ -609,6 +741,21 @@ function TrainingWorkspace({
     if (!issue || !record || busy) return;
     setBusy(true);
     setActionError("");
+    if (scenarioDefinition) {
+      const result = evaluateRetry(retryAnswer, issue.targetSkill);
+      const retry: RetryResult = {
+        issueId: issue.id, targetSkill: issue.targetSkill, answer: retryAnswer,
+        improved: result.improved, feedback: result.feedback, engine: "deterministic", modelVersion: "deterministic-v1"
+      };
+      setRetryResult(retry);
+      const nextRecord = addRetryToHistory(record, retry);
+      setRecord(nextRecord);
+      setRuntimeStatus("fallback");
+      setActionError("自定义场景复练由本地规则评估，不会进入正式能力趋势。");
+      onRetry(record.id, retry);
+      setBusy(false);
+      return;
+    }
     try {
       const result = await submitRemoteRetry(record, issue.id, retryAnswer);
       setRetryResult(result.retry);
@@ -704,7 +851,11 @@ function TrainingWorkspace({
               <span className="section-kicker">AI 角色</span>
               <h2>{scenario.role}</h2>
             </div>
-            <span className="quiet">{busy ? "处理中…" : `${session.mode}模式`}</span>
+            {session.mode === "严格" ? (
+              <span className={`strict-timer${strictExpired ? " expired" : ""}`} data-testid="strict-timer">
+                {strictDeadline === null ? "准备计时…" : strictExpired ? "时间到" : `剩余 ${formatCountdown(strictRemaining ?? 0)}`}
+              </span>
+            ) : <span className="quiet">{busy ? "处理中…" : `${session.mode}模式`}</span>}
           </div>
           <div className="message-list" data-testid="message-list" ref={messageListRef}>
             {session.messages.map((message) => (
@@ -729,7 +880,7 @@ function TrainingWorkspace({
           <div className="composer">
             <textarea
               aria-label="你的追问"
-              disabled={busy}
+              disabled={busy || strictExpired}
               onChange={(event) => setReply(event.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="提出一个具体问题，Enter 发送，Shift + Enter 换行"
@@ -737,6 +888,7 @@ function TrainingWorkspace({
               value={reply}
             />
             <div className="composer-actions">
+              <VoiceInputButton disabled={busy || strictExpired} onTranscript={(text) => setReply((current) => current ? `${current} ${text}` : text)} />
               <button
                 className="text-button"
                 disabled={busy || session.mode !== "练习"}
@@ -745,7 +897,7 @@ function TrainingWorkspace({
               >
                 给我一个轻提示
               </button>
-              <button className="button button-primary" disabled={busy || !reply.trim()} onClick={() => { void sendReply(); }} type="button">{busy ? "等待回应" : "发送追问"}</button>
+              <button className="button button-primary" disabled={busy || strictExpired || !reply.trim()} onClick={() => { void sendReply(); }} type="button">{busy ? "等待回应" : strictExpired ? "时间已到" : "发送追问"}</button>
             </div>
           </div>
         </section>
@@ -765,11 +917,11 @@ function TrainingWorkspace({
           <p>覆盖度只表示你是否问到了相关信息，不代表问题质量。</p>
           <button
             className="button button-secondary"
-            disabled={busy || session.messages.filter((message) => message.role === "user").length < 1}
+            disabled={busy || (!strictExpired && session.messages.filter((message) => message.role === "user").length < 1)}
             onClick={() => setSession((current) => moveToJudgment(current))}
             type="button"
           >
-            结束访谈，整理判断
+            {strictExpired ? "时间到，整理当前判断" : "结束访谈，整理判断"}
           </button>
         </aside>
       </div>
@@ -778,13 +930,18 @@ function TrainingWorkspace({
 }
 function ReviewPanel({
   records,
-  onStart
+  onStart,
+  onMentorNote
 }: {
   records: TrainingHistoryRecord[];
   onStart: (scenarioId: string, mode?: TrainingSession["mode"]) => void;
+  onMentorNote: (recordId: string, note: MentorNote) => void;
 }) {
   const [selectedId, setSelectedId] = useState(records[0]?.id ?? "");
+  const [mentorAuthor, setMentorAuthor] = useState("导师");
+  const [mentorContent, setMentorContent] = useState("");
   const selected = records.find((record) => record.id === selectedId) ?? records[0];
+  const comparison = selected ? compareScenarioRecords(records, selected) : null;
 
   if (!records.length) {
     return (
@@ -802,7 +959,7 @@ function ReviewPanel({
       <aside className="review-list surface">
         <span className="section-kicker">训练记录</span>
         {records.map((record) => {
-          const scenario = getScenario(record.scenarioId);
+          const scenario = record.scenarioSnapshot ?? getScenario(record.scenarioId);
           return (
             <button
               className={selected?.id === record.id ? "active" : ""}
@@ -819,10 +976,14 @@ function ReviewPanel({
       </aside>
       {selected ? (
         <section className="review-detail surface">
+          {(() => {
+            const scenario = selected.scenarioSnapshot ?? getScenario(selected.scenarioId);
+            return (
+          <>
           <div className="section-heading">
             <div>
-              <span className="section-kicker">{getScenario(selected.scenarioId).industry}</span>
-              <h2>{getScenario(selected.scenarioId).title}</h2>
+              <span className="section-kicker">{scenario.industry}</span>
+              <h2>{scenario.title}</h2>
             </div>
             <span className="status-tag">{selected.retry?.improved ? "已改善" : "待复练"}</span>
           </div>
@@ -831,6 +992,45 @@ function ReviewPanel({
             <div><span>训练模式</span><strong>{selected.mode}</strong></div>
             <div><span>复练结果</span><strong>{selected.retry?.improved ? "改善" : selected.retry ? "未达标" : "未复练"}</strong></div>
           </div>
+          <div className="mentor-note-panel">
+            <div>
+              <span className="section-kicker">导师 / 主管点评</span>
+              <p>点评只作为训练备注保存，不改变模型评分或正式能力证据。</p>
+            </div>
+            {selected.mentorNote ? (
+              <blockquote data-testid="mentor-note">
+                <strong>{selected.mentorNote.author}</strong>
+                <span>{selected.mentorNote.content}</span>
+                <small>{new Date(selected.mentorNote.createdAt).toLocaleString("zh-CN")}</small>
+              </blockquote>
+            ) : null}
+            <div className="mentor-note-form">
+              <input aria-label="点评人" onChange={(event) => setMentorAuthor(event.target.value)} placeholder="点评人" value={mentorAuthor} />
+              <textarea aria-label="点评内容" onChange={(event) => setMentorContent(event.target.value)} placeholder="写下对这次判断的具体建议" rows={2} value={mentorContent} />
+              <button
+                className="button button-secondary"
+                disabled={!mentorAuthor.trim() || mentorContent.trim().length < 4}
+                onClick={() => {
+                  onMentorNote(selected.id, { author: mentorAuthor.trim(), content: mentorContent.trim(), createdAt: new Date().toISOString() });
+                  setMentorContent("");
+                }}
+                type="button"
+              >保存点评</button>
+            </div>
+          </div>
+          {comparison ? (
+            <div className="scenario-comparison" data-testid="scenario-comparison">
+              <div className="scenario-comparison-heading">
+                <span>同场景对比</span>
+                <strong>{comparison.scoreDelta > 0 ? "+" : ""}{comparison.scoreDelta} 分</strong>
+              </div>
+              <p>与上一次同场景的{comparison.baseline.mode}训练相比，本次行为证据总分{comparison.scoreDelta === 0 ? "没有变化" : comparison.scoreDelta > 0 ? "有所提升" : "有所下降"}。</p>
+              <div className="scenario-comparison-details">
+                <span>改善维度：{comparison.improvedSkills.length ? comparison.improvedSkills.join("、") : "暂无"}</span>
+                <span>退步维度：{comparison.regressedSkills.length ? comparison.regressedSkills.join("、") : "暂无"}</span>
+              </div>
+            </div>
+          ) : null}
           <div className="review-evidence">
             {selected.evaluation.issues.map((issue) => (
               <article key={issue.id}>
@@ -852,6 +1052,9 @@ function ReviewPanel({
               用同一场景重新训练
             </button>
           )}
+          </>
+            );
+          })()}
         </section>
       ) : null}
     </div>
@@ -867,13 +1070,21 @@ function AbilityPanel({
 }) {
   const formalProfile = buildAbilityProfile(records.filter((record) => record.engine === "openai"), { formalEvidenceOnly: true });
   const practiceProfile = buildAbilityProfile(records);
+  const latestImprovement = records.find((record) => record.retry?.improved);
+  const latestImprovementSkill = latestImprovement?.retry
+    ? getSkill(latestImprovement.retry.targetSkill).name
+    : null;
   return (
     <div className="ability-layout">
       <section className="ability-summary surface-dark">
         <div>
           <span className="section-kicker light">专项训练证据</span>
           <h2>{practiceProfile.completedCount ? `专项训练已留下 ${practiceProfile.completedCount} 条记录，其中 ${formalProfile.completedCount} 条进入正式能力趋势` : "完成首次专项训练，建立能力基线"}</h2>
-          <p>{formalProfile.completedCount ? formalProfile.nextTraining : "这里仅统计今日训练和训练地图中的专项练习，不包含上方的世界工作台判断证据。离线或降级结果只作为练习反馈。"}</p>
+          <p>{practiceProfile.completedCount ? practiceProfile.nextTraining : "这里仅统计今日训练和训练地图中的专项练习，不包含上方的世界工作台判断证据。离线或降级结果只作为练习反馈。"}</p>
+          <p className="ability-summary-note">
+            {latestImprovementSkill ? `最近改善：${latestImprovementSkill}。` : "最近改善：完成一次复练后显示。"}
+            {formalProfile.completedCount ? " 正式趋势只统计模型完成的训练。" : " 当前状态包含练习反馈，正式趋势仍需模型训练证据。"}
+          </p>
           <button className="button button-light" onClick={onOpenReview} type="button">
             查看全部训练记录
           </button>
@@ -888,23 +1099,26 @@ function AbilityPanel({
         <div className="section-heading">
           <div>
             <span className="section-kicker">五项产品发现能力</span>
-            <h2>每个正式状态都能回到具体训练证据</h2>
+            <h2>每个状态都能回到具体训练证据</h2>
           </div>
         </div>
-        {formalProfile.skills.map((skill, index) => (
-          <article key={skill.id}>
+        {practiceProfile.skills.map((skill, index) => {
+          const formalSkill = formalProfile.skills.find((item) => item.id === skill.id);
+          return (
+          <article data-testid={`ability-skill-${skill.id}`} key={skill.id}>
             <span className="skill-index">0{index + 1}</span>
             <div>
               <h3>{skill.name}</h3>
               <p>{skill.latestEvidence}</p>
             </div>
             <div className="ability-counts">
-              <span>{skill.evidenceCount} 条正式证据</span>
-              <span>{skill.improvedCount} 次正式改善</span>
+              <span>{skill.evidenceCount} 条练习证据</span>
+              <span>{formalSkill?.evidenceCount ?? 0} 条正式证据</span>
             </div>
             <span className={`mastery mastery-${skill.state}`}>{skill.state}</span>
           </article>
-        ))}
+          );
+        })}
       </section>
     </div>
   );
@@ -920,6 +1134,12 @@ export function AppShell({
 }) {
   const [view, setView] = useState<ViewId>("today");
   const [activeTraining, setActiveTraining] = useState<{ scenarioId: string; mode: TrainingSession["mode"] } | null>(null);
+  const [productExperimentOpen, setProductExperimentOpen] = useState(false);
+  const [customScenarioBuilderOpen, setCustomScenarioBuilderOpen] = useState(false);
+  const [courseOpen, setCourseOpen] = useState(false);
+  const [multiRoleOpen, setMultiRoleOpen] = useState(false);
+  const [resourceHubOpen, setResourceHubOpen] = useState(false);
+  const [customScenarios, setCustomScenarios] = useState<TrainingScenario[]>([]);
   // #4 世界工作台：null = 未激活，string = 目标 world_id
   const [activeWorkbenchWorldId, setActiveWorkbenchWorldId] = useState<string | null>(null);
   const [completedWorldIds, setCompletedWorldIds] = useState<string[]>([]);
@@ -932,6 +1152,10 @@ export function AppShell({
   const meta = getViewMeta(view);
   const storageKey = `${STORAGE_KEY}:${userId}`;
   const worldProgressKey = `${WORLD_PROGRESS_STORAGE_KEY}:${userId}`;
+
+  useEffect(() => {
+    setCustomScenarios(loadCustomScenarios());
+  }, [userId]);
 
   useEffect(() => {
     try {
@@ -1009,7 +1233,7 @@ export function AppShell({
     topbarRef.current?.focus({ preventScroll: true });
     const timer = window.setTimeout(() => window.scrollTo(0, 0), 100);
     return () => window.clearTimeout(timer);
-  }, [activeTraining, activeWorkbenchWorldId, view]);
+  }, [activeTraining, activeWorkbenchWorldId, productExperimentOpen, courseOpen, multiRoleOpen, resourceHubOpen, view]);
 
   function startTraining(scenarioId: string, mode: TrainingSession["mode"] = "练习") {
     setActiveTraining({ scenarioId, mode });
@@ -1026,6 +1250,16 @@ export function AppShell({
     const currentRecord = historyRecords.find((record) => record.id === recordId);
     if (!currentRecord) return;
     const nextRecord = addRetryToHistory(currentRecord, retry);
+    setHistoryRecords((current) => current.map((record) => record.id === recordId ? nextRecord : record));
+    if (nextRecord.engine === "deterministic") {
+      void syncDeterministicRecord(nextRecord).catch(() => setHistoryStatus("local"));
+    }
+  }
+
+  function updateMentorNote(recordId: string, mentorNote: MentorNote) {
+    const currentRecord = historyRecords.find((record) => record.id === recordId);
+    if (!currentRecord) return;
+    const nextRecord = { ...currentRecord, mentorNote };
     setHistoryRecords((current) => current.map((record) => record.id === recordId ? nextRecord : record));
     if (nextRecord.engine === "deterministic") {
       void syncDeterministicRecord(nextRecord).catch(() => setHistoryStatus("local"));
@@ -1055,15 +1289,32 @@ export function AppShell({
     setView("ability");
   }
 
+  const activeCustomScenario = activeTraining ? customScenarios.find((scenario) => scenario.id === activeTraining.scenarioId) : undefined;
   const pageTitle = activeWorkbenchWorldId
     ? "世界工作台"
     : activeTraining
-    ? getScenario(activeTraining.scenarioId).shortTitle
+    ? (activeCustomScenario ?? getScenario(activeTraining.scenarioId)).shortTitle
+    : resourceHubOpen
+    ? "资源中心"
+    : multiRoleOpen
+    ? "多人角色训练"
+    : courseOpen
+    ? "课程内容"
+    : productExperimentOpen
+    ? "产品资料生成实验"
     : meta.title;
   const pageDescription = activeWorkbenchWorldId
     ? "调查、承诺、揭示后果，围绕世界规则工作。"
     : activeTraining
     ? "一次只训练一个主要能力，先理解问题，再做判断。"
+    : resourceHubOpen
+    ? "浏览社区案例、行业资料和内容审核队列。"
+    : multiRoleOpen
+    ? "在同一业务问题中切换不同利益相关者。"
+    : courseOpen
+    ? "通过短知识点和行动练习补足产品发现基础。"
+    : productExperimentOpen
+    ? "整理产品判断，但不把实验草稿当作真实市场结论。"
     : meta.description;
   const completedThisWeek = useMemo(() => historyRecords.length, [historyRecords.length]);
   const sourceLabel = historyStatus === "loading" ? "正在同步" : historyStatus === "server" ? "服务端记录" : "本地缓存";
@@ -1096,6 +1347,11 @@ export function AppShell({
               onClick={() => {
                 setActiveTraining(null);
                 setActiveWorkbenchWorldId(null);
+                setProductExperimentOpen(false);
+                setCustomScenarioBuilderOpen(false);
+                setCourseOpen(false);
+                setMultiRoleOpen(false);
+                setResourceHubOpen(false);
                 setView(item.view);
               }}
               type="button"
@@ -1144,7 +1400,25 @@ export function AppShell({
               onRecord={addRecord}
               onRetry={updateRetry}
               scenarioId={activeTraining.scenarioId}
+              scenarioDefinition={activeCustomScenario}
             />
+          ) : customScenarioBuilderOpen ? (
+            <CustomScenarioBuilder
+              onCancel={() => setCustomScenarioBuilderOpen(false)}
+              onCreated={(scenario) => {
+                setCustomScenarios((current) => [...current.filter((item) => item.id !== scenario.id), scenario]);
+                setCustomScenarioBuilderOpen(false);
+                setActiveTraining({ scenarioId: scenario.id, mode: "练习" });
+              }}
+            />
+          ) : resourceHubOpen ? (
+            <ResourceHubPanel onClose={() => setResourceHubOpen(false)} userId={userId} />
+          ) : multiRoleOpen ? (
+            <MultiRolePanel onClose={() => setMultiRoleOpen(false)} />
+          ) : courseOpen ? (
+            <CoursePanel onClose={() => setCourseOpen(false)} userId={userId} />
+          ) : productExperimentOpen ? (
+            <ProductMaterialExperiment onClose={() => setProductExperimentOpen(false)} />
           ) : view === "today" ? (
             <TodayPanel
               onOpenReview={() => setView("review")}
@@ -1157,18 +1431,29 @@ export function AppShell({
               records={historyRecords}
             />
           ) : view === "map" ? (
-            <TrainingMap onStart={startTraining} />
+            <TrainingMap
+              customScenarios={customScenarios}
+              onCreateCustomScenario={() => setCustomScenarioBuilderOpen(true)}
+              onOpenCourses={() => setCourseOpen(true)}
+              onOpenMultiRole={() => setMultiRoleOpen(true)}
+              onOpenResourceHub={() => setResourceHubOpen(true)}
+              onOpenProductExperiment={() => setProductExperimentOpen(true)}
+              onStart={startTraining}
+            />
           ) : view === "review" ? (
             <div className="stack-lg">
               <WorldDecisionHistoryPanel />
-              <ReviewPanel onStart={startTraining} records={historyRecords} />
+              <ReviewPanel onMentorNote={updateMentorNote} onStart={startTraining} records={historyRecords} />
             </div>
           ) : view === "ability" ? (
             // #6 新链路：判断证据画像（替换旧 totalScore / 雷达图）
             // 旧 AbilityPanel 保留供旧训练链路使用
-            <div className="ability-layout">
-              <JudgmentProfilePanel />
-              <AbilityPanel onOpenReview={() => setView("review")} records={historyRecords} />
+            <div className="stack-lg">
+              <TeamWorkspacePanel userId={userId} userName={userName} />
+              <div className="ability-layout">
+                <JudgmentProfilePanel />
+                <AbilityPanel onOpenReview={() => setView("review")} records={historyRecords} />
+              </div>
             </div>
           ) : null}
         </div>

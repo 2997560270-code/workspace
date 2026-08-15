@@ -106,10 +106,13 @@ function buildFeedbackContent(
   const missingLabels = missingDimensions
     .map((d) => DIMENSION_LABELS[d] ?? d)
     .join("；");
+  const missingCountLabel = missingDimensions.length === 3
+    ? "三个维度"
+    : `${missingDimensions.length} 个维度`;
 
   return (
     `在"${worldTrigger}"的情境中，你选择了"${decision.chosen_action}"。\n\n` +
-    `在做出这个决策时，以下维度尚未有明确证据：\n` +
+    `在做出这个决策时，以下${missingCountLabel}尚未有明确证据：\n` +
     missingDimensions.map((d, i) => `${i + 1}. ${DIMENSION_LABELS[d] ?? d}`).join("\n") +
     `\n\n这些维度（${missingLabels}）` +
     `是区分过早承诺与充分调查的核心。` +

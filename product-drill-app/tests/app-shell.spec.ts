@@ -3,6 +3,7 @@ import { enterApp } from "./e2e-helpers";
 
 test("navigates between the four direction A modules", async ({ page }) => {
   await enterApp(page);
+  await expect(page.getByTestId("weekly-summary")).toContainText("建立你的能力基线");
   const cases = [
     ["02 训练地图 按能力选择训练任务", "训练地图"],
     ["03 复盘与复练 重练具体失误时刻", "复盘与复练"],

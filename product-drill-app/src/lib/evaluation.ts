@@ -68,7 +68,7 @@ function judgmentMentions(session: TrainingSession, skillId: SkillId): boolean {
 }
 
 export function generateEvaluation(session: TrainingSession): Evaluation {
-  const scenario = getScenario(session.scenarioId);
+  const scenario = session.scenarioSnapshot ?? getScenario(session.scenarioId);
   const userTurnCount = session.messages.filter((message) => message.role === "user").length;
   const dimensions: EvidenceDimension[] = SKILLS.map((skill) => {
     const message = findEvidence(session, skill.id);

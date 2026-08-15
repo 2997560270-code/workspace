@@ -37,4 +37,14 @@ describe("API failure boundaries", () => {
 
     expect(payload.discovery_dimension).toBe("workflow");
   });
+
+  it("removes discovery dimensions when no new world fact was revealed", () => {
+    const payload = prepareLearnerEventPayload(
+      { text: "询问当前流程", discovery_dimension: "workflow" },
+      true,
+      "no_new_fact"
+    );
+
+    expect(payload).toEqual({ text: "询问当前流程", input_status: "no_new_fact" });
+  });
 });
