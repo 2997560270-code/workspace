@@ -33,6 +33,8 @@ export type LocalRuntimeState = {
   teamMembers: Array<Record<string, unknown>>;
   teamInvitations: Array<Record<string, unknown>>;
   mentorNotes: Array<Record<string, unknown>>;
+  multiRoleSessions: Array<Record<string, unknown>>;
+  multiRoleMessages: Array<Record<string, unknown>>;
   communityCases: Array<Record<string, unknown>>;
   knowledgeEntries: Array<Record<string, unknown>>;
   contentAuditLogs: Array<Record<string, unknown>>;
@@ -45,6 +47,7 @@ const EMPTY_STATE: LocalRuntimeState = {
   challenges: [], challengeEntries: [], credits: [], anomalies: [], assessmentBlueprints: [], assessmentItems: [], assessmentRuns: [],
   assessmentResponses: [], assessmentEvaluations: [], assessmentReports: [], fairnessMetrics: [], organizations: [], verifiedSessions: [],
   verifiedEvents: [], verifiedReports: [], humanReviewCases: [], teams: [], teamMembers: [], teamInvitations: [], mentorNotes: [],
+  multiRoleSessions: [], multiRoleMessages: [],
   communityCases: [], knowledgeEntries: [], contentAuditLogs: [], subscriptions: [],
 };
 

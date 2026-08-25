@@ -2,6 +2,8 @@
 
 ## 产品
 
+- [Product Drill 产品需求文档（PRD）](./product/product-requirements-document.md)
+- [Product Drill 产品需求文档（Word 版）](./product/product-requirements-document.docx)
 - [AI 原生重构方案](./product/ai-native-refactor-plan.md)
 - [方向 A 产品优化方案](./product/direction-a-product-optimization.md)
 - [全项目测试优化清单（2026-08-04）](./product/full-project-test-optimization-checklist-2026-08-04.md)

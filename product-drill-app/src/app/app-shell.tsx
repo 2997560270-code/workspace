@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { WorldWorkbench } from "./world-workbench";
@@ -31,6 +31,7 @@ import { CustomScenarioBuilder } from "./custom-scenario-builder";
 import { TeamWorkspacePanel } from "./team-workspace-panel";
 import { CoursePanel } from "./course-panel";
 import { VoiceInputButton } from "./voice-input-button";
+import { SignOutButton } from "./signout-button";
 import { MultiRolePanel } from "./multi-role-panel";
 import { ResourceHubPanel } from "./resource-hub-panel";
 import {
@@ -1362,9 +1363,16 @@ export function AppShell({
           ))}
         </nav>
         <div className="sidebar-footer">
-          <span>本周训练</span>
-          <strong>{completedThisWeek} / 5</strong>
-          <div><i style={{ width: `${Math.min(100, completedThisWeek * 20)}%` }} /></div>
+          <div className="sidebar-user">
+            <strong>{userName}</strong>
+            <span>产品练习生 · {sourceLabel}</span>
+          </div>
+          <div className="sidebar-week">
+            <span>本周训练</span>
+            <strong>{completedThisWeek} / 5</strong>
+            <div className="sidebar-week-bar"><i style={{ width: `${Math.min(100, completedThisWeek * 20)}%` }} /></div>
+          </div>
+          <SignOutButton />
         </div>
       </aside>
 
@@ -1373,10 +1381,6 @@ export function AppShell({
           <div>
             <h1>{pageTitle}</h1>
             <p>{pageDescription}</p>
-          </div>
-          <div className="user" aria-label="当前用户">
-            <span>产品练习生 · {sourceLabel}</span>
-            <strong>{userName}</strong>
           </div>
         </header>
         <div className="content">

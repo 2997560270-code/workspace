@@ -1,4 +1,4 @@
-﻿node_modules/
+node_modules/
 .next/
 test-results/
 playwright-report/
@@ -15,3 +15,10 @@ audit-evidence/
 归纳总结/
 .local-logs/
 product-drill-app/data/local-runtime-state.json
+
+# Local tool/cache directories (not part of the product source)
+.corepack/
+.docx-qa/
+.pnpm-tool/
+.preset-tmp/
+.shim/
