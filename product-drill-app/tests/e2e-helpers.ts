@@ -1,4 +1,4 @@
-﻿import type { Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 export async function enterApp(page: Page) {
   await page.context().addCookies([{
@@ -8,11 +8,9 @@ export async function enterApp(page: Page) {
     path: "/",
     sameSite: "Lax",
   }]);
+  // In E2E-isolated mode the isolated demo cookie is the login path, so the
+  // app enters the dashboard even when Supabase is configured (no real account).
   await page.goto("/");
-  const loginButton = page.getByRole("button", { name: "开始首次诊断", exact: true });
-  if (await loginButton.isVisible().catch(() => false)) {
-    await loginButton.click();
-  }
   await page.getByRole("heading", { level: 1, name: "今天，练会一个真正的产品判断" }).waitFor();
   await page.getByText(/产品练习生 · (服务端记录|本地缓存)/).waitFor({ state: "attached" });
 }

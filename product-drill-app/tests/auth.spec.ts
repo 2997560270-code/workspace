@@ -1,15 +1,18 @@
-﻿import { expect, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { enterApp } from "./e2e-helpers";
 
-test("requires the demo login before the direction A dashboard", async ({ page }) => {
+test("requires the login page before the direction A dashboard", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "建立你的第一条能力证据" })).toBeVisible();
-  await page.getByRole("button", { name: "开始首次诊断", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "今天，练会一个真正的产品判断" })).toBeVisible();
+  // Supabase email/password login is the entry gate.
+  await expect(page.getByRole("heading", { name: "登录你的账号" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "登录" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "注册" })).toBeVisible();
+  // Not signed in: the dashboard must stay locked behind login.
+  await expect(page.getByRole("heading", { level: 1, name: "今天，练会一个真正的产品判断" })).not.toBeVisible();
 });
 
-test("stores the demo session cookie", async ({ page }) => {
+test("enters the app with the isolated e2e session cookie", async ({ page }) => {
   await enterApp(page);
   const cookies = await page.context().cookies();
-  expect(cookies.some((cookie) => cookie.name === "product_drill_user")).toBe(true);
+  expect(cookies.some((cookie) => cookie.name === "product_drill_e2e_user")).toBe(true);
 });

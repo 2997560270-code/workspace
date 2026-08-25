@@ -15,7 +15,7 @@ test("separates claims, evidence, and provenance visually", async ({ page }) => 
     return {
       claim: read(".topbar h1"),
       evidence: read(".topbar p"),
-      provenance: read(".sidebar-footer > span")
+      provenance: read(".sidebar-week > span")
     };
   });
 

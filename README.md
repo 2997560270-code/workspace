@@ -130,6 +130,8 @@ OPENAI_EVALUATION_MODEL=gpt-5.6-terra
 
 `.env.local` 已被 Git 忽略，密钥不会进入仓库。修改配置后需要重启开发服务。完整的环境变量清单见 `product-drill-app/.env.example`。
 
+> **fork / 本地开箱即用**：未配置 Supabase 时，登录页默认是**本地邮箱注册/登录**——注册即登录、无需邮箱验证，账号数据保存在本机（`product-drill-app/data/local-runtime-state.json`）；配置 Supabase 后自动切换为云端邮箱登录。
+
 ### 验证
 
 ```powershell

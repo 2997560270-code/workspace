@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { DEV_USER, isDemoAuthAllowed, isLoggedIn, SESSION_COOKIE, type ProductDrillUser } from "./auth";
 import { isSupabaseConfigured } from "./env";
+import { getLocalUserById, isLocalAuthEnabled } from "./local-auth";
 import { createSupabaseServerClient } from "./supabase/server";
 
 export async function getCurrentUser(): Promise<ProductDrillUser | null> {
@@ -30,15 +31,13 @@ export async function getCurrentUser(): Promise<ProductDrillUser | null> {
     };
   }
 
-  if (!isDemoAuthAllowed(process.env.NODE_ENV, process.env.ALLOW_DEMO_AUTH)) return null;
+  // No Supabase configured: authenticate against a local email/password
+  // account stored on this machine. The session cookie holds the local user id.
+  if (!isLocalAuthEnabled()) return null;
   const cookieStore = await cookies();
   const session = cookieStore.get(SESSION_COOKIE)?.value;
-  if (!isLoggedIn(session)) return null;
-  const isolatedUserId = process.env.E2E_ISOLATED_USERS === "true"
-    ? cookieStore.get("product_drill_e2e_user")?.value
-    : undefined;
-  const userId = isolatedUserId && /^e2e-[a-z0-9-]{8,80}$/i.test(isolatedUserId)
-    ? isolatedUserId
-    : DEV_USER.id;
-  return { ...DEV_USER, id: userId, source: "demo" };
+  if (!session) return null;
+  const localUser = await getLocalUserById(session);
+  if (!localUser) return null;
+  return { id: localUser.id, email: localUser.email, name: localUser.name, source: "demo" };
 }
