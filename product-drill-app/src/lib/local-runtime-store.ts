@@ -55,7 +55,10 @@ const STATE_PATH = path.join(process.cwd(), "data", "local-runtime-state.json");
 let operationQueue: Promise<unknown> = Promise.resolve();
 
 export function isLocalRuntimeFallbackEnabled() {
-  return process.env.NODE_ENV !== "production" && process.env.ALLOW_DEMO_AUTH !== "false";
+  // The Playwright test server runs a production build (dev: false), so also
+  // allow the local runtime fallback during E2E-isolated runs. Production and
+  // real deployments never set E2E_ISOLATED_USERS.
+  return (process.env.E2E_ISOLATED_USERS === "true" || process.env.NODE_ENV !== "production") && process.env.ALLOW_DEMO_AUTH !== "false";
 }
 
 async function readState(): Promise<LocalRuntimeState> {
