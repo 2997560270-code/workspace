@@ -17,6 +17,15 @@ if errorlevel 1 (
   exit /b 1
 )
 
+echo [Product Drill] Checking port 3000...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$listeners = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue; if ($listeners) { $listeners | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Write-Host ('[Product Drill] Stopping stale dev server (PID ' + $_ + ')...'); Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }; Start-Sleep -Seconds 1 }"
+if errorlevel 1 (
+  echo [Product Drill] Failed to free port 3000. Close the old dev server window and try again.
+  pause
+  exit /b 1
+)
+
 if not exist "%APP_DIR%\node_modules\.bin\next.cmd" (
   echo [Product Drill] Installing dependencies...
   pushd "%APP_DIR%"
@@ -32,7 +41,7 @@ if not exist "%APP_DIR%\node_modules\.bin\next.cmd" (
 
 echo [Product Drill] Starting the development server...
 pushd "%APP_DIR%"
-start "Product Drill dev server" cmd /k "npm.cmd run dev"
+start "Product Drill dev server" cmd /k "npm.cmd run dev -- -p 3000"
 popd
 
 echo [Product Drill] Waiting for http://localhost:3000 ...
