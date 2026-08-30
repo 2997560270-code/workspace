@@ -476,10 +476,14 @@ p { color: var(--ink-2); line-height: 1.66; }
 /* ══════════════════════════ TRAINING WORKSPACE ═════════════════════════ */
 .training-shell { display: grid; grid-template-columns: 256px minmax(420px, 1fr) 250px; gap: 16px; align-items: stretch; }
 .briefing, .conversation, .training-progress { min-height: calc(100vh - 202px); }
-.briefing { padding: 26px; }
+.briefing { padding: 26px; max-height: calc(100vh - 202px); overflow-y: auto; }
 .back-button { margin-bottom: 40px; }
 .briefing h2 { font-size: var(--fs-title-lg); }
 .briefing > p { font-size: var(--fs-body); }
+.background-block { margin: 18px 0 0; padding: 16px 18px; border: 1px solid var(--line); border-left: 4px solid var(--sage-strong); border-radius: 6px; background: #fff; }
+.background-label { display: block; color: var(--sage-strong); font-family: var(--font-mono); font-size: var(--fs-aux-sm); font-weight: 700; letter-spacing: 0.06em; }
+.background-list { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 8px; color: var(--ink-2); font-size: var(--fs-body-sm); line-height: 1.6; }
+.background-source { margin: 12px 0 0; padding-top: 10px; border-top: 1px dashed var(--line); color: var(--ink-2); font-size: var(--fs-aux-sm); line-height: 1.5; }
 .briefing-list { margin: 28px 0; display: grid; gap: 14px; }
 .briefing-list > div { display: flex; align-items: flex-start; gap: 9px; color: var(--ink-2); font-size: var(--fs-body-sm); line-height: 1.55; }
 .check { flex: 0 0 auto; width: 17px; height: 17px; display: inline-grid; place-items: center; color: #b7b8b3; border: 1px solid #cfcdc6; border-radius: 50%; font-size: 9px; }
@@ -868,6 +872,7 @@ p { color: var(--ink-2); line-height: 1.66; }
   .training-shell { grid-template-columns: 220px minmax(0, 1fr); }
   .training-progress { grid-column: 1 / -1; min-height: auto; }
   .briefing, .conversation { min-height: 680px; }
+  .briefing { max-height: 680px; }
   .scenario-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
@@ -887,6 +892,7 @@ p { color: var(--ink-2); line-height: 1.66; }
   .scenario-grid { grid-template-columns: 1fr; }
   .training-shell { grid-template-columns: 1fr; }
   .briefing, .conversation, .training-progress { min-height: auto; }
+  .briefing { max-height: none; }
   .message-list { max-height: 520px; }
   .judgment-grid { grid-template-columns: 1fr; }
   .judgment-grid label.wide { grid-column: 1; }

@@ -17,6 +17,13 @@ export type TrainingScenario = {
   duration: number;
   role: string;
   context: string;
+  /**
+   * 业务需求背景：改编自真实公开案例的情境细节（公司规模、现状、张力、约束）。
+   * 内置场景必须提供；自定义场景可以省略。
+   */
+  background?: string[];
+  /** 业务背景的真实来源说明，展示给用户，建立训练可信度。 */
+  backgroundSource?: string;
   opening: string;
   hiddenFacts: Record<SkillId, string>;
   briefing: string[];
@@ -66,6 +73,13 @@ export const TRAINING_SCENARIOS: TrainingScenario[] = [
     duration: 8,
     role: "连锁零售运营负责人",
     context: "总部每周需要汇总 48 家门店的经营数据，运营负责人提出建设数据大屏。",
+    background: [
+      "一家直营 48 家门店的连锁零售企业，门店分布在三个城市，收银、进销存和会员营销分别由三套系统承载。",
+      "门店经营数据分散在不同系统里，各系统的门店编码规则不一致，总部每周一要向管理层提交经营周报。",
+      "管理层参观同行门店后提出：在总部和样板店各建一块实时数据大屏，'所有指标都放上去'。",
+      "行业参照：IBM 与 Gartner 的公开统计显示，约 60%-85% 的 BI 项目未能交付预期业务价值，大量看板建成后无人使用。"
+    ],
+    backgroundSource: "连锁零售企业 BI 看板落地实践；IBM/Gartner 关于 BI 项目失败率的公开统计（约 60%-85% 未达预期）。",
     opening: "我们现在看经营情况太麻烦了，能不能给我们做一个数据大屏？最好所有指标都放上去。",
     hiddenFacts: {
       role: "真正每天整理数据的是区域运营，老板只在周会上看汇总结论，门店店长负责补录异常数据。",
@@ -86,6 +100,14 @@ export const TRAINING_SCENARIOS: TrainingScenario[] = [
     duration: 7,
     role: "协同办公产品业务负责人",
     context: "管理层担心产品落后于竞品，希望快速发布 AI 功能。",
+    background: [
+      "一家面向中小企业的协同办公 SaaS，核心功能是任务分配、审批和会议记录，付费团队约 2 万家。",
+      "2023 年起头部厂商密集发布大模型功能：钉钉宣布接入通义千问并全面智能化，飞书推出 My AI，金山办公发布 WPS AI。",
+      "最近两次客户竞标中，采购方直接问'你们有 AI 功能吗'，销售反馈没有 AI 演示时明显吃亏。",
+      "老板在季度会上拍板：下个季度必须上线一个 AI 功能，用于销售演示与客户沟通。",
+      "研发资源有限，同一排期里还有审批流和移动端两个项目在排队。"
+    ],
+    backgroundSource: "2023 年钉钉（接入通义千问）、飞书（My AI）、金山办公（WPS AI）掀起的协同办公 AI 功能竞赛（财联社等公开报道）。",
     opening: "竞品都在上 AI，我们下个季度也必须有一个 AI 功能，你们尽快给方案吧。",
     hiddenFacts: {
       role: "老板是推动者，但真正使用产品的是中小企业行政和项目负责人。",
@@ -106,6 +128,14 @@ export const TRAINING_SCENARIOS: TrainingScenario[] = [
     duration: 6,
     role: "客户成功经理",
     context: "多个客户反馈月底导出经营报表耗时很长。",
+    background: [
+      "一款面向财务团队的经营分析 SaaS，客户以 50-500 人规模的企业为主。",
+      "每月最后一天是客户关账日，财务分析师需要导出当月全量经营报表，交给管理层与审计。",
+      "行业普遍存在导出上限约束：例如 Salesforce 格式化报表单次仅能导出 2000 行，用户社区里'拆分导出再手工合并'是常见绕行方式。",
+      "近期三家大客户的客户成功经理同时收到投诉：导出等待 20-40 分钟，重复点击还会产生互相挤占的失败任务。",
+      "本迭代性能优化的研发预算有限，必须挑准优先级。"
+    ],
+    backgroundSource: "Salesforce 报表导出行数上限（格式化报表 2000 行）及官方社区中拆分导出、第三方工具绕行的公开讨论。",
     opening: "最近好几个客户都在投诉报表导出太慢，这个问题优先级必须提上去。",
     hiddenFacts: {
       role: "提出投诉的是管理员，但真正等待报表的是财务分析师，审批人只接收最终文件。",
@@ -126,6 +156,14 @@ export const TRAINING_SCENARIOS: TrainingScenario[] = [
     duration: 6,
     role: "门店店长",
     context: "门店经常有临期商品未及时处理，店长希望增加提醒。",
+    background: [
+      "一家连锁便利店的直营门店，鲜食和乳制品占比约四成，保质期普遍只有 3-7 天。",
+      "门店目前靠收货员工手写保质期、闭店前店长凭经验翻检临期商品，没有任何系统提醒。",
+      "行业头部已用系统化方式管理临期：便利蜂对短保商品自动测算临期折扣，日本全家靠数据模型把损耗率控制在约 3%，而行业平均在 6%-8%。",
+      "店主每月盘点发现临期商品漏处理造成约 3000 元损耗，直接影响门店利润。",
+      "区域经理要求门店先证明改进方案有效，才会在全区门店推广。"
+    ],
+    backgroundSource: "便利店行业临期商品管理实践（便利蜂短保商品动态折扣系统；全家凭数据模型将损耗率控制在约 3%，行业平均 6%-8%）。",
     opening: "我们经常忘记处理快过期的商品，系统加个提醒就行，最好每天自动提醒。",
     hiddenFacts: {
       role: "店长负责处理，但商品日期主要由收货员工录入，区域经理关心损耗金额。",
@@ -146,6 +184,14 @@ export const TRAINING_SCENARIOS: TrainingScenario[] = [
     duration: 10,
     role: "增长负责人",
     context: "产品改版后新用户激活率下降，团队对原因存在不同判断。",
+    background: [
+      "一款面向项目团队的协作工具，改版前新用户注册后可以立即创建自己的第一个项目。",
+      "本季度改版上线了'先邀请成员，再创建项目'的新手引导，希望提高团队渗透率与留存。",
+      "行业经典参照：Slack 公开过'团队累计发送 2000 条消息后 93% 客户留存'的激活指标；Facebook 早期用'10 天加 7 个好友'衡量激活，但后续分析指出这是相关性而非因果。",
+      "改版两周后新用户激活率连续下滑，个人用户下降最明显，企业销售导入的用户几乎不受影响。",
+      "市场投放仍按原计划消耗预算，老板要求本周末前给出解释和修复方案。"
+    ],
+    backgroundSource: "Slack '2000 条消息'激活指标（First Round Review 访谈）与 Facebook '10 天加 7 个好友'增长框架（Mode/Geckoboard 复盘）。",
     opening: "这两周激活率一直往下掉，我倾向于把新手引导再做长一点，多解释几个核心功能。",
     hiddenFacts: {
       role: "增长负责人关注激活率，真正经历流程的是首次创建项目的新用户，销售导入用户另有路径。",
@@ -166,6 +212,14 @@ export const TRAINING_SCENARIOS: TrainingScenario[] = [
     duration: 10,
     role: "大客户销售总监",
     context: "一个重要客户把定制审批流作为续约条件，销售要求产品团队立即承诺。",
+    background: [
+      "一家 B2B 费用与采购管理 SaaS，服务约 300 家中大型企业客户。",
+      "第一大客户（占年度经常性收入约 12%）在续约谈判中把'多级审批流定制'写入采购条件，要求三个月内交付。",
+      "客户目前用邮件走特殊审批，标准审批仍在系统内完成；真正操作审批的是其区域财务团队。",
+      "销售总监施压：竞品已表示愿意为客户定制，不承诺就可能失去续约。",
+      "行业公开共识：SaaStr 创始人 Jason Lemkin 认为'一次性定制本身就是坏事，这是 SaaS 不是外包'；钉钉则把审批做成可配置产品，支撑了海量企业的多级审批需求。"
+    ],
+    backgroundSource: "SaaStr 创始人 Jason Lemkin 关于大客户定制的公开判断框架；钉钉把多级审批做成可配置产品的规模化实践。",
     opening: "这个客户占我们年度收入很大一部分，他们说没有多级审批就不续约，你们必须这个月排进去。",
     hiddenFacts: {
       role: "销售总监传递需求，客户采购提出续约条件，真正使用审批的是区域财务团队。",
@@ -186,6 +240,14 @@ export const TRAINING_SCENARIOS: TrainingScenario[] = [
     duration: 8,
     role: "客户支持负责人",
     context: "AI 客服上线后，支持团队收到回答不准确的反馈，团队正在考虑扩大知识库。",
+    background: [
+      "一家电商平台的客服团队于 2024 年初上线 AI 客服助手，自动草拟回复，一线客服确认后发送。",
+      "上线三个月，退款和账号权限两类问题的错误回答明显偏多，客户因错误回答重复提交工单。",
+      "同年行业接连出现 AI 客服事故：Air Canada 因官网聊天机器人给出错误退票政策被仲裁庭判赔 812 加元；DPD 聊天机器人被诱导输出辱骂内容；纽约市官方商务聊天机器人给出违法建议。",
+      "法务提醒：企业要对 AI 输出的全部内容负责，'是 AI 说的'不构成有效抗辩。",
+      "支持负责人的第一反应是'把知识库再扩充一轮'，但客服内部的纠错清单还没有同步回知识库。"
+    ],
+    backgroundSource: "2024 年 Air Canada 聊天机器人赔偿案（BCCRT 149 号裁决，判赔 812.02 加元）、DPD 聊天机器人事故、纽约市 MyCity 机器人违法建议等公开报道。",
     opening: "最近客户总说 AI 客服答得不准，我们先把知识库再扩充一轮吧。",
     hiddenFacts: {
       role: "支持负责人关注工单量，真正使用 AI 回复的是一线客服，最终承担错误后果的是客户和售后团队。",
@@ -206,6 +268,14 @@ export const TRAINING_SCENARIOS: TrainingScenario[] = [
     duration: 8,
     role: "企业学习负责人",
     context: "企业客户购买了在线培训，但员工课程完成率连续下降，管理者要求增加提醒。",
+    background: [
+      "一家连锁服务企业采购了在线培训平台，覆盖 4000 余名轮班员工，包含合规必修课与技能选修课。",
+      "平台数据显示课程完成率连续两个季度下滑，采购方管理层要求'加强提醒、上线排行榜'推动完成。",
+      "公开研究显示低完成率是在线学习的普遍现象：MOOC 完成率中位数约 12.6%，MITx/HarvardX 全量学习者获证率约 3%；而 Duolingo 靠连续打卡和排行榜在四年内把 DAU 提升了 4.5 倍。",
+      "员工主要在手机上利用班前班后的碎片时间学习，课程中途退出后没有'下次从哪继续'的记录。",
+      "夜班和外勤岗位完成率最低，强制提醒已经引发部分主管抱怨：'连排班时间都不保证，提醒有什么用'。"
+    ],
+    backgroundSource: "MOOC 完成率公开研究（Katy Jordan 中位数约 12.6%；Reich & Ruipérez-Valiente, Science 2019，获证率约 3%）与 Duolingo 增长复盘（连续打卡 + 排行榜，DAU 四年 4.5 倍）。",
     opening: "员工总是学到一半就不学了，我们需要更强的提醒和排行榜来推动完成。",
     hiddenFacts: {
       role: "学习负责人负责采购和汇报，实际学习者是轮班员工，直属主管决定是否给他们留出学习时间。",
@@ -226,6 +296,14 @@ export const TRAINING_SCENARIOS: TrainingScenario[] = [
     duration: 10,
     role: "项目管理产品负责人",
     context: "客户成功团队汇总了大量功能投诉，但数据却显示相关功能仍被高频使用。",
+    background: [
+      "一款项目管理工具的批量任务更新功能，单季度在客户成功渠道收到 100 余条投诉。",
+      "同期产品数据显示该功能使用率不降反升，'投诉最多的功能反而最多人用'在团队内部引发争论。",
+      "行业最著名的对照案例是 Snapchat 2018 年改版：超 120 万人请愿恢复旧版，Kylie Jenner 一条推文让 Snap 市值蒸发约 13 亿美元，但 Snap 官方财报称改版后用户使用时长不降反升。",
+      "声量最大的投诉者与沉默的高频使用者往往不是同一批人，态度数据与行为数据可能指向不同事实。",
+      "若有流失，通常先出现在下一期的留存与续约数据里，而不是当前的使用率里。"
+    ],
+    backgroundSource: "Snapchat 2018 年改版事件（超 120 万人请愿、市值一度蒸发约 13 亿美元，但官方财报称改版后使用时长上升）。",
     opening: "这个功能的投诉太多了，大家都觉得应该重做，可使用率明明还在上涨。",
     hiddenFacts: {
       role: "投诉主要由项目负责人提交，实际高频操作的是协作者，管理层只关注项目是否按期交付。",
@@ -246,6 +324,14 @@ export const TRAINING_SCENARIOS: TrainingScenario[] = [
     duration: 9,
     role: "销售副总裁",
     context: "销售团队把近期几次丢单归因于缺少一个报表功能，产品团队需要判断是否投入。",
+    background: [
+      "一家数据分析 SaaS 的销售团队近期丢了 5 个中型订单，销售副总裁在周会上把其中 4 笔归因为'缺少客户要的报表功能'。",
+      "Win/Loss 研究的公开结论与此直觉相悖：Clozd 对照 1000 条 CRM 丢单记录与买家访谈，发现销售填写的丢单原因与买家真实原因仅约 15% 一致；另一项基于 5 万次访谈的统计显示，销售把丢单归因于价格的比例（约 48%）接近买家真实提及率（约 23%）的两倍。",
+      "销售天然倾向'产品缺功能'这类外部归因，买家访谈则更常指向信任、实施风险与采购过程。",
+      "产品团队需要在下季度规划前判断：报表功能到底是不是丢单的真实原因。",
+      "研发排期已满，新报表功能至少要挤掉一个现有项目。"
+    ],
+    backgroundSource: "Clozd'CRM 丢单原因与买家访谈仅 15% 一致'的 win/loss 对照研究与 Primary Intelligence 5 万余次访谈统计。",
     opening: "最近丢掉的几个客户都问过这个报表，我们必须马上补上，否则还会继续丢单。",
     hiddenFacts: {
       role: "销售副总裁汇总丢单原因，实际评估产品的是数据平台主管，采购和安全团队也会参与决策。",
@@ -266,6 +352,14 @@ export const TRAINING_SCENARIOS: TrainingScenario[] = [
     duration: 8,
     role: "产品增长经理",
     context: "团队上线了新的协作视图，但月活使用率低于预期，推广团队建议增加入口曝光。",
+    background: [
+      "一款团队协作工具上线了新的'跨团队视图'，一个月后月活跃使用率不足预期的一半。",
+      "增长团队的第一反应是把入口挪到首页最显眼的位置；数据团队则发现低使用集中在新建项目上。",
+      "行业统计：Pendo《2019 功能采用率报告》显示，平均一个软件产品中 80% 的功能很少或从未被使用，约 6 个核心功能贡献了约 80% 的点击量。",
+      "低采用可能出在'功能发现'（不知道有）或'激活漏斗'（知道但用不起来），两者的解法完全不同。",
+      "该视图要求先完成项目模板配置才能看到数据，首次进入时默认一片空白。"
+    ],
+    backgroundSource: "Pendo《2019 Feature Adoption Report》（平均软件产品中 80% 的功能很少或从未被使用）。",
     opening: "新视图已经上线一个月了，使用率还是很低，我们把入口放到首页最显眼的位置吧。",
     hiddenFacts: {
       role: "增长经理关注点击率，真正需要视图的是跨团队项目负责人，普通成员只有被分配任务时才会看到。",
@@ -286,6 +380,14 @@ export const TRAINING_SCENARIOS: TrainingScenario[] = [
     duration: 10,
     role: "客户业务副总裁",
     context: "企业客户续费率连续两个季度下降，团队争论是应该降价还是补充功能。",
+    background: [
+      "一家企业软件公司的年度续费率连续两个季度下滑，管理层正在争论'给大客户打折'还是'承诺新功能'。",
+      "行业基准：SaaS Capital《2023 B2B SaaS Retention Benchmarks》显示 B2B SaaS 净收入留存（NRR）中位数约 102%、总收入留存（GRR）中位数约 91%。",
+      "'已购未用'是续费流失最常见的根因之一：Nexthink 2023 年研究发现约一半已安装的软件许可证从未被员工使用。",
+      "目前客户在续约前两个月收到的使用报告只有登录次数和功能点击量，没有对应业务成果。",
+      "打折可以直接保住本季度数字，但会同时压低所有续约客户的合同价值。"
+    ],
+    backgroundSource: "SaaS Capital《2023 B2B SaaS Retention Benchmarks》（NRR 中位数约 102%）与 Nexthink 软件许可证使用研究（约 50% 许可证从未被使用）。",
     opening: "续费率已经连续两个季度下降了，我们先给大客户打折，再承诺几个新功能吧。",
     hiddenFacts: {
       role: "业务副总裁负责续费数字，合同签署者是采购负责人，日常使用和价值评估由业务部门主管完成。",
@@ -302,6 +404,21 @@ export const DEFAULT_SCENARIO_ID = TRAINING_SCENARIOS[0].id;
 
 export function getScenario(id: string): TrainingScenario {
   return TRAINING_SCENARIOS.find((scenario) => scenario.id === id) ?? TRAINING_SCENARIOS[0];
+}
+
+/**
+ * 会话场景解析：内置场景一律以服务端配置为准（客户端快照不可信），
+ * 仅自定义场景（不在配置表中）使用随会话携带的快照。
+ */
+export function resolveSessionScenario(session: {
+  scenarioId: string;
+  scenarioSnapshot?: TrainingScenario;
+}): TrainingScenario {
+  return (
+    TRAINING_SCENARIOS.find((scenario) => scenario.id === session.scenarioId) ??
+    session.scenarioSnapshot ??
+    getScenario(session.scenarioId)
+  );
 }
 
 export function getSkill(id: SkillId): SkillDefinition {

@@ -827,6 +827,17 @@ function TrainingWorkspace({
           <span className="section-kicker">场景简报</span>
           <h2>{scenario.title}</h2>
           <p>{scenario.context}</p>
+          {scenario.background?.length ? (
+            <div className="background-block" data-testid="scenario-background">
+              <span className="background-label">业务背景</span>
+              <ul className="background-list">
+                {scenario.background.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+              {scenario.backgroundSource ? (
+                <p className="background-source">背景原型：{scenario.backgroundSource}</p>
+              ) : null}
+            </div>
+          ) : null}
           <div className="briefing-list">
             {scenario.briefing.map((item) => <div key={item}><CheckMark /> {item}</div>)}
           </div>

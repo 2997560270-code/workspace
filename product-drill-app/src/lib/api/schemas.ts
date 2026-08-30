@@ -23,6 +23,8 @@ export const TrainingScenarioSchema = z.object({
   duration: z.number().positive(),
   role: z.string(),
   context: z.string(),
+  background: z.array(z.string().max(600)).max(8).optional(),
+  backgroundSource: z.string().max(400).optional(),
   opening: z.string(),
   hiddenFacts: z.object({
     role: z.string(), workflow: z.string(), impact: z.string(), alternative: z.string(), metric: z.string()
