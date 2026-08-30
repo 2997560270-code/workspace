@@ -474,7 +474,7 @@ p { color: var(--ink-2); line-height: 1.66; }
 .scenario-card .text-button { margin-top: 20px; text-align: left; }
 
 /* ══════════════════════════ TRAINING WORKSPACE ═════════════════════════ */
-.training-shell { display: grid; grid-template-columns: 256px minmax(420px, 1fr) 250px; gap: 16px; align-items: stretch; }
+.training-shell { display: grid; grid-template-columns: clamp(300px, 22vw, 440px) minmax(420px, 1fr) 250px; gap: 16px; align-items: stretch; }
 .briefing, .conversation, .training-progress { min-height: calc(100vh - 202px); }
 .briefing { padding: 26px; max-height: calc(100vh - 202px); overflow-y: auto; }
 .back-button { margin-bottom: 40px; }
@@ -869,7 +869,7 @@ p { color: var(--ink-2); line-height: 1.66; }
   .hero-training { grid-template-columns: 1fr; }
   .hero-proof { align-self: auto; }
   .weekly, .focus-card, .map-preview { grid-column: 1; }
-  .training-shell { grid-template-columns: 220px minmax(0, 1fr); }
+  .training-shell { grid-template-columns: 260px minmax(0, 1fr); }
   .training-progress { grid-column: 1 / -1; min-height: auto; }
   .briefing, .conversation { min-height: 680px; }
   .briefing { max-height: 680px; }
