@@ -91,7 +91,17 @@ Product Drill **不替用户完成真实市场调研或业务决策**，也**不
 
 ### 本地开发
 
-最方便的 Windows 启动入口是双击仓库根目录的 `start-test.cmd`。它会自动检查依赖、启动开发服务器，并在服务就绪后打开浏览器。
+**Windows 一键启动**：用户克隆 / Fork 本仓库到本机后，双击仓库根目录的 `start-test.cmd` 即可直接使用。它会自动完成：
+
+1. 检查 Node.js 与 `product-drill-app/package.json` 是否存在；
+2. 若依赖未安装则自动执行 `npm ci`；
+3. 释放 3000 端口的残留进程；
+4. 启动开发服务器 `npm run dev -- -p 3000`；
+5. 服务就绪后自动打开浏览器。
+
+克隆后无需额外配置即可运行起来。
+
+**等价手动命令（macOS / Linux 通用）**：
 
 ```powershell
 cd product-drill-app
