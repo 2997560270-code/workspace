@@ -7,3 +7,7 @@
 *.pdf binary
 *.png binary
 *.webp binary
+
+# Windows batch files must stay CRLF so cmd.exe can parse them reliably.
+*.cmd text eol=crlf
+*.bat text eol=crlf
