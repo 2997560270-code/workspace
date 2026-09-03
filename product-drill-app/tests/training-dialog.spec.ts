@@ -1,4 +1,4 @@
-﻿import { expect, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { enterApp } from "./e2e-helpers";
 
 test("runs an evidence-led interview and opens the judgment canvas", async ({ page }) => {
@@ -16,6 +16,13 @@ test("runs an evidence-led interview and opens the judgment canvas", async ({ pa
 });
 
 test("shows a voice input fallback without blocking text training", async ({ page }) => {
+  // 强制走「浏览器不支持」路径：headless Chromium 可能带 SpeechRecognition 但不出错，
+  // 导致按钮一直停留在「监听中」而不显示可用提示（FB-002 要求失败必须可见）。
+  await page.addInitScript(() => {
+    const w = window as unknown as Record<string, unknown>;
+    Object.defineProperty(w, "SpeechRecognition", { value: undefined, configurable: true });
+    Object.defineProperty(w, "webkitSpeechRecognition", { value: undefined, configurable: true });
+  });
   await enterApp(page);
   await page.getByRole("button", { name: "开始 3 分钟诊断", exact: true }).click();
   await expect(page.getByRole("button", { name: "语音输入", exact: true })).toBeVisible();
