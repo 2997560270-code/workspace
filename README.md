@@ -111,6 +111,13 @@ npm run dev
 
 环境变量清单见 `product-drill-app/.env.example`。`.env.local` 已被 Git 忽略，密钥不会进入仓库。
 
+**本地开发模式说明**：克隆后直接运行即可，不需要配置 Supabase。当前应用包含两个新入口——
+
+- **用户反馈**：页面右下角悬浮「反馈」按钮，提交后会写入数据库；
+- **自定义大模型 API 配置**：顶部栏「⚙ 设置」/ 侧边栏「⚙ 模型设置」，可填写 OpenAI 兼容的 Base URL、API 密钥、模型名并「测试连接 / 保存」，保存前会真实调用一次模型做严格校验（模型名不符会返回上游错误且不落库）。
+
+本地开发时以上数据写入 `product-drill-app/data/local-runtime-state.json`（已 Git 忽略）。正式部署要真正落库，请按 `product-drill-app/.env.example` 配置 Supabase 相关密钥，并执行 `product-drill-app/supabase/migrations/` 下的迁移文件。
+
 ### 验证
 
 ```powershell
