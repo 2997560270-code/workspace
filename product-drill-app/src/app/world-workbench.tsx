@@ -22,6 +22,7 @@ import {
   advanceToReflect,
   canRevealConsequences,
   buildDecisionPayload,
+  getDecisionDraftIssues,
   type WorkbenchState,
   type DecisionDraft,
 } from "../lib/workbench-state";
@@ -80,6 +81,10 @@ type WorkbenchProps = {
   onClose: () => void;
   /** run 完成后回调，用于更新父组件状态 */
   onRunComplete?: (worldId: string, nextChallenge?: NextChallengeSelection) => void;
+  /** 已完成的世界 id 列表（FB-007：用于展示三个世界的推进状态） */
+  completedWorldIds?: string[];
+  /** 切换到指定世界（FB-007：进度入口） */
+  onSwitchWorld?: (worldId: string) => void;
 };
 
 // ── 工具函数 ──────────────────────────────────────────────────────
@@ -161,7 +166,8 @@ function DecisionForm({
   busy: boolean;
   eventIds: string[];
 }) {
-  const isValid = buildDecisionPayload(draft) !== null;
+  const issues = getDecisionDraftIssues(draft);
+  const isValid = Object.keys(issues).length === 0;
 
   function field(
     label: string,
@@ -170,6 +176,9 @@ function DecisionForm({
     rows = 2
   ) {
     const value = draft[key];
+    // FB-013：字段已有内容但无效（乱码/过短）时给出可见原因；
+    // 空字段只靠提交按钮禁用，避免初始满屏报错。
+    const issue = typeof value === "string" && value.trim() ? issues[key as keyof typeof issues] : undefined;
     return (
       <div className="wb-field">
         <label htmlFor={`wb-${key}`}>{label}</label>
@@ -181,6 +190,9 @@ function DecisionForm({
           rows={rows}
           value={typeof value === "string" ? value : ""}
         />
+        {issue ? (
+          <p className="wb-field-error" role="alert">{issue}</p>
+        ) : null}
       </div>
     );
   }
@@ -268,6 +280,11 @@ function DecisionForm({
       >
         {busy ? "提交中…" : "提交决策（不可撤回）"}
       </button>
+      {!isValid && !busy ? (
+        <p className="wb-form-notice" data-testid="wb-decision-invalid" role="status">
+          无法提交：判断、行动方案和预期结果都需要是可读懂的具体内容（每项至少 6 字，不接受乱码）。
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -283,7 +300,7 @@ const EMPTY_DRAFT: DecisionDraft = {
   evidence_basis: [],
 };
 
-export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: WorkbenchProps) {
+export function WorldWorkbench({ initialWorldId, onClose, onRunComplete, completedWorldIds = [], onSwitchWorld }: WorkbenchProps) {
   const [world, setWorld] = useState<WorldSeed | null>(null);
   const [state, setState] = useState<WorkbenchState | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -765,6 +782,36 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete }: Workb
         </div>
         <PhaseTag phase={state.phase} wasAssisted={state.was_assisted} />
       </header>
+
+      {/* FB-007：三个世界的概念与推进进度必须可见、可切换 */}
+      <nav aria-label="三个世界的推进进度" className="wb-world-track" data-testid="wb-world-track">
+        <p className="wb-world-track-intro">
+          世界 1、2、3 依次验证同一个底层判断习惯：先调查、再承诺。按顺序完成，也可以随时回到任一世界重练。
+        </p>
+        <ol>
+          {DEMO_WORLDS.map((item, index) => {
+            const isCurrent = item.world_id === world.world_id;
+            const isDone = completedWorldIds.includes(item.world_id);
+            const status = isDone ? "已完成" : isCurrent ? "进行中" : "未开始";
+            return (
+              <li key={item.world_id}>
+                <button
+                  aria-current={isCurrent ? "step" : undefined}
+                  className={`wb-world-step wb-world-step-${status}${isCurrent ? " current" : ""}`}
+                  disabled={busy}
+                  onClick={() => { if (!isCurrent) onSwitchWorld?.(item.world_id); }}
+                  title={item.title}
+                  type="button"
+                >
+                  <strong>世界 {index + 1}</strong>
+                  <span className="wb-world-step-title">{item.title}</span>
+                  <span className="wb-world-status" data-testid={`wb-world-status-${item.world_id}`}>{status}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      </nav>
 
       {error && (
         <div className="wb-error-banner" role="alert">{error}</div>

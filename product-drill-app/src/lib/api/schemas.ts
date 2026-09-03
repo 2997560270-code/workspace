@@ -1,7 +1,10 @@
 ﻿import { z } from "zod";
 import { EvidenceLevelSchema, SkillIdSchema } from "../ai/schemas";
 
-export const TrainingModeSchema = z.enum(["练习", "独立", "严格"]);
+// 「独立」是历史遗留模式名（现称「训练」）：仅允许旧记录通过校验，统一归一化为「训练」。
+export const TrainingModeSchema = z
+  .enum(["训练", "严格", "练习", "独立"])
+  .transform((mode) => (mode === "独立" ? "训练" : mode));
 export const TrainingEngineSchema = z.enum(["openai", "deterministic"]);
 export const TrainingStageSchema = z.enum(["interview", "judgment", "feedback", "retry", "complete"]);
 
@@ -113,6 +116,14 @@ export const MentorNoteSchema = z.object({
   createdAt: z.string().datetime()
 });
 
+// FB-014：服务端评分完整性签名。
+export const RecordIntegritySchema = z.object({
+  version: z.number().int().positive(),
+  algorithm: z.string().min(1),
+  signedAt: z.string(),
+  signature: z.string().min(16)
+});
+
 export const TrainingHistoryRecordSchema = z.object({
   id: z.string().min(1),
   sessionId: z.string().min(1),
@@ -129,7 +140,8 @@ export const TrainingHistoryRecordSchema = z.object({
   judgment: ProductJudgmentSchema.optional(),
   evaluation: EvaluationSchema,
   retry: RetryResultSchema.optional(),
-  mentorNote: MentorNoteSchema.optional()
+  mentorNote: MentorNoteSchema.optional(),
+  integrity: RecordIntegritySchema.optional()
 });
 
 export const StoredHistorySchema = z.object({
@@ -163,3 +175,7 @@ export const RetryBodySchema = z.object({
 });
 
 export const HistorySyncBodySchema = z.object({ record: TrainingHistoryRecordSchema });
+
+export const HistoryVerifyBodySchema = z.object({
+  records: z.array(TrainingHistoryRecordSchema).min(1).max(50)
+});

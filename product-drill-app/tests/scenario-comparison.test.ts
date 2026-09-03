@@ -6,12 +6,12 @@ import { createTrainingSession, sendTrainingMessage } from "../src/lib/training-
 
 function records() {
   const firstSession = sendTrainingMessage(
-    createTrainingSession({ scenarioId: "dashboard-request", mode: "独立" }),
+    createTrainingSession({ scenarioId: "dashboard-request", mode: "训练" }),
     "谁每天使用这份周报？"
   );
   const secondSession = sendTrainingMessage(
     sendTrainingMessage(
-      createTrainingSession({ scenarioId: "dashboard-request", mode: "独立" }),
+      createTrainingSession({ scenarioId: "dashboard-request", mode: "训练" }),
       "谁每天使用这份周报？"
     ),
     "目前完整流程是怎么完成的？"

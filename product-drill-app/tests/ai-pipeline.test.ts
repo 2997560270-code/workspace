@@ -12,7 +12,7 @@ afterEach(() => { openaiMock.client = null; });
 
 describe("AI pipeline fallback and evidence validation", () => {
   it("uses the deterministic engine when OpenAI is unavailable", async () => {
-    const session = createTrainingSession({ scenarioId: "dashboard-request", mode: "独立" });
+    const session = createTrainingSession({ scenarioId: "dashboard-request", mode: "训练" });
     const next = await generateRoleplayTurn(session, "你们目前的流程是怎么完成的？");
     expect(next.engine).toBe("deterministic");
     expect(next.modelVersion).toBe("deterministic-v1");
@@ -20,7 +20,7 @@ describe("AI pipeline fallback and evidence validation", () => {
   });
 
   it("accepts prefixed JSON from an OpenAI-compatible roleplay model", async () => {
-    const session = createTrainingSession({ scenarioId: "dashboard-request", mode: "独立" });
+    const session = createTrainingSession({ scenarioId: "dashboard-request", mode: "训练" });
     openaiMock.client = {
       responses: {
         parse: async () => ({
@@ -39,7 +39,7 @@ describe("AI pipeline fallback and evidence validation", () => {
   });
 
   it("discards model evidence that does not reference a real verbatim message span", async () => {
-    const base = createTrainingSession({ scenarioId: "dashboard-request", mode: "独立" });
+    const base = createTrainingSession({ scenarioId: "dashboard-request", mode: "训练" });
     const session = applyRoleplayReply(base, {
       userMessage: "谁是真正每天使用报表的用户？",
       reply: "区域运营专员每天使用。",

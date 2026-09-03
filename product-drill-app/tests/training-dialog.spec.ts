@@ -19,6 +19,9 @@ test("shows a voice input fallback without blocking text training", async ({ pag
   await enterApp(page);
   await page.getByRole("button", { name: "开始 3 分钟诊断", exact: true }).click();
   await expect(page.getByRole("button", { name: "语音输入", exact: true })).toBeVisible();
+  // FB-002：点击后失败/不支持必须有可见提示（不能只藏在 title 里）
+  await page.getByRole("button", { name: "语音输入", exact: true }).click();
+  await expect(page.getByTestId("voice-input-notice")).toContainText(/请直接输入文字|可重试或直接输入文字/);
   await page.getByRole("textbox", { name: "你的追问", exact: true }).fill("谁每天使用这个流程？");
   await expect(page.getByRole("button", { name: "发送追问", exact: true })).toBeEnabled();
 });
@@ -85,6 +88,30 @@ test("strict mode shows a countdown and disables hints", async ({ page }) => {
   await expect(page.getByTestId("strict-timer")).toContainText("剩余");
   await expect(page.getByRole("button", { name: "给我一个轻提示", exact: true })).toBeDisabled();
   await expect(page.getByRole("textbox", { name: "你的追问", exact: true })).toBeEnabled();
+});
+
+test("mode switching never inflates the strict countdown (FB-005)", async ({ page }) => {
+  await enterApp(page);
+  await page.getByRole("button", { name: "开始 3 分钟诊断", exact: true }).click();
+  const timer = page.getByTestId("strict-timer");
+  const fullSeconds = 6 * 60; // 首次诊断场景固定 6 分钟
+
+  function parseSeconds(text: string): number {
+    const match = text.match(/(\d{2}):(\d{2})/);
+    if (!match) throw new Error(`Unexpected timer text: ${text}`);
+    return Number(match[1]) * 60 + Number(match[2]);
+  }
+
+  for (let index = 0; index < 3; index += 1) {
+    await page.getByRole("button", { name: "严格", exact: true }).click();
+    await expect(timer).toContainText("剩余");
+    const remaining = parseSeconds(await timer.innerText());
+    expect(remaining, `第 ${index + 1} 次切换到严格后计时被放大`).toBeLessThanOrEqual(fullSeconds);
+    expect(remaining).toBeGreaterThanOrEqual(fullSeconds - 10);
+    await page.getByRole("button", { name: "练习", exact: true }).click();
+    // 练习模式下计时停摆，模拟用户停留一段时间后再切回严格。
+    await page.waitForTimeout(1500);
+  }
 });
 
 test("shows submission progress while judgment feedback is being generated", async ({ page }) => {

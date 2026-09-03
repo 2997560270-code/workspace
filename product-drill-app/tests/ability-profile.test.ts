@@ -5,7 +5,7 @@ import { addRetryToHistory, createTrainingHistoryRecord } from "../src/lib/train
 import { createTrainingSession, moveToJudgment, sendTrainingMessage, submitJudgment, type TrainingEngine } from "../src/lib/training-session";
 
 function recordWithRetry(retryEngine: TrainingEngine = "deterministic") {
-  let session = createTrainingSession({ scenarioId: "dashboard-request", mode: "独立" });
+  let session = createTrainingSession({ scenarioId: "dashboard-request", mode: "训练" });
   session = sendTrainingMessage(session, "你们目前的完整流程是怎么完成的？");
   session = moveToJudgment(session);
   session = submitJudgment(session, {

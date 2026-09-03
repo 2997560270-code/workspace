@@ -1441,3 +1441,11 @@ create trigger profiles_set_updated_at
 
 create index if not exists idx_profiles_email on public.profiles(email);
 
+
+-- 202609020001_training_mode_rename.sql
+-- 训练模式更名（FB-004）：旧名「独立」更名为「训练」，旧行保留并由读取侧归一化。
+alter table public.training_sessions
+  drop constraint if exists training_sessions_mode_check;
+alter table public.training_sessions
+  add constraint training_sessions_mode_check
+  check (mode in ('训练', '严格', '练习', '独立'));

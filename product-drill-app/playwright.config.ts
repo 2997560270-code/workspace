@@ -10,7 +10,7 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   workers: 1,
   use: {
-    baseURL: "http://127.0.0.1:3100",
+    baseURL: process.env.E2E_BASE_URL ?? "http://127.0.0.1:3100",
     trace: "on-first-retry"
   },
   projects: [

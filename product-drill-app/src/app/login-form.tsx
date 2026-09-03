@@ -8,6 +8,8 @@ import { createSupabaseBrowserClient } from "../lib/supabase/browser";
 type Mode = "login" | "register";
 type Status = { kind: "info" | "success" | "error"; text: string } | null;
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 async function postJson<T>(url: string, payload: unknown): Promise<{ ok: boolean; data?: T; error?: string }> {
   try {
     const response = await fetch(url, {
@@ -33,6 +35,9 @@ export function LoginForm() {
   const [confirm, setConfirm] = useState("");
   const [status, setStatus] = useState<Status>(null);
   const [busy, setBusy] = useState(false);
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [passwordTouched, setPasswordTouched] = useState(false);
+  const [confirmTouched, setConfirmTouched] = useState(false);
 
   async function recordSignIn(userId: string) {
     if (!supabase) return;
@@ -80,8 +85,14 @@ export function LoginForm() {
 
   async function handleRegister(event: FormEvent) {
     event.preventDefault();
+    setEmailTouched(true);
+    setPasswordTouched(true);
+    setConfirmTouched(true);
     const registerEmail = email.trim();
-    if (!registerEmail || !password) return;
+    if (!EMAIL_RE.test(registerEmail)) {
+      setStatus({ kind: "error", text: "邮箱格式不正确，请检查后重新输入。" });
+      return;
+    }
     if (password.length < 8) {
       setStatus({ kind: "error", text: "密码至少需要 8 位。" });
       return;
@@ -148,11 +159,26 @@ export function LoginForm() {
   function switchMode(next: Mode) {
     setMode(next);
     setStatus(null);
+    setEmailTouched(false);
+    setPasswordTouched(false);
+    setConfirmTouched(false);
   }
 
-  const emailInvalid = !email.trim();
-  const passwordInvalid = !password || (mode === "register" && password.length < 8);
-  const submitDisabled = busy || emailInvalid || passwordInvalid || (mode === "register" && confirm !== password);
+  const trimmedEmail = email.trim();
+  const emailError = !trimmedEmail
+    ? "请输入邮箱地址。"
+    : !EMAIL_RE.test(trimmedEmail)
+      ? "邮箱格式不正确，应形如 you@example.com。"
+      : "";
+  const passwordError = !password
+    ? "请输入密码。"
+    : mode === "register" && password.length < 8
+      ? "密码至少需要 8 位，当前 " + password.length + " 位。"
+      : "";
+  const confirmError = mode === "register" && confirm !== password ? "两次输入的密码不一致。" : "";
+  const emailInvalid = Boolean(emailError);
+  const passwordInvalid = Boolean(passwordError);
+  const submitDisabled = busy || emailInvalid || passwordInvalid || Boolean(confirmError);
 
   return (
     <main className="login-page">
@@ -190,14 +216,17 @@ export function LoginForm() {
               </label>
             ) : null}
             <label><span>邮箱</span>
-              <input autoComplete="email" onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" type="email" value={email} required />
+              <input autoComplete="email" onBlur={() => setEmailTouched(true)} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" type="email" value={email} required />
+              {emailTouched && emailError ? <p className="form-error" role="alert">{emailError}</p> : null}
             </label>
-            <label><span>密码</span>
-              <input autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "register" ? 8 : undefined} onChange={(event) => setPassword(event.target.value)} placeholder={mode === "register" ? "至少 8 位" : "输入密码"} type="password" value={password} required />
+            <label><span>密码{mode === "register" ? "（至少 8 位）" : ""}</span>
+              <input autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "register" ? 8 : undefined} onBlur={() => setPasswordTouched(true)} onChange={(event) => setPassword(event.target.value)} placeholder={mode === "register" ? "至少 8 位" : "输入密码"} type="password" value={password} required />
+              {passwordTouched && passwordError ? <p className="form-error" role="alert">{passwordError}</p> : null}
             </label>
             {mode === "register" ? (
               <label><span>确认密码</span>
-                <input autoComplete="new-password" minLength={8} onChange={(event) => setConfirm(event.target.value)} placeholder="再次输入密码" type="password" value={confirm} required />
+                <input autoComplete="new-password" minLength={8} onBlur={() => setConfirmTouched(true)} onChange={(event) => setConfirm(event.target.value)} placeholder="再次输入密码" type="password" value={confirm} required />
+                {confirmTouched && confirmError ? <p className="form-error" role="alert">{confirmError}</p> : null}
               </label>
             ) : null}
             <button className="button button-primary" disabled={submitDisabled} type="submit">

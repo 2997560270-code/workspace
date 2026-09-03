@@ -14,7 +14,7 @@ describe("business background prompt injection", () => {
   });
 
   it("injects the business background into the roleplay prompt", () => {
-    const session = createTrainingSession({ scenarioId: "dashboard-request", mode: "独立" });
+    const session = createTrainingSession({ scenarioId: "dashboard-request", mode: "训练" });
     const prompt = buildRoleplayPrompt(session, "你们现在的流程是怎么完成的？");
     expect(prompt).toContain("BUSINESS BACKGROUND RULES");
     expect(prompt).toContain("48 家门店");
@@ -29,7 +29,7 @@ describe("business background prompt injection", () => {
       background: ["被篡改的业务背景"],
       hiddenFacts: { ...base.hiddenFacts, workflow: "被篡改的隐藏事实" }
     };
-    const session = createTrainingSession({ scenarioId: "dashboard-request", scenario: tampered, mode: "独立" });
+    const session = createTrainingSession({ scenarioId: "dashboard-request", scenario: tampered, mode: "训练" });
     expect(resolveSessionScenario(session)).toBe(base);
     const prompt = buildRoleplayPrompt(session, "现在流程是什么？");
     expect(prompt).not.toContain("被篡改的业务背景");
@@ -39,13 +39,13 @@ describe("business background prompt injection", () => {
 
   it("uses the session snapshot for custom scenarios outside the config table", () => {
     const custom = { ...getScenario("dashboard-request"), id: "custom-demo", background: ["自定义场景的业务背景"] };
-    const session = createTrainingSession({ scenarioId: "custom-demo", scenario: custom, mode: "独立" });
+    const session = createTrainingSession({ scenarioId: "custom-demo", scenario: custom, mode: "训练" });
     expect(resolveSessionScenario(session)).toBe(custom);
     expect(buildRoleplayPrompt(session, "现在流程是什么？")).toContain("自定义场景的业务背景");
   });
 
   it("injects scenario background into the evaluation prompt without weakening the citation contract", () => {
-    const session = createTrainingSession({ scenarioId: "sales-lost-deals", mode: "独立" });
+    const session = createTrainingSession({ scenarioId: "sales-lost-deals", mode: "训练" });
     const prompt = buildEvaluationPrompt(session);
     expect(prompt).toContain("SCENARIO BACKGROUND (reference only");
     expect(prompt).toContain("Clozd");

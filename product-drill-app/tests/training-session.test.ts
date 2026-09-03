@@ -18,7 +18,7 @@ describe("direction A training session", () => {
   });
 
   it("reveals a scenario fact and records the covered skill", () => {
-    const session = createTrainingSession({ scenarioId: "dashboard-request", mode: "独立" });
+    const session = createTrainingSession({ scenarioId: "dashboard-request", mode: "训练" });
     const updated = sendTrainingMessage(session, "你们目前的完整流程是怎么完成的？");
     expect(updated.messages.map((message) => message.role)).toEqual(["ai", "user", "ai"]);
     expect(updated.coveredSkills).toContain("workflow");

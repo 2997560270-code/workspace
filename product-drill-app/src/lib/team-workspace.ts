@@ -9,6 +9,15 @@ export type TeamMember = {
   joinedAt: string;
 };
 
+export type TeamMentorNote = {
+  id: string;
+  sessionId: string;
+  authorId: string;
+  authorName: string;
+  content: string;
+  createdAt: string;
+};
+
 export type TeamWorkspace = {
   id: string;
   name: string;
@@ -16,6 +25,8 @@ export type TeamWorkspace = {
   ownerId: string;
   createdAt: string;
   members: TeamMember[];
+  /** FB-009/FB-011：负责人/导师以自己账号对成员训练记录留下的点评 */
+  mentorNotes?: TeamMentorNote[];
 };
 
 export const TEAM_DIRECTORY_STORAGE_KEY = "product-drill-team-directory-v1";
@@ -78,6 +89,29 @@ export function findTeamForMember(teams: TeamWorkspace[], memberId: string): Tea
 export function findTeamByInviteCode(teams: TeamWorkspace[], inviteCode: string): TeamWorkspace | undefined {
   const normalized = inviteCode.trim().toUpperCase();
   return teams.find((team) => team.inviteCode === normalized);
+}
+
+export function addTeamMentorNote(
+  team: TeamWorkspace,
+  input: { sessionId: string; authorId: string; authorName: string; content: string }
+): TeamWorkspace {
+  const note: TeamMentorNote = {
+    id: randomId("note"),
+    sessionId: input.sessionId,
+    authorId: input.authorId,
+    authorName: input.authorName.trim() || "团队负责人",
+    content: input.content.trim(),
+    createdAt: new Date().toISOString()
+  };
+  return { ...team, mentorNotes: [...(team.mentorNotes ?? []), note] };
+}
+
+/** 某条训练记录收到的全部团队点评（新→旧） */
+export function findNotesForSession(teams: TeamWorkspace[], sessionId: string): TeamMentorNote[] {
+  return teams
+    .flatMap((team) => team.mentorNotes ?? [])
+    .filter((note) => note.sessionId === sessionId)
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }
 
 function isTeamWorkspace(value: unknown): value is TeamWorkspace {

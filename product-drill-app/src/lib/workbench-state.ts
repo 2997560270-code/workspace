@@ -137,18 +137,61 @@ export function canRevealConsequences(state: WorkbenchState): boolean {
 // ── 决策载荷构造 ──────────────────────────────────────────────────
 
 /**
+ * 检测乱码/无意义输入（如 "hhhh"、"1111"、"？？？"）：
+ * - 只有一个独特字符；
+ * - 或字符种类极少且单一字符占比过高（典型键盘乱按）。
+ */
+export function isMeaninglessText(text: string): boolean {
+  const compact = text.replace(/\s+/g, "");
+  if (compact.length === 0) return true;
+  const uniqueChars = new Set(compact).size;
+  if (uniqueChars === 1) return true;
+  // 短模式重复（"ababab"、"121212"）同样视为乱按。
+  if (/^(.{1,2})\1+$/.test(compact)) return true;
+  const counts = new Map<string, number>();
+  for (const char of compact) counts.set(char, (counts.get(char) ?? 0) + 1);
+  const maxShare = Math.max(...counts.values()) / compact.length;
+  return compact.length >= 4 && uniqueChars <= 2 && maxShare >= 0.75;
+}
+
+// 最少有效字符数：低于该长度的内容无法构成一个可验证的判断（FB-013）。
+const MIN_DECISION_TEXT_LENGTH = 6;
+
+type DecisionTextField = "judgment" | "chosen_action" | "expected_outcome";
+
+/** 单个必填文本字段的问题描述；合法时返回 null。 */
+export function getDecisionFieldIssue(text: string): string | null {
+  const trimmed = text.trim();
+  if (!trimmed) return "必填，不能为空";
+  if (isMeaninglessText(trimmed)) return "无法识别为有效内容，请写出具体的判断或行动";
+  if (trimmed.length < MIN_DECISION_TEXT_LENGTH) {
+    return `内容过短（至少 ${MIN_DECISION_TEXT_LENGTH} 字），无法构成可验证的判断`;
+  }
+  return null;
+}
+
+/** 决策草稿三个必填字段的问题清单；全部合法时返回空对象。 */
+export function getDecisionDraftIssues(
+  draft: DecisionDraft
+): Partial<Record<DecisionTextField, string>> {
+  const issues: Partial<Record<DecisionTextField, string>> = {};
+  const fields: DecisionTextField[] = ["judgment", "chosen_action", "expected_outcome"];
+  for (const field of fields) {
+    const issue = getDecisionFieldIssue(draft[field]);
+    if (issue) issues[field] = issue;
+  }
+  return issues;
+}
+
+/**
  * 从决策草稿构造 API 提交载荷。
- * 必填字段（judgment / chosen_action / expected_outcome）为空时返回 null，
- * 防止提交不完整的决策。
+ * 必填字段（judgment / chosen_action / expected_outcome）为空或无效（乱码/过短）时
+ * 返回 null，防止无效输入走完决策流程并获得正面后果（FB-013）。
  */
 export function buildDecisionPayload(
   draft: DecisionDraft
 ): DecisionPayload | null {
-  if (
-    !draft.judgment.trim() ||
-    !draft.chosen_action.trim() ||
-    !draft.expected_outcome.trim()
-  ) {
+  if (Object.keys(getDecisionDraftIssues(draft)).length > 0) {
     return null;
   }
   return {

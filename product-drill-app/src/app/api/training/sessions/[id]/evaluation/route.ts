@@ -7,6 +7,7 @@ import { captureServerException } from "@/lib/monitoring/server";
 import { getSessionSnapshot, saveHistoryRecord } from "@/lib/repositories/training-repository";
 import { consumeModelRateLimit } from "@/lib/security/rate-limit";
 import { createTrainingHistoryRecord } from "@/lib/training-history";
+import { signTrainingRecord } from "@/lib/training-integrity";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const user = await requireApiUser();
@@ -31,7 +32,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     }
 
     const evaluation = await generateStructuredEvaluation(session);
-    const record = createTrainingHistoryRecord(session, evaluation);
+    // FB-014：评分由服务端计算，落库与返回前签名，供客户端校验篡改。
+    const record = signTrainingRecord(createTrainingHistoryRecord(session, evaluation));
     const persisted = await saveHistoryRecord(user.id, record);
     if (user.source === "supabase" && !persisted) return apiError("服务端持久化尚未配置。", 503);
     await trackServerEvent(user.id, ANALYTICS_EVENTS.evaluationViewed, {

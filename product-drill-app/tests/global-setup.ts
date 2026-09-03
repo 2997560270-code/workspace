@@ -19,6 +19,11 @@ async function waitForServer(child: ChildProcess) {
 }
 
 export default async function globalSetup(_config: FullConfig) {
+  // 开发调试：已经有一个以 E2E_ISOLATED_USERS=true 启动的本地服务器时，
+  // 可以用 E2E_SKIP_SERVER=true + E2E_BASE_URL 直接复用它跑用例。
+  if (process.env.E2E_SKIP_SERVER === "true") {
+    return async () => {};
+  }
   const useLiveModel = process.env.E2E_USE_LIVE_MODEL === "true";
   const modelEnv = useLiveModel
     ? {}

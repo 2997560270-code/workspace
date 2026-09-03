@@ -6,7 +6,7 @@ import { createTrainingSession, sendTrainingMessage } from "../src/lib/training-
 
 function recordFor(scenarioId: string, message: string) {
   const session = sendTrainingMessage(
-    createTrainingSession({ scenarioId, mode: "独立" }),
+    createTrainingSession({ scenarioId, mode: "训练" }),
     message
   );
   return createTrainingHistoryRecord(session, generateEvaluation(session));

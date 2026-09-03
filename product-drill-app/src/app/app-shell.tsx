@@ -31,9 +31,11 @@ import { CustomScenarioBuilder } from "./custom-scenario-builder";
 import { TeamWorkspacePanel } from "./team-workspace-panel";
 import { CoursePanel } from "./course-panel";
 import { VoiceInputButton } from "./voice-input-button";
+import { FeedbackWidget } from "./feedback-widget";
 import { SignOutButton } from "./signout-button";
 import { MultiRolePanel } from "./multi-role-panel";
 import { ResourceHubPanel } from "./resource-hub-panel";
+import { LlmConfigPanel } from "./llm-config-panel";
 import {
   evaluateRetry,
   generateEvaluation,
@@ -43,6 +45,7 @@ import { NAV_ITEMS, getViewMeta, type ViewId } from "../lib/navigation";
 import {
   addRetryToHistory,
   createTrainingHistoryRecord,
+  getScenarioTrainingStatus,
   type MentorNote,
   type RetryResult,
   type TrainingHistoryRecord
@@ -68,6 +71,8 @@ import {
   type TrainingSession
 } from "../lib/training-session";
 import { loadCustomScenarios } from "../lib/custom-scenarios";
+import { findNotesForSession, loadTeamDirectory } from "../lib/team-workspace";
+import { requestClientJson } from "../lib/client-api";
 import type { TrainingScenario } from "../lib/training-config";
 
 const STORAGE_KEY = "product-drill-direction-a-v1";
@@ -253,6 +258,7 @@ function TodayPanel({
 }
 
 function TrainingMap({
+  records,
   onStart,
   onOpenProductExperiment,
   customScenarios,
@@ -261,6 +267,7 @@ function TrainingMap({
   onOpenMultiRole,
   onOpenResourceHub
 }: {
+  records: TrainingHistoryRecord[];
   onStart: (scenarioId: string, mode?: TrainingSession["mode"]) => void;
   onOpenProductExperiment: () => void;
   customScenarios: TrainingScenario[];
@@ -269,6 +276,12 @@ function TrainingMap({
   onOpenMultiRole: () => void;
   onOpenResourceHub: () => void;
 }) {
+  // FB-003：地图状态直接从训练记录推导，完成训练后即时刷新。
+  const allScenarios = [...TRAINING_SCENARIOS, ...customScenarios];
+  const coveredCount = allScenarios.filter(
+    (scenario) => getScenarioTrainingStatus(scenario.id, records).status !== "未训练"
+  ).length;
+
   return (
     <div className="stack-lg">
       <section className="surface map-intro">
@@ -277,15 +290,27 @@ function TrainingMap({
           <h2>从会问问题，到能做出产品判断</h2>
         </div>
         <p>每个任务只突出一个主要能力；完成后，你会得到可追溯的证据，而不是一个模糊总分。</p>
+        <p className="map-progress" data-testid="map-progress">
+          已覆盖 <strong>{coveredCount} / {allScenarios.length}</strong> 个场景；完成后状态会即时更新。
+        </p>
       </section>
       <div className="scenario-grid">
-        {[...TRAINING_SCENARIOS, ...customScenarios].map((scenario) => {
+        {allScenarios.map((scenario) => {
           const skill = getSkill(scenario.skillId);
+          const { status, attempts, latest } = getScenarioTrainingStatus(scenario.id, records);
           return (
-            <article className="scenario-card surface" key={scenario.id}>
+            <article className="scenario-card surface" data-testid={`scenario-card-${scenario.id}`} key={scenario.id}>
               <div className="scenario-topline">
                 <span>{scenario.industry}</span>
                 <span>{scenario.id.startsWith("custom-") ? "本地场景" : `${scenario.duration} 分钟 · ${scenario.difficulty}`}</span>
+              </div>
+              <div className="scenario-status-row">
+                <span className={`status-tag scenario-status scenario-status-${status}`} data-testid={`scenario-status-${scenario.id}`}>{status}</span>
+                {latest ? (
+                  <span className="scenario-attempts">
+                    已训练 {attempts} 次 · 最新证据分 {latest.totalScore}
+                  </span>
+                ) : null}
               </div>
               <h2>{scenario.shortTitle}</h2>
               <p>{scenario.title}</p>
@@ -294,12 +319,17 @@ function TrainingMap({
                 <strong>{skill.name}</strong>
               </div>
               <button className="text-button" onClick={() => onStart(scenario.id)} type="button">
-                开始训练 <ArrowIcon />
+                {status === "未训练" ? "开始训练" : "复练这个场景"} <ArrowIcon />
               </button>
             </article>
           );
         })}
       </div>
+      {/* FB-008：多人角色训练是需求文档 4.5 的正式能力，入口必须紧跟场景列表，不能被埋在页面底部 */}
+      <section className="surface multi-role-entry" data-testid="multi-role-entry">
+        <div><span className="section-kicker">多视角练习</span><h2>多人角色训练</h2><p>在同一业务问题中切换运营、财务和一线角色，练习处理利益差异。</p></div>
+        <button className="button button-secondary" onClick={onOpenMultiRole} type="button">开始多人角色训练</button>
+      </section>
       <section className="surface custom-scenario-entry" data-testid="custom-scenario-entry">
         <div>
           <span className="section-kicker">本地扩展</span>
@@ -311,10 +341,6 @@ function TrainingMap({
       <section className="surface course-entry" data-testid="course-entry">
         <div><span className="section-kicker">结构化学习</span><h2>课程内容</h2><p>用短知识点和行动练习补足场景训练之外的基础。</p></div>
         <button className="button button-secondary" onClick={onOpenCourses} type="button">查看课程</button>
-      </section>
-      <section className="surface multi-role-entry" data-testid="multi-role-entry">
-        <div><span className="section-kicker">多视角练习</span><h2>多人角色训练</h2><p>在同一业务问题中切换运营、财务和一线角色，练习处理利益差异。</p></div>
-        <button className="button button-secondary" onClick={onOpenMultiRole} type="button">开始多人角色训练</button>
       </section>
       <section className="surface resource-hub-entry" data-testid="resource-hub-entry">
         <div><span className="section-kicker">开放资料</span><h2>社区与行业知识库</h2><p>浏览案例、检索行业资料，并预览内容审核流程。</p></div>
@@ -527,7 +553,7 @@ function TrainingWorkspace({
   initialMode: TrainingSession["mode"];
   onClose: () => void;
   onRecord: (record: TrainingHistoryRecord) => void;
-  onRetry: (recordId: string, retry: RetryResult) => void;
+  onRetry: (recordId: string, retry: RetryResult, verifiedRecord?: TrainingHistoryRecord) => void;
 }) {
   const [session, setSession] = useState(() => createTrainingSession({ scenarioId, scenario: scenarioDefinition, mode: initialMode }));
   const [reply, setReply] = useState("");
@@ -546,6 +572,13 @@ function TrainingWorkspace({
     return Date.now() + (scenarioDefinition?.duration ?? getScenario(scenarioId).duration) * 60 * 1000;
   });
   const [clockMs, setClockMs] = useState(() => Date.now());
+  // 设置严格模式截止时间时必须同步刷新 clockMs：
+  // 非严格模式下时钟不会走动，若沿用旧的 clockMs 计算，
+  // 每次切换模式都会把停摆的时间差叠加进剩余时间（计时漂移）。
+  function applyStrictDeadline(deadline: number | null) {
+    setStrictDeadline(deadline);
+    setClockMs(Date.now());
+  }
   const messageListRef = useRef<HTMLDivElement>(null);
   const scenario = session.scenarioSnapshot ?? getScenario(session.scenarioId);
   const coverage = getCoveragePercent(session);
@@ -573,7 +606,7 @@ function TrainingWorkspace({
     setActionError("");
     if (scenarioDefinition) {
       setSession(createTrainingSession({ scenarioId, scenario: scenarioDefinition, mode: initialMode }));
-      setStrictDeadline(initialMode === "严格" ? Date.now() + scenarioDefinition.duration * 60 * 1000 : null);
+      applyStrictDeadline(initialMode === "严格" ? Date.now() + scenarioDefinition.duration * 60 * 1000 : null);
       setRuntimeStatus("fallback");
       setActionError("这是本地自定义场景，反馈由本地练习引擎生成，不计入正式能力趋势。");
       setBusy(false);
@@ -583,7 +616,7 @@ function TrainingWorkspace({
       .then((remoteSession) => {
         if (cancelled) return;
         setSession(remoteSession);
-        setStrictDeadline(remoteSession.mode === "严格"
+        applyStrictDeadline(remoteSession.mode === "严格"
           ? Date.now() + (remoteSession.scenarioSnapshot?.duration ?? getScenario(remoteSession.scenarioId).duration) * 60 * 1000
           : null);
         setRuntimeStatus("online");
@@ -591,7 +624,7 @@ function TrainingWorkspace({
       .catch(() => {
         if (cancelled) return;
         setSession(createTrainingSession({ scenarioId, mode: initialMode }));
-        setStrictDeadline(initialMode === "严格"
+        applyStrictDeadline(initialMode === "严格"
           ? Date.now() + getScenario(scenarioId).duration * 60 * 1000
           : null);
         setRuntimeStatus("fallback");
@@ -599,6 +632,7 @@ function TrainingWorkspace({
       })
       .finally(() => { if (!cancelled) setBusy(false); });
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scenarioId, initialMode, scenarioDefinition]);
 
   async function resetMode(mode: TrainingSession["mode"]) {
@@ -610,10 +644,10 @@ function TrainingWorkspace({
     setPendingReply(null);
     setJudgmentSubmissionStage("idle");
     setJudgment(EMPTY_JUDGMENT);
-    setStrictDeadline(null);
+    applyStrictDeadline(null);
     if (scenarioDefinition) {
       setSession(createTrainingSession({ scenarioId, scenario: scenarioDefinition, mode }));
-      setStrictDeadline(mode === "严格" ? Date.now() + scenarioDefinition.duration * 60 * 1000 : null);
+      applyStrictDeadline(mode === "严格" ? Date.now() + scenarioDefinition.duration * 60 * 1000 : null);
       setRuntimeStatus("fallback");
       setActionError("这是本地自定义场景，反馈由本地练习引擎生成，不计入正式能力趋势。");
       setBusy(false);
@@ -622,13 +656,13 @@ function TrainingWorkspace({
     try {
       const remoteSession = await createRemoteSession(scenarioId, mode);
       setSession(remoteSession);
-      setStrictDeadline(remoteSession.mode === "严格"
+      applyStrictDeadline(remoteSession.mode === "严格"
         ? Date.now() + (remoteSession.scenarioSnapshot?.duration ?? getScenario(remoteSession.scenarioId).duration) * 60 * 1000
         : null);
       setRuntimeStatus("online");
     } catch {
       setSession(createTrainingSession({ scenarioId, mode }));
-      setStrictDeadline(mode === "严格"
+      applyStrictDeadline(mode === "严格"
         ? Date.now() + getScenario(scenarioId).duration * 60 * 1000
         : null);
       setRuntimeStatus("fallback");
@@ -762,7 +796,7 @@ function TrainingWorkspace({
       setRetryResult(result.retry);
       setRecord(result.record);
       setRuntimeStatus(result.fallback ? "fallback" : "online");
-      onRetry(record.id, result.retry);
+      onRetry(record.id, result.retry, result.record);
     } catch {
       const result = evaluateRetry(retryAnswer, issue.targetSkill);
       const retry: RetryResult = {
@@ -943,17 +977,42 @@ function TrainingWorkspace({
 function ReviewPanel({
   records,
   onStart,
-  onMentorNote
+  onMentorNote,
+  integrity
 }: {
   records: TrainingHistoryRecord[];
   onStart: (scenarioId: string, mode?: TrainingSession["mode"]) => void;
   onMentorNote: (recordId: string, note: MentorNote) => void;
+  integrity: Record<string, "valid" | "invalid">;
 }) {
   const [selectedId, setSelectedId] = useState(records[0]?.id ?? "");
   const [mentorAuthor, setMentorAuthor] = useState("导师");
   const [mentorContent, setMentorContent] = useState("");
   const selected = records.find((record) => record.id === selectedId) ?? records[0];
   const comparison = selected ? compareScenarioRecords(records, selected) : null;
+  // FB-014：完整性校验失败的记录视为被篡改，分数显示为不可信。
+  const selectedTampered = selected ? integrity[selected.id] === "invalid" : false;
+  const selectedVerified = selected ? integrity[selected.id] === "valid" : false;
+  // FB-011：学员在自己账号内看到负责人/导师以他们身份留下的点评。
+  const localTeamNotes = useMemo(
+    () => (selected ? findNotesForSession(loadTeamDirectory(), selected.id) : []),
+    [selected?.id]
+  );
+  const [remoteTeamNotes, setRemoteTeamNotes] = useState<Array<{ id: string; author_id: string; content: string; created_at: string }>>([]);
+  useEffect(() => {
+    if (!selected) return;
+    let active = true;
+    requestClientJson<{ mentorNotes?: Array<{ id: string; author_id: string; content: string; created_at: string }> }>(
+      `/api/teams?sessionId=${encodeURIComponent(selected.id)}`
+    )
+      .then((result) => { if (active) setRemoteTeamNotes(result?.mentorNotes ?? []); })
+      .catch(() => { if (active) setRemoteTeamNotes([]); });
+    return () => { active = false; };
+  }, [selected?.id]);
+  const teamNotes = [
+    ...localTeamNotes.map((note) => ({ id: note.id, author: note.authorName, content: note.content, createdAt: note.createdAt })),
+    ...remoteTeamNotes.map((note) => ({ id: note.id, author: note.author_id, content: note.content, createdAt: note.created_at }))
+  ];
 
   if (!records.length) {
     return (
@@ -999,15 +1058,72 @@ function ReviewPanel({
             </div>
             <span className="status-tag">{selected.retry?.improved ? "已改善" : "待复练"}</span>
           </div>
+          {selectedTampered ? (
+            <div className="integrity-warning" data-testid="review-tamper-warning" role="alert">
+              <strong>完整性校验失败</strong>
+              <p>这条记录与本地签名不一致（评分可能被人为修改），分数已标记为不可信，且不再计入能力证据与统计。</p>
+            </div>
+          ) : selectedVerified ? (
+            <p className="integrity-badge" data-testid="review-integrity-badge">评分由服务端计算并签名，完整性校验通过。</p>
+          ) : null}
           <div className="review-metrics">
-            <div><span>行为证据分</span><strong>{selected.totalScore}</strong></div>
+            <div><span>行为证据分</span><strong>{selectedTampered ? "不可信" : selected.totalScore}</strong></div>
             <div><span>训练模式</span><strong>{selected.mode}</strong></div>
             <div><span>复练结果</span><strong>{selected.retry?.improved ? "改善" : selected.retry ? "未达标" : "未复练"}</strong></div>
           </div>
+          {/* FB-006：复盘必须能回看这次训练实际提交的对话与判断内容 */}
+          <details className="review-submission" data-testid="review-submission">
+            <summary>查看上次提交内容（对话与判断画布）</summary>
+            {selected.judgment ? (
+              <div className="review-submission-block">
+                <span className="detail-label">提交的判断画布</span>
+                <dl>
+                  {[
+                    ["核心用户", selected.judgment.targetUser],
+                    ["当前流程", selected.judgment.currentWorkflow],
+                    ["核心问题", selected.judgment.coreProblem],
+                    ["问题影响", selected.judgment.problemImpact],
+                    ["现有替代方案", selected.judgment.alternative],
+                    ["建议行动", selected.judgment.recommendation],
+                    ["成功指标", selected.judgment.successMetric],
+                    ["最大假设", selected.judgment.biggestAssumption]
+                  ].filter(([, value]) => value.trim()).map(([label, value]) => (
+                    <div key={label}><dt>{label}</dt><dd>{value}</dd></div>
+                  ))}
+                </dl>
+              </div>
+            ) : null}
+            <div className="review-submission-block">
+              <span className="detail-label">提交的对话（{selected.messages.length} 条）</span>
+              {selected.messages.length ? (
+                <ol>
+                  {selected.messages.map((message, index) => (
+                    <li key={index}>
+                      <strong>{message.role === "user" ? "你" : "对方"}</strong>
+                      <p>{message.content}</p>
+                    </li>
+                  ))}
+                </ol>
+              ) : <p>本次训练未保存对话记录。</p>}
+            </div>
+          </details>
+          {teamNotes.length ? (
+            <div className="team-notes review-team-notes" data-testid="review-team-notes">
+              <span className="section-kicker">团队负责人 / 导师点评</span>
+              <p>以下点评由团队成员以他们自己的账号留下，不改变模型评分。</p>
+              {teamNotes.map((note) => (
+                <blockquote data-testid={`review-team-note-${note.id}`} key={note.id}>
+                  <strong>{note.author}</strong>
+                  <span>{note.content}</span>
+                  <small>{new Date(note.createdAt).toLocaleString("zh-CN")}</small>
+                </blockquote>
+              ))}
+            </div>
+          ) : null}
           <div className="mentor-note-panel">
             <div>
-              <span className="section-kicker">导师 / 主管点评</span>
-              <p>点评只作为训练备注保存，不改变模型评分或正式能力证据。</p>
+              <span className="section-kicker">本账号备注</span>
+              <p>这里只以当前账号保存个人备注，不改变模型评分；负责人/导师对成员的点评请在团队面板以他们自己的账号留下。</p>
             </div>
             {selected.mentorNote ? (
               <blockquote data-testid="mentor-note">
@@ -1028,6 +1144,14 @@ function ReviewPanel({
                 }}
                 type="button"
               >保存点评</button>
+              {/* FB-010：按钮置灰必须给出可见原因，不能静默禁用 */}
+              <p className="mentor-note-hint" data-testid="mentor-note-hint" role="status">
+                {!mentorAuthor.trim()
+                  ? "请填写点评人后再保存。"
+                  : mentorContent.trim().length < 4
+                    ? `点评内容至少 4 个字（当前 ${mentorContent.trim().length} 字）。`
+                    : "可以保存了。"}
+              </p>
             </div>
           </div>
           {comparison ? (
@@ -1151,6 +1275,7 @@ export function AppShell({
   const [courseOpen, setCourseOpen] = useState(false);
   const [multiRoleOpen, setMultiRoleOpen] = useState(false);
   const [resourceHubOpen, setResourceHubOpen] = useState(false);
+  const [llmConfigOpen, setLlmConfigOpen] = useState(false);
   const [customScenarios, setCustomScenarios] = useState<TrainingScenario[]>([]);
   // #4 世界工作台：null = 未激活，string = 目标 world_id
   const [activeWorkbenchWorldId, setActiveWorkbenchWorldId] = useState<string | null>(null);
@@ -1159,6 +1284,8 @@ export function AppShell({
   const [worldProgressReady, setWorldProgressReady] = useState(false);
   const [historyRecords, setHistoryRecords] = useState<TrainingHistoryRecord[]>([]);
   const [storageReady, setStorageReady] = useState(false);
+  // FB-014：服务端签名校验结果（本地记录可能被篡改，校验只能在服务端完成）。
+  const [integrityResults, setIntegrityResults] = useState<Record<string, "valid" | "invalid">>({});
   const [historyStatus, setHistoryStatus] = useState<"loading" | "server" | "local">("loading");
   const topbarRef = useRef<HTMLElement>(null);
   const meta = getViewMeta(view);
@@ -1241,6 +1368,25 @@ export function AppShell({
     window.localStorage.setItem(storageKey, JSON.stringify({ version: 1, records: historyRecords }));
   }, [historyRecords, storageKey, storageReady]);
 
+  // FB-014：带服务端签名的记录统一提交服务端校验；校验失败的记录标记为被篡改。
+  useEffect(() => {
+    const signedRecords = historyRecords.filter((record) => record.integrity?.signature).slice(0, 50);
+    if (!signedRecords.length) return;
+    let cancelled = false;
+    requestClientJson<{ results: Array<{ id: string; valid: boolean }> }>("/api/training/history/verify", {
+      method: "POST",
+      body: JSON.stringify({ records: signedRecords })
+    }).then((data) => {
+      if (cancelled || !data) return;
+      setIntegrityResults((current) => {
+        const next = { ...current };
+        data.results.forEach((item) => { next[item.id] = item.valid ? "valid" : "invalid"; });
+        return next;
+      });
+    });
+    return () => { cancelled = true; };
+  }, [historyRecords]);
+
   useEffect(() => {
     topbarRef.current?.focus({ preventScroll: true });
     const timer = window.setTimeout(() => window.scrollTo(0, 0), 100);
@@ -1258,10 +1404,15 @@ export function AppShell({
     }
   }
 
-  function updateRetry(recordId: string, retry: RetryResult) {
+  function updateRetry(recordId: string, retry: RetryResult, verifiedRecord?: TrainingHistoryRecord) {
     const currentRecord = historyRecords.find((record) => record.id === recordId);
     if (!currentRecord) return;
-    const nextRecord = addRetryToHistory(currentRecord, retry);
+    // FB-014：优先使用服务端返回的完整记录（含最新签名）；
+    // 客户端降级复练无法重新签名，需丢弃旧签名避免被误判为篡改。
+    let nextRecord = verifiedRecord ?? addRetryToHistory(currentRecord, retry);
+    if (!verifiedRecord && nextRecord.integrity) {
+      nextRecord = { ...nextRecord, integrity: undefined };
+    }
     setHistoryRecords((current) => current.map((record) => record.id === recordId ? nextRecord : record));
     if (nextRecord.engine === "deterministic") {
       void syncDeterministicRecord(nextRecord).catch(() => setHistoryStatus("local"));
@@ -1329,6 +1480,11 @@ export function AppShell({
     ? "整理产品判断，但不把实验草稿当作真实市场结论。"
     : meta.description;
   const completedThisWeek = useMemo(() => historyRecords.length, [historyRecords.length]);
+  // FB-014：被篡改的记录不进入能力证据。
+  const trustedRecords = useMemo(
+    () => historyRecords.filter((record) => integrityResults[record.id] !== "invalid"),
+    [historyRecords, integrityResults]
+  );
   const sourceLabel = historyStatus === "loading" ? "正在同步" : historyStatus === "server" ? "服务端记录" : "本地缓存";
   const nextWorkbenchWorld = useMemo(
     () => getNextIncompleteDemoWorld(completedWorldIds),
@@ -1364,6 +1520,7 @@ export function AppShell({
                 setCourseOpen(false);
                 setMultiRoleOpen(false);
                 setResourceHubOpen(false);
+                setLlmConfigOpen(false);
                 setView(item.view);
               }}
               type="button"
@@ -1383,6 +1540,22 @@ export function AppShell({
             <strong>{completedThisWeek} / 5</strong>
             <div className="sidebar-week-bar"><i style={{ width: `${Math.min(100, completedThisWeek * 20)}%` }} /></div>
           </div>
+          <button
+            className="sidebar-setting-button"
+            onClick={() => {
+              setLlmConfigOpen(true);
+              setCourseOpen(false);
+              setMultiRoleOpen(false);
+              setResourceHubOpen(false);
+              setProductExperimentOpen(false);
+              setCustomScenarioBuilderOpen(false);
+              setActiveTraining(null);
+              setActiveWorkbenchWorldId(null);
+            }}
+            type="button"
+          >
+            ⚙ 模型设置
+          </button>
           <SignOutButton />
         </div>
       </aside>
@@ -1393,17 +1566,36 @@ export function AppShell({
             <h1>{pageTitle}</h1>
             <p>{pageDescription}</p>
           </div>
+          <button
+            aria-label="打开设置"
+            className="topbar-settings-button"
+            onClick={() => {
+              setLlmConfigOpen(true);
+              setCourseOpen(false);
+              setMultiRoleOpen(false);
+              setResourceHubOpen(false);
+              setProductExperimentOpen(false);
+              setCustomScenarioBuilderOpen(false);
+              setActiveTraining(null);
+              setActiveWorkbenchWorldId(null);
+            }}
+            type="button"
+          >
+            ⚙ 设置
+          </button>
         </header>
         <div className="content">
           {activeWorkbenchWorldId !== null ? (
             <WorldWorkbench
               key={activeWorkbenchWorldId}
+              completedWorldIds={completedWorldIds}
               initialWorldId={activeWorkbenchWorldId}
               onClose={() => {
                 setActiveWorkbenchWorldId(null);
                 setView("today");
               }}
               onRunComplete={completeWorkbenchWorld}
+              onSwitchWorld={(worldId) => setActiveWorkbenchWorldId(worldId)}
             />
           ) : activeTraining ? (
             <TrainingWorkspace
@@ -1434,6 +1626,8 @@ export function AppShell({
             <CoursePanel onClose={() => setCourseOpen(false)} userId={userId} />
           ) : productExperimentOpen ? (
             <ProductMaterialExperiment onClose={() => setProductExperimentOpen(false)} />
+          ) : llmConfigOpen ? (
+            <LlmConfigPanel onClose={() => setLlmConfigOpen(false)} />
           ) : view === "today" ? (
             <TodayPanel
               onOpenReview={() => setView("review")}
@@ -1448,6 +1642,7 @@ export function AppShell({
           ) : view === "map" ? (
             <TrainingMap
               customScenarios={customScenarios}
+              records={historyRecords}
               onCreateCustomScenario={() => setCustomScenarioBuilderOpen(true)}
               onOpenCourses={() => setCourseOpen(true)}
               onOpenMultiRole={() => setMultiRoleOpen(true)}
@@ -1457,8 +1652,8 @@ export function AppShell({
             />
           ) : view === "review" ? (
             <div className="stack-lg">
-              <WorldDecisionHistoryPanel />
-              <ReviewPanel onMentorNote={updateMentorNote} onStart={startTraining} records={historyRecords} />
+              <WorldDecisionHistoryPanel localCompletedWorldIds={completedWorldIds} />
+              <ReviewPanel integrity={integrityResults} onMentorNote={updateMentorNote} onStart={startTraining} records={historyRecords} />
             </div>
           ) : view === "ability" ? (
             // #6 新链路：判断证据画像（替换旧 totalScore / 雷达图）
@@ -1467,12 +1662,13 @@ export function AppShell({
               <TeamWorkspacePanel userId={userId} userName={userName} />
               <div className="ability-layout">
                 <JudgmentProfilePanel />
-                <AbilityPanel onOpenReview={() => setView("review")} records={historyRecords} />
+                <AbilityPanel onOpenReview={() => setView("review")} records={trustedRecords} />
               </div>
             </div>
           ) : null}
         </div>
       </section>
+      <FeedbackWidget />
     </main>
   );
 }

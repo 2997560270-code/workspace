@@ -3,7 +3,7 @@ import { evaluateRetry, generateEvaluation } from "../src/lib/evaluation";
 import { createTrainingSession, moveToJudgment, sendTrainingMessage, submitJudgment } from "../src/lib/training-session";
 
 function completedSession() {
-  let session = createTrainingSession({ scenarioId: "dashboard-request", mode: "独立" });
+  let session = createTrainingSession({ scenarioId: "dashboard-request", mode: "训练" });
   session = sendTrainingMessage(session, "谁每天使用这些报表，谁负责决策？");
   session = sendTrainingMessage(session, "你们目前的流程是怎么完成的？");
   session = moveToJudgment(session);

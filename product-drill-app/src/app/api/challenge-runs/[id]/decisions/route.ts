@@ -1,5 +1,6 @@
 import { apiError, parseJsonBody, requireApiUser } from "@/lib/api/server";
 import { CreateDecisionBodySchema } from "@/lib/api/challenge-schemas";
+import { getDecisionFieldIssue } from "@/lib/workbench-state";
 import {
   insertDecisionEvent,
   RunNotFoundError,
@@ -18,6 +19,16 @@ export async function POST(
   const { id: runId } = await params;
   const parsed = CreateDecisionBodySchema.safeParse(await parseJsonBody(request));
   if (!parsed.success) return apiError("参数无效。", 422, parsed.error.flatten());
+
+  // FB-013：服务端同样拦截乱码/过短的无效决策，防止绕过前端走完流程。
+  const fieldIssues = {
+    judgment: getDecisionFieldIssue(parsed.data.judgment),
+    chosen_action: getDecisionFieldIssue(parsed.data.chosen_action),
+    expected_outcome: getDecisionFieldIssue(parsed.data.expected_outcome),
+  };
+  if (Object.values(fieldIssues).some(Boolean)) {
+    return apiError("决策内容无效：请写出具体的判断、行动和预期结果。", 422, { fieldErrors: fieldIssues });
+  }
 
   try {
     const dec = await insertDecisionEvent({

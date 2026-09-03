@@ -5,6 +5,7 @@ playwright-report/
 .playwright-mcp/
 audit-evidence/
 .env.local
+.env.development.local
 *.log
 *.tsbuildinfo
 .tools/

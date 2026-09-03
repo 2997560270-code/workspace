@@ -4,7 +4,8 @@ import type { TrainingScenario } from "./training-config";
 
 export const DETERMINISTIC_ENGINE_VERSION = "deterministic-v1";
 export const DEFAULT_RUBRIC_VERSION = "direction-a-v1";
-export const TRAINING_MODE_OPTIONS = ["练习", "独立", "严格"] as const;
+// 命名与需求文档 4.1 对齐：训练模式、严格模式和练习模式（旧名「独立」已废弃）。
+export const TRAINING_MODE_OPTIONS = ["训练", "严格", "练习"] as const;
 
 export type TrainingRole = "ai" | "user";
 export type TrainingStage = "interview" | "judgment" | "feedback" | "retry" | "complete";

@@ -40,6 +40,8 @@ export type LocalRuntimeState = {
   knowledgeEntries: Array<Record<string, unknown>>;
   contentAuditLogs: Array<Record<string, unknown>>;
   subscriptions: Array<Record<string, unknown>>;
+  feedbackSubmissions: Array<Record<string, unknown>>;
+  llmConfigs: Array<Record<string, unknown>>;
 };
 
 const EMPTY_STATE: LocalRuntimeState = {
@@ -49,10 +51,10 @@ const EMPTY_STATE: LocalRuntimeState = {
   assessmentResponses: [], assessmentEvaluations: [], assessmentReports: [], fairnessMetrics: [], organizations: [], verifiedSessions: [],
   verifiedEvents: [], verifiedReports: [], humanReviewCases: [], teams: [], teamMembers: [], teamInvitations: [], mentorNotes: [],
   multiRoleSessions: [], multiRoleMessages: [], localUsers: [],
-  communityCases: [], knowledgeEntries: [], contentAuditLogs: [], subscriptions: [],
+  communityCases: [], knowledgeEntries: [], contentAuditLogs: [], subscriptions: [], feedbackSubmissions: [], llmConfigs: [],
 };
 
-const STATE_PATH = path.join(process.cwd(), "data", "local-runtime-state.json");
+const STATE_PATH = process.env.LOCAL_RUNTIME_STATE_PATH ?? path.join(process.cwd(), "data", "local-runtime-state.json");
 let operationQueue: Promise<unknown> = Promise.resolve();
 
 export function isLocalRuntimeFallbackEnabled() {

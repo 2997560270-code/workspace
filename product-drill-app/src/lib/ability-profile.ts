@@ -70,7 +70,7 @@ export function buildAbilityProfile(
     skills,
     primaryWeakness: weakest?.name ?? "场景与当前流程",
     nextTraining: weakest
-      ? `下一次优先训练“${weakest.name}”，并在独立模式下留下新的行为证据。`
+      ? `下一次优先训练“${weakest.name}”，并在训练模式下留下新的行为证据。`
       : "完成一次训练后生成下一步建议。"
   };
 }

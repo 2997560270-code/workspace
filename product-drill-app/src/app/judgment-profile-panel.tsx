@@ -23,6 +23,7 @@ import type {
 } from "../lib/challenge-history";
 import { trackClientEvent } from "../lib/analytics/client";
 import { CAUSAL_EVENTS, buildProfileViewedProps } from "../lib/causal-analytics";
+import { getDemoWorld } from "../lib/world-seeds";
 
 // ── 工具 ──────────────────────────────────────────────────────────
 
@@ -460,13 +461,20 @@ export function JudgmentProfilePanel() {
   );
 }
 
-export function WorldDecisionHistoryPanel() {
+export function WorldDecisionHistoryPanel({
+  localCompletedWorldIds = [],
+}: {
+  /** FB-006：本地（离线演示模式）已完成的世界 id，服务端无记录时合并展示 */
+  localCompletedWorldIds?: string[];
+}) {
   const [records, setRecords] = useState<ChallengeDecisionSummary[]>([]);
   const [selectedDecisionId, setSelectedDecisionId] = useState<string | null>(null);
+  const [selectedLocalId, setSelectedLocalId] = useState<string | null>(null);
   const [timelineFocusRequest, setTimelineFocusRequest] = useState(0);
-  const [status, setStatus] = useState<"loading" | "loaded" | "empty" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
 
   function openDecisionTimeline(decisionEventId: string) {
+    setSelectedLocalId(null);
     setSelectedDecisionId(decisionEventId);
     setTimelineFocusRequest((request) => request + 1);
   }
@@ -477,13 +485,41 @@ export function WorldDecisionHistoryPanel() {
       .then((result) => {
         if (cancelled) return;
         setRecords(result);
-        setStatus(result.length ? "loaded" : "empty");
+        setStatus("loaded");
       })
       .catch(() => {
         if (!cancelled) setStatus("error");
       });
     return () => { cancelled = true; };
   }, []);
+
+  // FB-006：离线演示模式下完成的世界不会写入服务端数据库，
+  // 这里把本地完成但服务端缺失的世界合并为本地演示记录，避免历史永远为空。
+  // 必须等服务端请求有结果（loaded/error）后再合并，
+  // 否则加载中的空列表会先渲染出本地记录，与服务端记录形成瞬时重复。
+  const localRecords: ChallengeDecisionSummary[] = status === "loading"
+    ? []
+    : localCompletedWorldIds
+    .filter((worldId) => !records.some((record) => record.world_id === worldId))
+    .flatMap((worldId) => {
+      const seed = getDemoWorld(worldId);
+      if (!seed) return [];
+      return [{
+        run_id: `local-demo-run-${worldId}`,
+        decision_event_id: `local-demo-decision-${worldId}`,
+        world_id: worldId,
+        world_version: seed.version.version,
+        world_title: seed.title,
+        status: "completed",
+        started_at: "",
+        completed_at: null,
+        chosen_action: "在离线演示模式下完成了该世界的调查与决策。",
+        confidence: "medium",
+        consequences_revealed: true,
+        source: "local_demo",
+      }];
+    });
+  const mergedRecords = [...records, ...localRecords];
 
   return (
     <section className="world-history" aria-labelledby="world-history-title">
@@ -496,36 +532,60 @@ export function WorldDecisionHistoryPanel() {
       </div>
 
       {status === "loading" ? <div className="world-history-status surface">正在加载世界决策记录…</div> : null}
-      {status === "error" ? <div className="world-history-status surface" role="alert">世界决策记录加载失败，请刷新重试。</div> : null}
-      {status === "empty" ? (
+      {status === "error" && mergedRecords.length ? (
+        <div className="world-history-status surface" role="alert">服务端记录加载失败，以下为本地演示模式下的完成记录。</div>
+      ) : null}
+      {status === "error" && !mergedRecords.length ? (
+        <div className="world-history-status surface" role="alert">世界决策记录加载失败，请刷新重试。</div>
+      ) : null}
+      {status === "loaded" && !mergedRecords.length ? (
         <div className="world-history-status surface">
           <h3>还没有已完成的世界决策</h3>
           <p>完成一个世界工作台挑战后，调查、决策和后果会显示在这里。</p>
         </div>
       ) : null}
 
-      {status === "loaded" ? (
+      {mergedRecords.length ? (
         <div className="world-history-list">
-          {records.map((record) => (
+          {mergedRecords.map((record, index) => (
             <button
-              aria-pressed={selectedDecisionId === record.decision_event_id}
-              className={selectedDecisionId === record.decision_event_id ? "surface active" : "surface"}
+              aria-pressed={selectedDecisionId === record.decision_event_id || selectedLocalId === record.world_id}
+              className={selectedDecisionId === record.decision_event_id || selectedLocalId === record.world_id ? "surface active" : "surface"}
               key={record.decision_event_id}
-              onClick={() => openDecisionTimeline(record.decision_event_id)}
+              onClick={() => {
+                if (record.source === "local_demo") {
+                  setSelectedDecisionId(null);
+                  setSelectedLocalId(record.world_id);
+                } else {
+                  openDecisionTimeline(record.decision_event_id);
+                }
+              }}
               type="button"
             >
-              <span className="world-history-index">{String(records.indexOf(record) + 1).padStart(2, "0")}</span>
+              <span className="world-history-index">{String(index + 1).padStart(2, "0")}</span>
               <span className="world-history-copy">
                 <strong>{record.world_title}</strong>
                 <small>{record.chosen_action}</small>
               </span>
               <span className="world-history-meta">
                 <small>World {record.world_version}</small>
-                <small>{formatDateTime(record.completed_at)}</small>
+                {record.source === "local_demo" ? (
+                  <small className="world-history-local" data-testid="world-history-local">本地演示记录</small>
+                ) : (
+                  <small>{formatDateTime(record.completed_at)}</small>
+                )}
               </span>
               <span aria-hidden="true" className="world-history-arrow">→</span>
             </button>
           ))}
+        </div>
+      ) : null}
+
+      {selectedLocalId ? (
+        <div className="world-history-status surface" data-testid="world-history-local-note" role="note">
+          <h3>这是一条本地演示记录</h3>
+          <p>该世界在离线演示模式下完成，详细时间线未同步到服务端；连接服务端后完成的决策才会生成完整记录。</p>
+          <button className="button button-secondary" onClick={() => setSelectedLocalId(null)} type="button">关闭</button>
         </div>
       ) : null}
 

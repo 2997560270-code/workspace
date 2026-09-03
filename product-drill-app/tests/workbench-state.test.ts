@@ -8,6 +8,9 @@ import {
   commitToDecisionPhase,
   recordHintUsed,
   buildDecisionPayload,
+  getDecisionDraftIssues,
+  getDecisionFieldIssue,
+  isMeaninglessText,
   canRevealConsequences,
   advanceToReflect,
   type WorkbenchState,
@@ -17,9 +20,9 @@ import {
 // ── fixtures ──────────────────────────────────────────────────────
 function makeDraft(override: Partial<DecisionDraft> = {}): DecisionDraft {
   return {
-    judgment: "认为问题是X",
-    chosen_action: "建议方案A",
-    expected_outcome: "提升效率",
+    judgment: "真正的问题是数据编码不一致",
+    chosen_action: "先统一数据编码，再评估大屏必要性",
+    expected_outcome: "数据整理时间从每周 6 小时降到 1 小时",
     confidence: "medium",
     rejected_alternatives: ["方案B"],
     evidence_basis: ["evt-001"],
@@ -105,7 +108,7 @@ describe("buildDecisionPayload", () => {
     const draft = makeDraft();
     const payload = buildDecisionPayload(draft);
     expect(payload).not.toBeNull();
-    expect(payload?.judgment).toBe("认为问题是X");
+    expect(payload?.judgment).toBe("真正的问题是数据编码不一致");
     expect(payload?.confidence).toBe("medium");
   });
 
@@ -113,6 +116,47 @@ describe("buildDecisionPayload", () => {
     const draft = makeDraft();
     const payload = buildDecisionPayload(draft);
     expect(payload?.consequences_revealed).toBe(false);
+  });
+
+  // FB-013：无效输入不能走完决策流程获得正面后果。
+  it("returns null for meaningless gibberish like \"hhhh\"", () => {
+    expect(buildDecisionPayload(makeDraft({ judgment: "hhhh" }))).toBeNull();
+    expect(buildDecisionPayload(makeDraft({ chosen_action: "111111" }))).toBeNull();
+    expect(buildDecisionPayload(makeDraft({ expected_outcome: "？？？？" }))).toBeNull();
+  });
+
+  it("returns null for content that is too short to be a judgment", () => {
+    expect(buildDecisionPayload(makeDraft({ judgment: "先查一下" }))).toBeNull();
+  });
+
+  it("still accepts real, readable judgments", () => {
+    expect(buildDecisionPayload(makeDraft())).not.toBeNull();
+  });
+});
+
+// ── decision field validation (FB-013) ─────────────────────────────────────
+describe("decision field validation", () => {
+  it("detects meaningless text", () => {
+    expect(isMeaninglessText("hhhh")).toBe(true);
+    expect(isMeaninglessText("aaaaa")).toBe(true);
+    expect(isMeaninglessText("？？？？？")).toBe(true);
+    expect(isMeaninglessText("ababab")).toBe(true);
+    expect(isMeaninglessText("真正的问题是数据不一致")).toBe(false);
+    expect(isMeaninglessText("hhhh hhhh")).toBe(true);
+  });
+
+  it("explains why a field is invalid", () => {
+    expect(getDecisionFieldIssue("")).toContain("必填");
+    expect(getDecisionFieldIssue("hhhh")).toContain("有效内容");
+    expect(getDecisionFieldIssue("太短了")).toContain("过短");
+    expect(getDecisionFieldIssue("真正的问题是数据编码不一致")).toBeNull();
+  });
+
+  it("lists per-field issues for the draft", () => {
+    const issues = getDecisionDraftIssues(makeDraft({ judgment: "hhhh", expected_outcome: "" }));
+    expect(issues.judgment).toContain("有效内容");
+    expect(issues.expected_outcome).toContain("必填");
+    expect(issues.chosen_action).toBeUndefined();
   });
 });
 

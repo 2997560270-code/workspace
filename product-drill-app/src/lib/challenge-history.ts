@@ -17,6 +17,8 @@ export type ChallengeDecisionSummary = {
   chosen_action: string;
   confidence: DecisionEvent["confidence"];
   consequences_revealed: boolean;
+  /** FB-006：本地演示模式下完成的世界没有服务端记录，合并时标记来源 */
+  source?: "server" | "local_demo";
 };
 
 export type ChallengeDecisionTimeline = ChallengeDecisionSummary & {
