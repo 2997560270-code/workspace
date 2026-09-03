@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="zh-CN"><body><RuntimeProviders>{children}</RuntimeProviders></body></html>;
+  return <html lang="zh-CN"><body suppressHydrationWarning><RuntimeProviders>{children}</RuntimeProviders></body></html>;
 }
