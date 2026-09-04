@@ -34,7 +34,7 @@ import { VoiceInputButton } from "./voice-input-button";
 import { FeedbackWidget } from "./feedback-widget";
 import { SignOutButton } from "./signout-button";
 import { MultiRolePanel } from "./multi-role-panel";
-import { ResourceHubPanel } from "./resource-hub-panel";
+import { ResourceHubPanel, type HubTab } from "./resource-hub-panel";
 import { LlmConfigPanel } from "./llm-config-panel";
 import {
   evaluateRetry,
@@ -134,6 +134,7 @@ function TodayPanel({
   onOpenReview,
   onStartWorkbench,
   onOpenAbility,
+  onOpenMultiRole,
   nextWorldTitle,
   nextWorldReason,
   workbenchComplete,
@@ -143,6 +144,7 @@ function TodayPanel({
   onOpenReview: () => void;
   onStartWorkbench: (worldId?: string) => void;
   onOpenAbility: () => void;
+  onOpenMultiRole: () => void;
   nextWorldTitle: string;
   nextWorldReason: string;
   workbenchComplete: boolean;
@@ -253,6 +255,12 @@ function TodayPanel({
           ))}
         </div>
       </section>
+
+      {/* FB-008：多角色训练入口在默认的“今日训练”页也可见，避免埋在二级“训练地图”里找不到 */}
+      <section className="surface multi-role-entry" data-testid="today-multi-role-entry">
+        <div><span className="section-kicker">多视角练习</span><h2>多人角色训练</h2><p>在同一业务问题中切换运营、财务和一线角色，练习处理利益差异。</p></div>
+        <button className="button button-secondary" onClick={onOpenMultiRole} type="button">开始多人角色训练</button>
+      </section>
     </div>
   );
 }
@@ -274,7 +282,7 @@ function TrainingMap({
   onCreateCustomScenario: () => void;
   onOpenCourses: () => void;
   onOpenMultiRole: () => void;
-  onOpenResourceHub: () => void;
+  onOpenResourceHub: (tab?: HubTab) => void;
 }) {
   // FB-003：地图状态直接从训练记录推导，完成训练后即时刷新。
   const allScenarios = [...TRAINING_SCENARIOS, ...customScenarios];
@@ -343,8 +351,13 @@ function TrainingMap({
         <button className="button button-secondary" onClick={onOpenCourses} type="button">查看课程</button>
       </section>
       <section className="surface resource-hub-entry" data-testid="resource-hub-entry">
-        <div><span className="section-kicker">开放资料</span><h2>社区与行业知识库</h2><p>浏览案例、检索行业资料，并预览内容审核流程。</p></div>
-        <button className="button button-secondary" onClick={onOpenResourceHub} type="button">打开资源中心</button>
+        <div><span className="section-kicker">开放资料</span><h2>社区、行业知识库与标准化考核</h2><p>浏览案例、检索行业资料、预览内容审核流程，并体验标准化考核诊断。</p></div>
+        <button className="button button-secondary" onClick={() => onOpenResourceHub("community")} type="button">打开资源中心</button>
+      </section>
+      {/* RT-006/FB-012：标准化考核直达入口，避免被埋在资源中心第 7 个标签里而“找不到” */}
+      <section className="surface assessment-entry" data-testid="assessment-entry">
+        <div><span className="section-kicker">阶段 5 标准化考核</span><h2>固定题序诊断试点</h2><p>用固定题序做一次标准化能力诊断，练习者可用同一标准衡量掌握情况。</p></div>
+        <button className="button button-secondary" onClick={() => onOpenResourceHub("assessment")} type="button">进入标准化考核</button>
       </section>
       <section className="surface experiment-entry" data-testid="product-material-experiment-entry">
         <div>
@@ -978,15 +991,16 @@ function ReviewPanel({
   records,
   onStart,
   onMentorNote,
-  integrity
+  integrity,
+  userName
 }: {
   records: TrainingHistoryRecord[];
   onStart: (scenarioId: string, mode?: TrainingSession["mode"]) => void;
   onMentorNote: (recordId: string, note: MentorNote) => void;
   integrity: Record<string, "valid" | "invalid">;
+  userName: string;
 }) {
   const [selectedId, setSelectedId] = useState(records[0]?.id ?? "");
-  const [mentorAuthor, setMentorAuthor] = useState("导师");
   const [mentorContent, setMentorContent] = useState("");
   const selected = records.find((record) => record.id === selectedId) ?? records[0];
   const comparison = selected ? compareScenarioRecords(records, selected) : null;
@@ -1133,24 +1147,22 @@ function ReviewPanel({
               </blockquote>
             ) : null}
             <div className="mentor-note-form">
-              <input aria-label="点评人" onChange={(event) => setMentorAuthor(event.target.value)} placeholder="点评人" value={mentorAuthor} />
+              <input aria-label="点评人" disabled value={userName} />
               <textarea aria-label="点评内容" onChange={(event) => setMentorContent(event.target.value)} placeholder="写下对这次判断的具体建议" rows={2} value={mentorContent} />
               <button
                 className="button button-secondary"
-                disabled={!mentorAuthor.trim() || mentorContent.trim().length < 4}
+                disabled={mentorContent.trim().length < 4}
                 onClick={() => {
-                  onMentorNote(selected.id, { author: mentorAuthor.trim(), content: mentorContent.trim(), createdAt: new Date().toISOString() });
+                  onMentorNote(selected.id, { author: userName.trim(), content: mentorContent.trim(), createdAt: new Date().toISOString() });
                   setMentorContent("");
                 }}
                 type="button"
               >保存点评</button>
               {/* FB-010：按钮置灰必须给出可见原因，不能静默禁用 */}
               <p className="mentor-note-hint" data-testid="mentor-note-hint" role="status">
-                {!mentorAuthor.trim()
-                  ? "请填写点评人后再保存。"
-                  : mentorContent.trim().length < 4
-                    ? `点评内容至少 4 个字（当前 ${mentorContent.trim().length} 字）。`
-                    : "可以保存了。"}
+                {mentorContent.trim().length < 4
+                  ? `点评内容至少 4 个字（当前 ${mentorContent.trim().length} 字）。`
+                  : `将以 ${userName} 的身份保存。`}
               </p>
             </div>
           </div>
@@ -1275,6 +1287,7 @@ export function AppShell({
   const [courseOpen, setCourseOpen] = useState(false);
   const [multiRoleOpen, setMultiRoleOpen] = useState(false);
   const [resourceHubOpen, setResourceHubOpen] = useState(false);
+  const [resourceHubTab, setResourceHubTab] = useState<HubTab>("community");
   const [llmConfigOpen, setLlmConfigOpen] = useState(false);
   const [customScenarios, setCustomScenarios] = useState<TrainingScenario[]>([]);
   // #4 世界工作台：null = 未激活，string = 目标 world_id
@@ -1471,7 +1484,7 @@ export function AppShell({
     : activeTraining
     ? "一次只训练一个主要能力，先理解问题，再做判断。"
     : resourceHubOpen
-    ? "浏览社区案例、行业资料和内容审核队列。"
+    ? "浏览社区案例、行业资料，并体验标准化考核诊断。"
     : multiRoleOpen
     ? "在同一业务问题中切换不同利益相关者。"
     : courseOpen
@@ -1480,9 +1493,10 @@ export function AppShell({
     ? "整理产品判断，但不把实验草稿当作真实市场结论。"
     : meta.description;
   const completedThisWeek = useMemo(() => historyRecords.length, [historyRecords.length]);
-  // FB-014：被篡改的记录不进入能力证据。
+  // FB-014：只有服务端签名且校验通过的记录才作为正式能力证据；
+  // 被篡改的记录（invalid）与本地降级/无签名记录（undefined）都不计入正式能力趋势。
   const trustedRecords = useMemo(
-    () => historyRecords.filter((record) => integrityResults[record.id] !== "invalid"),
+    () => historyRecords.filter((record) => integrityResults[record.id] === "valid"),
     [historyRecords, integrityResults]
   );
   const sourceLabel = historyStatus === "loading" ? "正在同步" : historyStatus === "server" ? "服务端记录" : "本地缓存";
@@ -1619,7 +1633,7 @@ export function AppShell({
               }}
             />
           ) : resourceHubOpen ? (
-            <ResourceHubPanel onClose={() => setResourceHubOpen(false)} userId={userId} />
+            <ResourceHubPanel initialTab={resourceHubTab} onClose={() => setResourceHubOpen(false)} userId={userId} />
           ) : multiRoleOpen ? (
             <MultiRolePanel onClose={() => setMultiRoleOpen(false)} />
           ) : courseOpen ? (
@@ -1634,6 +1648,7 @@ export function AppShell({
               onStart={startTraining}
               onStartWorkbench={(worldId) => setActiveWorkbenchWorldId(worldId ?? displayedNextChallenge.world_id ?? DEFAULT_WORLD_ID)}
               onOpenAbility={() => setView("ability")}
+              onOpenMultiRole={() => setMultiRoleOpen(true)}
               nextWorldTitle={displayedNextChallenge.world_title}
               nextWorldReason={displayedNextChallenge.reason}
               workbenchComplete={nextChallengeSelection?.loop_complete ?? false}
@@ -1646,14 +1661,14 @@ export function AppShell({
               onCreateCustomScenario={() => setCustomScenarioBuilderOpen(true)}
               onOpenCourses={() => setCourseOpen(true)}
               onOpenMultiRole={() => setMultiRoleOpen(true)}
-              onOpenResourceHub={() => setResourceHubOpen(true)}
+              onOpenResourceHub={(tab) => { setResourceHubTab(tab ?? "community"); setResourceHubOpen(true); }}
               onOpenProductExperiment={() => setProductExperimentOpen(true)}
               onStart={startTraining}
             />
           ) : view === "review" ? (
             <div className="stack-lg">
               <WorldDecisionHistoryPanel localCompletedWorldIds={completedWorldIds} />
-              <ReviewPanel integrity={integrityResults} onMentorNote={updateMentorNote} onStart={startTraining} records={historyRecords} />
+              <ReviewPanel integrity={integrityResults} onMentorNote={updateMentorNote} onStart={startTraining} records={historyRecords} userName={userName} />
             </div>
           ) : view === "ability" ? (
             // #6 新链路：判断证据画像（替换旧 totalScore / 雷达图）

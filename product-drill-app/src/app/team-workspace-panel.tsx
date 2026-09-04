@@ -9,6 +9,7 @@ import {
   joinTeamWorkspace,
   loadTeamDirectory,
   saveTeamDirectory,
+  setTeamMemberRole,
   type TeamMember,
   type TeamMemberRole,
   type TeamMentorNote,
@@ -90,6 +91,8 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
   const [noteSessionId, setNoteSessionId] = useState("");
   const [noteContent, setNoteContent] = useState("");
   const [noteStatus, setNoteStatus] = useState("");
+  // FB-009：远程（服务端）团队下，负责人/导师按需拉取每位成员的训练概况。
+  const [remoteMemberRecords, setRemoteMemberRecords] = useState<Record<string, MemberRecordSummary[]>>({});
 
   useEffect(() => {
     let active = true;
@@ -115,12 +118,30 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
   const myRole = team?.members.find((member) => member.id === userId)?.role ?? null;
   const isManager = myRole === "owner" || myRole === "coach";
 
+  // FB-009：远程团队下由服务端拉取成员概况；本地团队则按账号读取其本机训练历史。
+  useEffect(() => {
+    if (!isRemoteTeam || !team || !isManager) { setRemoteMemberRecords({}); return; }
+    let active = true;
+    const memberIds = team.members.filter((member) => member.status === "active").map((member) => member.id);
+    void Promise.all(
+      memberIds.map((memberId) =>
+        requestClientJson<{ records: MemberRecordSummary[] }>(`/api/teams?teamId=${encodeURIComponent(team.id)}&memberId=${encodeURIComponent(memberId)}`)
+          .then((result) => [memberId, result?.records ?? []] as const)
+          .catch(() => [memberId, []] as const)
+      )
+    ).then((pairs) => {
+      if (!active) return;
+      setRemoteMemberRecords(Object.fromEntries(pairs));
+    });
+    return () => { active = false; };
+  }, [isRemoteTeam, team, isManager]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const memberOverviews = useMemo(() => {
-    if (!team || isRemoteTeam) return [];
+    if (!team) return [];
     return team.members
       .filter((member) => member.status === "active")
-      .map((member) => ({ member, records: loadMemberRecords(member.id) }));
-  }, [team, isRemoteTeam]);
+      .map((member) => ({ member, records: isRemoteTeam ? remoteMemberRecords[member.id] ?? [] : loadMemberRecords(member.id) }));
+  }, [team, isRemoteTeam, remoteMemberRecords]);
 
   const noteMemberRecords = memberOverviews.find((item) => item.member.id === noteMemberId)?.records ?? [];
   const teamNotes: TeamMentorNote[] = useMemo(
@@ -196,6 +217,17 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
     setNoteContent("");
   }
 
+  // RT-005：负责人调整成员角色（仅在 learner/coach 之间；owner 角色不可改）。
+  async function changeRole(memberId: string, role: TeamMemberRole) {
+    if (!team || role === "owner") return;
+    if (isRemoteTeam) {
+      const remote = await requestClientJson<{ team: ApiTeam }>("/api/teams", { method: "POST", body: JSON.stringify({ action: "set_role", teamId: team.id, memberId, role }) });
+      if (remote?.team) setTeam(mapApiTeam(remote.team));
+      return;
+    }
+    persist(setTeamMemberRole(team, memberId, role));
+  }
+
   if (!ready) return null;
 
   return (
@@ -220,11 +252,23 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
               <div className="team-member" data-testid={`team-member-${member.id}`} key={member.id}>
                 <span>{member.name}{member.id === userId ? "（你）" : ""}</span>
                 <small>{ROLE_LABELS[member.role]} · {member.status === "active" ? "已加入" : "待加入"}</small>
+                {/* RT-005：负责人可在 learner/coach 之间调整成员角色（不能改 owner） */}
+                {myRole === "owner" && member.role !== "owner" ? (
+                  <select
+                    aria-label={`调整 ${member.name} 的角色`}
+                    data-testid={`team-member-role-${member.id}`}
+                    onChange={(event) => { void changeRole(member.id, event.target.value as TeamMemberRole); }}
+                    value={member.role}
+                  >
+                    <option value="learner">学习者</option>
+                    <option value="coach">导师</option>
+                  </select>
+                ) : null}
               </div>
             ))}
           </div>
-          {/* FB-009/FB-011：负责人与导师查看成员训练概况，并直接以自己账号点评 */}
-          {isManager && !isRemoteTeam ? (
+          {/* FB-009/FB-011：负责人与导师查看成员训练概况，并直接以自己账号点评（本地与远程团队均可用） */}
+          {isManager ? (
             <div className="team-manager-view" data-testid="team-manager-view">
               <div className="team-manager-heading">
                 <h3>成员训练概况</h3>
@@ -308,11 +352,6 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
               </div>
             </div>
           ) : null}
-          {isManager && isRemoteTeam ? (
-            <p className="team-member-empty" data-testid="team-manager-remote-note">
-              正式账号团队的成员训练概况需要服务端训练记录同步，当前环境未配置；本地试用团队（同一浏览器）可提供完整成员视图。
-            </p>
-          ) : null}
           {teamNotes.length ? (
             <div className="team-notes" data-testid="team-notes">
               <h3>团队点评记录</h3>
@@ -329,9 +368,11 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
       ) : (
         <div className="team-actions">
           <label><span>团队名称</span><input aria-label="团队名称" onChange={(event) => setTeamName(event.target.value)} placeholder="例如：产品新人训练小组" value={teamName} /></label>
+          {teamName.trim() && teamName.trim().length < 2 ? <p className="mentor-note-hint" data-testid="team-name-hint" role="status">团队名称至少 2 个字（当前 {teamName.trim().length} 字）。</p> : null}
           <button className="button button-primary" disabled={teamName.trim().length < 2} onClick={create} type="button">创建团队</button>
           <div className="team-divider"><span>或</span></div>
-          <label><span>已有邀请码</span><input aria-label="团队邀请码" onChange={(event) => setInviteCode(event.target.value)} placeholder="输入 8 位邀请码" value={inviteCode} /></label>
+          <label><span>已有邀请码</span><input aria-label="团队邀请码" onChange={(event) => setInviteCode(event.target.value)} placeholder="输入 4–16 位邀请码（字母数字）" value={inviteCode} /></label>
+          {inviteCode.trim() && inviteCode.trim().length < 4 ? <p className="mentor-note-hint" data-testid="team-invite-hint" role="status">邀请码至少 4 位（当前 {inviteCode.trim().length} 位）。</p> : null}
           <button className="button button-secondary" disabled={inviteCode.trim().length < 4} onClick={join} type="button">加入团队</button>
           {joinError ? <p className="form-error" role="alert">{joinError}</p> : null}
         </div>

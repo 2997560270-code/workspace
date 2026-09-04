@@ -545,6 +545,11 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete, complet
 
   // ── 进入决策阶段 ────────────────────────────────────────────────
   function enterCommitPhase() {
+    // FB-013：无有效调查证据时不得进入决策承诺阶段，避免任意输入得到正面后果。
+    if (eligibleEvidenceEventIds.length === 0) {
+      setError("你还没有获得任何有效调查证据，无法提交决策。请先围绕当前流程、用户、使用现状、风险或替代方案向世界提问，确认至少一条世界事实（提示可帮助你标记证据）。");
+      return;
+    }
     setState((prev) => prev ? commitToDecisionPhase(prev) : prev);
   }
 
@@ -583,6 +588,19 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete, complet
         worldMessage("✅ 决策已提交。点击「揭示后果」查看世界的实际反应。"),
       ]);
     } catch (err) {
+      // FB-013：服务端明确拒绝（4xx 校验失败）是真实错误，不能当作演示模式静默生成本地决策，
+      // 否则会绕过「必须引用有效调查证据」的约束。
+      const apiMessage = err instanceof Error ? err.message : "";
+      if (/failed: 4\d\d/.test(apiMessage)) {
+        const detail = apiMessage.replace(/^API [^\s]* failed: \d+\s*/u, "").trim();
+        let reason = "你的决策未被接受，请检查后再试。";
+        try {
+          const parsed = JSON.parse(detail);
+          if (parsed?.error) reason = parsed.error;
+        } catch { /* keep default reason */ }
+        setError("决策未被接受：" + reason);
+        return;
+      }
       // offline fallback: generate a local decision id
       const localDecId = `local-dec-${Date.now()}`;
       setState((prev) =>
@@ -601,6 +619,11 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete, complet
   // ── 揭示后果 ────────────────────────────────────────────────────
   async function handleReveal() {
     if (!state?.run_id || !state.decision_event_id || busy) return;
+    // FB-013：无有效证据不得揭示后果，防止「无效输入 → 正面后果」失真。
+    if (eligibleEvidenceEventIds.length === 0) {
+      setError("你还没有获得任何有效调查证据，无法揭示后果。请先回到调查阶段，围绕当前流程、用户、使用现状、风险或替代方案确认至少一条世界事实后再提交决策。");
+      return;
+    }
     setBusy(true);
     setError("");
 
@@ -612,7 +635,9 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete, complet
 
     const buildContent = (prefix: string) =>
       rule
-        ? `${prefix}后果揭示：${rule.short_term}\n\n反事实路径：${rule.counterfactual}`
+        ? `${prefix}后果揭示（${rule.consequence_path === "premature" ? "过早承诺路径" : "充分调查路径"}）：\n` +
+          `短期：${rule.short_term}\n中期：${rule.medium_term}\n长期：${rule.long_term}\n\n` +
+          `反事实路径：${rule.counterfactual}`
         : `${prefix}后果已揭示。`;
 
     try {

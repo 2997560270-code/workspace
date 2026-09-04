@@ -30,6 +30,12 @@ export async function POST(
     return apiError("决策内容无效：请写出具体的判断、行动和预期结果。", 422, { fieldErrors: fieldIssues });
   }
 
+  // FB-013：决策必须至少引用一条有效调查证据，否则不允许提交，防止绕过前端
+  // 用任意无效输入走完流程并得到正面后果。
+  if (parsed.data.evidence_basis.length === 0) {
+    return apiError("决策必须至少引用一条有效调查证据；请先完成有效调查再提交决策。", 422);
+  }
+
   try {
     const dec = await insertDecisionEvent({
       userId: user.id,

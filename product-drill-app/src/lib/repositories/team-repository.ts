@@ -1,5 +1,6 @@
 import { createSupabaseAdminClient } from "../supabase/admin";
 import { isLocalRuntimeFallbackEnabled, withLocalRuntimeState } from "../local-runtime-store";
+import { getHistoryRecords } from "./training-repository";
 
 export type TeamRow = {
   id: string;
@@ -127,6 +128,70 @@ export async function saveMentorNote(input: { userId: string; teamId: string; se
   const { data, error } = await admin.from("mentor_notes").insert({ team_id: input.teamId, session_id: input.sessionId, author_id: input.userId, content: input.content.trim() }).select("*").single();
   if (error) throw error;
   return data;
+}
+
+// RT-005：负责人可在 learner/coach 之间调整成员角色（owner 角色不可被改动）。
+export async function setTeamMemberRole(userId: string, teamId: string, memberId: string, role: "coach" | "learner"): Promise<TeamRow> {
+  const admin = createSupabaseAdminClient();
+  if (!admin) {
+    if (!isLocalRuntimeFallbackEnabled()) throw new Error("Team persistence is not configured");
+    return withLocalRuntimeState((state) => {
+      const caller = localActiveMember(state, teamId, userId);
+      if (!caller || caller.role !== "owner") throw new Error("Only team owner can change roles");
+      const target = state.teamMembers.find((item) => item.team_id === teamId && String(item.user_id) === memberId);
+      if (!target || String(target.role) === "owner") throw new Error("Owner role cannot be changed");
+      state.teamMembers = state.teamMembers.map((item) =>
+        item.team_id === teamId && String(item.user_id) === memberId ? { ...item, role } : item
+      );
+      const team = localTeamRow(state, teamId);
+      if (!team) throw new Error("Team not found");
+      return team;
+    });
+  }
+  const { data: membership, error: membershipError } = await admin.from("team_members").select("role").eq("team_id", teamId).eq("user_id", userId).eq("status", "active").maybeSingle();
+  if (membershipError) throw membershipError;
+  if (!membership || membership.role !== "owner") throw new Error("Only team owner can change roles");
+  const { data: target, error: targetError } = await admin.from("team_members").select("role").eq("team_id", teamId).eq("user_id", memberId).maybeSingle();
+  if (targetError) throw targetError;
+  if (!target || target.role === "owner") throw new Error("Owner role cannot be changed");
+  const { error: updateError } = await admin.from("team_members").update({ role }).eq("team_id", teamId).eq("user_id", memberId);
+  if (updateError) throw updateError;
+  const team = await getTeamForUser(userId);
+  if (!team) throw new Error("Team not found");
+  return team;
+}
+
+// FB-009：负责人/导师查看某成员的训练概况（仅同团队、且调用者为 owner/coach 才可读）。
+export async function listMemberRecords(
+  callerUserId: string,
+  teamId: string,
+  memberUserId: string
+): Promise<Array<{ id: string; scenarioId: string; title: string; mode: string; totalScore: number; completedAt: string }>> {
+  const admin = createSupabaseAdminClient();
+  if (!admin) {
+    if (!isLocalRuntimeFallbackEnabled()) return [];
+    return withLocalRuntimeState((state) => {
+      const caller = localActiveMember(state, teamId, callerUserId);
+      if (!caller || !["owner", "coach"].includes(String(caller.role))) throw new Error("Team manager permission required");
+      if (!state.teamMembers.some((item) => item.team_id === teamId && String(item.user_id) === memberUserId)) throw new Error("Member not in team");
+      return [];
+    });
+  }
+  const { data: callerMembership, error: callerError } = await admin.from("team_members").select("role").eq("team_id", teamId).eq("user_id", callerUserId).eq("status", "active").maybeSingle();
+  if (callerError) throw callerError;
+  if (!callerMembership || !["owner", "coach"].includes(callerMembership.role)) throw new Error("Team manager permission required");
+  const { data: memberMembership, error: memberError } = await admin.from("team_members").select("user_id").eq("team_id", teamId).eq("user_id", memberUserId).eq("status", "active").maybeSingle();
+  if (memberError) throw memberError;
+  if (!memberMembership) throw new Error("Member not in team");
+  const records = await getHistoryRecords(memberUserId);
+  return records.map((record) => ({
+    id: record.id,
+    scenarioId: record.scenarioId,
+    title: record.scenarioSnapshot?.shortTitle ?? record.scenarioId,
+    mode: record.mode,
+    totalScore: record.totalScore,
+    completedAt: record.completedAt,
+  }));
 }
 
 export async function listMentorNotesForSession(userId: string, sessionId: string) {

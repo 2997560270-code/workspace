@@ -65,6 +65,16 @@ export function joinTeamWorkspace(team: TeamWorkspace, input: { memberId: string
   };
 }
 
+// RT-005：负责人可在 learner/coach 之间调整成员角色；owner 角色不可被改动。
+export function setTeamMemberRole(team: TeamWorkspace, memberId: string, role: TeamMemberRole): TeamWorkspace {
+  return {
+    ...team,
+    members: team.members.map((member) =>
+      member.id === memberId && member.role !== "owner" ? { ...member, role } : member
+    )
+  };
+}
+
 export function loadTeamDirectory(): TeamWorkspace[] {
   if (typeof window === "undefined") return [];
   try {

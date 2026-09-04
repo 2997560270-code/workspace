@@ -9,7 +9,7 @@ import { CommunityReviewPanel } from "./community-review-panel";
 import { AssessmentLabPanel } from "./assessment-lab-panel";
 import { VerifiedPilotPanel } from "./verified-pilot-panel";
 
-type HubTab = "community" | "knowledge" | "admin" | "billing" | "validation" | "review-beta" | "assessment" | "verified";
+export type HubTab = "community" | "knowledge" | "admin" | "billing" | "validation" | "review-beta" | "assessment" | "verified";
 
 type ApiCase = { id: string; title: string; industry: string; skill_id: string; summary: string; lesson: string; status: "pending" | "published" | "archived" | "rejected"; author_id?: string; created_at: string };
 
@@ -17,8 +17,8 @@ function mapApiCase(item: ApiCase): CommunityCase {
   return { id: item.id, title: item.title, industry: item.industry, skillId: "workflow", summary: item.summary, lesson: item.lesson, author: item.author_id ?? "服务端用户", status: item.status === "rejected" ? "archived" : item.status, createdAt: item.created_at };
 }
 
-export function ResourceHubPanel({ onClose, userId }: { onClose: () => void; userId: string }) {
-  const [tab, setTab] = useState<HubTab>("community");
+export function ResourceHubPanel({ onClose, userId, initialTab = "community" }: { onClose: () => void; userId: string; initialTab?: HubTab }) {
+  const [tab, setTab] = useState<HubTab>(initialTab);
   const [query, setQuery] = useState("");
   const [cases, setCases] = useState<CommunityCase[]>(() => loadCommunityCases());
   const [remoteCases, setRemoteCases] = useState<CommunityCase[]>([]);
@@ -73,7 +73,7 @@ export function ResourceHubPanel({ onClose, userId }: { onClose: () => void; use
 
   return (
     <div className="resource-hub-shell">
-      <section className="surface resource-hub-intro"><div className="section-heading"><div><span className="section-kicker">资源中心</span><h2>案例、知识与内容管理</h2></div><button className="back-button" onClick={onClose} type="button">← 返回训练地图</button></div><p>社区和行业资料先在本地验证内容结构；正式发布前需要账号权限、审核流程和来源治理。</p></section>
+      <section className="surface resource-hub-intro"><div className="section-heading"><div><span className="section-kicker">资源中心</span><h2>案例、知识与标准化考核</h2></div><button className="back-button" onClick={onClose} type="button">← 返回训练地图</button></div><p>社区和行业资料先在本地验证内容结构；标准化考核提供固定题序的诊断试点。正式发布前需要账号权限、审核流程和来源治理。</p></section>
       <div className="resource-tabs" role="tablist"><button aria-selected={tab === "community"} className={tab === "community" ? "active" : ""} onClick={() => setTab("community")} role="tab" type="button">社区案例</button><button aria-selected={tab === "knowledge"} className={tab === "knowledge" ? "active" : ""} onClick={() => setTab("knowledge")} role="tab" type="button">行业知识库</button><button aria-selected={tab === "admin"} className={tab === "admin" ? "active" : ""} onClick={() => setTab("admin")} role="tab" type="button">内容管理</button><button aria-selected={tab === "billing"} className={tab === "billing" ? "active" : ""} onClick={() => setTab("billing")} role="tab" type="button">计划与订阅</button><button aria-selected={tab === "validation"} className={tab === "validation" ? "active" : ""} onClick={() => setTab("validation")} role="tab" type="button">验证实验室</button><button aria-selected={tab === "review-beta"} className={tab === "review-beta" ? "active" : ""} onClick={() => setTab("review-beta")} role="tab" type="button">社区盲评 Beta</button><button aria-selected={tab === "assessment"} className={tab === "assessment" ? "active" : ""} onClick={() => setTab("assessment")} role="tab" type="button">标准化考核</button><button aria-selected={tab === "verified"} className={tab === "verified" ? "active" : ""} onClick={() => setTab("verified")} role="tab" type="button">受验证试点</button></div>
       {tab === "community" ? <div className="resource-community"><section className="surface resource-case-list" data-testid="community-case-list"><div className="section-heading"><div><span className="section-kicker">已发布案例</span><h2>从他人的判断中学习</h2></div></div>{allCases.filter((item) => item.status === "published").map((item) => <article key={item.id}><span>{item.industry}</span><h3>{item.title}</h3><p>{item.summary}</p><strong>练习启发：{item.lesson}</strong></article>)}</section><section className="surface resource-submit"><span className="section-kicker">分享案例</span><h2>提交一个值得复盘的判断</h2><label><span>标题</span><input aria-label="案例标题" onChange={(event) => setTitle(event.target.value)} value={title} /></label><label><span>行业</span><input aria-label="案例行业" onChange={(event) => setIndustry(event.target.value)} value={industry} /></label><label><span>发生了什么</span><textarea aria-label="案例摘要" onChange={(event) => setSummary(event.target.value)} rows={3} value={summary} /></label><label><span>你学到了什么</span><textarea aria-label="案例启发" onChange={(event) => setLesson(event.target.value)} rows={3} value={lesson} /></label><button className="button button-primary" disabled={[title, industry, summary, lesson].some((value) => value.trim().length < 4)} onClick={submitCase} type="button">提交待审核案例</button></section></div> : null}
       {tab === "knowledge" ? <section className="surface resource-knowledge" data-testid="knowledge-list"><div className="section-heading"><div><span className="section-kicker">检索资料</span><h2>行业知识库</h2></div><input aria-label="搜索知识库" onChange={(event) => setQuery(event.target.value)} placeholder="搜索标题、行业或标签" value={query} /></div><div className="knowledge-grid">{filteredKnowledge.map((entry) => <article key={entry.id}><span>{entry.industry}</span><h3>{entry.title}</h3><p>{entry.content}</p><small>{entry.tags.join(" · ")} · 来源：{entry.source}</small></article>)}</div>{!filteredKnowledge.length ? <p className="empty-state-copy">没有匹配的资料。</p> : null}</section> : null}

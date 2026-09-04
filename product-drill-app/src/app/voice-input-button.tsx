@@ -24,7 +24,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   "service-not-allowed": "当前环境不提供语音识别服务",
   "no-speech": "没有检测到语音，请靠近麦克风再说",
   "audio-capture": "没有找到可用的麦克风",
-  network: "语音识别网络不可用"
+  network: "Chrome 语音识别需将音频上传到云端识别服务，当前网络无法访问该服务"
 };
 
 export function VoiceInputButton({ onTranscript, disabled }: { onTranscript: (text: string) => void; disabled?: boolean }) {

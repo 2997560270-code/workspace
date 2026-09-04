@@ -8,11 +8,17 @@ import type { TrainingHistoryRecord } from "./training-history";
 
 const ALGORITHM = "hmac-sha256";
 const VERSION = 1;
-// 未配置 INTEGRITY_SECRET 时使用开发默认值；生产环境必须显式配置。
+// 未配置 INTEGRITY_SECRET 时仅开发/测试环境可使用公开默认值；
+// 生产环境必须显式配置，否则任何读过源码的人都可伪造签名（FB-014）。
 const DEV_SECRET = "product-drill-integrity-dev-secret";
 
 function getIntegritySecret(): string {
-  return process.env.INTEGRITY_SECRET?.trim() || DEV_SECRET;
+  const configured = process.env.INTEGRITY_SECRET?.trim();
+  if (configured) return configured;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("INTEGRITY_SECRET 未配置：生产环境必须显式设置评分签名密钥。");
+  }
+  return DEV_SECRET;
 }
 
 // 只签名评分与证据相关字段；mentorNote 等纯展示字段不参与签名。
