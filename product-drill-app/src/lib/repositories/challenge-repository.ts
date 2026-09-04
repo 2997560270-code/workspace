@@ -331,6 +331,11 @@ export async function revealDecisionConsequences(
     if (decision.consequences_revealed) throw new AlreadyRevealedError();
     const revealed = { ...decision, consequences_revealed: true };
     demoStore.decisionEvents.set(decisionEventId, revealed);
+    // FB-006：看到结果（揭示后果）即视为完成该世界，避免复盘页/画像查不到记录。
+    const run = demoStore.runs.get(runId);
+    if (run && run.user_id === userId && run.status === "active") {
+      demoStore.runs.set(runId, { ...run, status: "completed", completed_at: new Date().toISOString() });
+    }
     return revealed;
   }
 
@@ -354,6 +359,8 @@ export async function revealDecisionConsequences(
     if (!existing) throw new RunNotFoundError();
     throw new AlreadyRevealedError();
   }
+  // FB-006：揭示后果后即视为完成该世界，让复盘页/判断画像能读到这条记录（反馈步仍可幂等补齐证据）。
+  await admin.from("challenge_runs").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", runId).eq("status", "active");
   return data as DecisionEvent;
 }
 
