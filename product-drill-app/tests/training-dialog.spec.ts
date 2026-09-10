@@ -97,6 +97,20 @@ test("strict mode shows a countdown and disables hints", async ({ page }) => {
   await expect(page.getByRole("textbox", { name: "你的追问", exact: true })).toBeEnabled();
 });
 
+test("mode switch uses 诊断/严格/练习 after the RT-002 rename", async ({ page }) => {
+  await enterApp(page);
+  await page.getByRole("button", { name: "开始 3 分钟诊断", exact: true }).click();
+  const modeSwitch = page.locator(".mode-switch");
+  await expect(modeSwitch.getByRole("button", { name: "诊断", exact: true })).toBeVisible();
+  await expect(modeSwitch.getByRole("button", { name: "严格", exact: true })).toBeVisible();
+  await expect(modeSwitch.getByRole("button", { name: "练习", exact: true })).toBeVisible();
+  // 旧名「训练」不得再作为模式出现
+  await expect(modeSwitch.getByRole("button", { name: "训练", exact: true })).toHaveCount(0);
+  // 切到诊断模式后正确置为激活态
+  await modeSwitch.getByRole("button", { name: "诊断", exact: true }).click();
+  await expect(modeSwitch.getByRole("button", { name: "诊断", exact: true })).toHaveAttribute("aria-pressed", "true");
+});
+
 test("mode switching never inflates the strict countdown (FB-005)", async ({ page }) => {
   await enterApp(page);
   await page.getByRole("button", { name: "开始 3 分钟诊断", exact: true }).click();

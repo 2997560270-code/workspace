@@ -7,7 +7,7 @@ import type { SkillId } from "../src/lib/training-config";
 type GoldenCase = {
   id: string;
   scenarioId: string;
-  mode: "训练" | "严格" | "练习";
+  mode: "诊断" | "严格" | "练习";
   messages: Array<{ role: "user"; content: string }>;
   expected: {
     primarySkill: SkillId;

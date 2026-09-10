@@ -1,5 +1,6 @@
 import { createSupabaseAdminClient } from "../supabase/admin";
 import { isLocalRuntimeFallbackEnabled, withLocalRuntimeState } from "../local-runtime-store";
+import { TEAM_MEMBER_TITLE_MAX } from "../team-workspace";
 import { getHistoryRecords } from "./training-repository";
 
 export type TeamRow = {
@@ -8,7 +9,7 @@ export type TeamRow = {
   owner_id: string;
   created_at: string;
   updated_at: string;
-  team_members?: Array<{ user_id: string; role: "owner" | "coach" | "learner"; status: "active" | "invited" | "suspended"; joined_at: string }>;
+  team_members?: Array<{ user_id: string; role: "owner" | "coach" | "learner"; status: "active" | "invited" | "suspended"; joined_at: string; title?: string | null }>;
 };
 
 function localTeamRow(state: { teams: Array<Record<string, unknown>>; teamMembers: Array<Record<string, unknown>> }, teamId: string): TeamRow | null {
@@ -16,7 +17,13 @@ function localTeamRow(state: { teams: Array<Record<string, unknown>>; teamMember
   if (!team) return null;
   const members = state.teamMembers
     .filter((item) => item.team_id === teamId)
-    .map((item) => ({ user_id: String(item.user_id), role: item.role as "owner" | "coach" | "learner", status: item.status as "active" | "invited" | "suspended", joined_at: String(item.joined_at) }));
+    .map((item) => ({
+      user_id: String(item.user_id),
+      role: item.role as "owner" | "coach" | "learner",
+      status: item.status as "active" | "invited" | "suspended",
+      joined_at: String(item.joined_at),
+      title: typeof item.title === "string" && item.title.trim() ? item.title : null
+    }));
   return { id: String(team.id), name: String(team.name), owner_id: String(team.owner_id), created_at: String(team.created_at), updated_at: String(team.updated_at), team_members: members };
 }
 
@@ -37,7 +44,7 @@ export async function getTeamForUser(userId: string): Promise<TeamRow | null> {
   if (membershipError) throw membershipError;
   const teamId = memberships?.[0]?.team_id;
   if (!teamId) return null;
-  const { data, error } = await admin.from("teams").select("*, team_members(user_id, role, status, joined_at)").eq("id", teamId).maybeSingle();
+  const { data, error } = await admin.from("teams").select("*, team_members(user_id, role, status, joined_at, title)").eq("id", teamId).maybeSingle();
   if (error) throw error;
   return data as TeamRow | null;
 }
@@ -155,6 +162,153 @@ export async function setTeamMemberRole(userId: string, teamId: string, memberId
   if (targetError) throw targetError;
   if (!target || target.role === "owner") throw new Error("Owner role cannot be changed");
   const { error: updateError } = await admin.from("team_members").update({ role }).eq("team_id", teamId).eq("user_id", memberId);
+  if (updateError) throw updateError;
+  const team = await getTeamForUser(userId);
+  if (!team) throw new Error("Team not found");
+  return team;
+}
+
+// RT-008：成员自愿退出团队。负责人还有活跃成员时不能退出，必须先解散。
+// 退出即删除成员关系，方便该账号之后凭邀请码重新加入。
+// teamId 用于精确指定要退出的团队（同一账号可能建过多个团队），缺省时退第一个活跃团队。
+export async function leaveTeam(userId: string, teamId?: string): Promise<{ dissolved: boolean }> {
+  const admin = createSupabaseAdminClient();
+  if (!admin) {
+    if (!isLocalRuntimeFallbackEnabled()) throw new Error("Team persistence is not configured");
+    return withLocalRuntimeState((state) => {
+      const membership = state.teamMembers.find((item) => String(item.user_id) === userId && item.status === "active" && (!teamId || String(item.team_id) === teamId));
+      if (!membership) throw new Error("Not a team member");
+      const targetTeamId = String(membership.team_id);
+      const others = state.teamMembers.filter((item) => String(item.team_id) === targetTeamId && String(item.user_id) !== userId && item.status === "active");
+      if (membership.role === "owner" && others.length > 0) throw new Error("Team owner must dissolve the team before leaving");
+      state.teamMembers = state.teamMembers.filter((item) => !(String(item.team_id) === targetTeamId && String(item.user_id) === userId));
+      const remaining = state.teamMembers.filter((item) => String(item.team_id) === targetTeamId);
+      if (!remaining.length) {
+        state.teams = state.teams.filter((item) => String(item.id) !== targetTeamId);
+        state.teamInvitations = state.teamInvitations.filter((item) => String(item.team_id) !== targetTeamId);
+        state.mentorNotes = state.mentorNotes.filter((item) => String(item.team_id) !== targetTeamId);
+        return { dissolved: true };
+      }
+      return { dissolved: false };
+    });
+  }
+  let membershipQuery = admin.from("team_members").select("team_id,role").eq("user_id", userId).eq("status", "active");
+  if (teamId) membershipQuery = membershipQuery.eq("team_id", teamId);
+  const { data: membership, error: membershipError } = await membershipQuery.maybeSingle();
+  if (membershipError) throw membershipError;
+  if (!membership) throw new Error("Not a team member");
+  const targetTeamId = membership.team_id as string;
+  const { data: others, error: othersError } = await admin.from("team_members").select("user_id").eq("team_id", targetTeamId).eq("status", "active").neq("user_id", userId);
+  if (othersError) throw othersError;
+  if (membership.role === "owner" && (others ?? []).length > 0) throw new Error("Team owner must dissolve the team before leaving");
+  const { error: deleteError } = await admin.from("team_members").delete().eq("team_id", targetTeamId).eq("user_id", userId);
+  if (deleteError) throw deleteError;
+  const { data: remaining, error: remainingError } = await admin.from("team_members").select("user_id").eq("team_id", targetTeamId);
+  if (remainingError) throw remainingError;
+  if (!(remaining ?? []).length) {
+    await admin.from("team_invitations").delete().eq("team_id", targetTeamId);
+    await admin.from("mentor_notes").delete().eq("team_id", targetTeamId);
+    const { error: teamDeleteError } = await admin.from("teams").delete().eq("id", targetTeamId);
+    if (teamDeleteError) throw teamDeleteError;
+    return { dissolved: true };
+  }
+  return { dissolved: false };
+}
+
+// RT-008：负责人解散团队（清空成员、邀请码与点评）。
+export async function dissolveTeam(userId: string, teamId?: string): Promise<{ dissolved: true }> {
+  const admin = createSupabaseAdminClient();
+  if (!admin) {
+    if (!isLocalRuntimeFallbackEnabled()) throw new Error("Team persistence is not configured");
+    return withLocalRuntimeState((state) => {
+      const membership = state.teamMembers.find((item) => String(item.user_id) === userId && item.status === "active" && (!teamId || String(item.team_id) === teamId));
+      if (!membership || membership.role !== "owner") throw new Error("Only team owner can dissolve the team");
+      const targetTeamId = String(membership.team_id);
+      state.teams = state.teams.filter((item) => String(item.id) !== targetTeamId);
+      state.teamMembers = state.teamMembers.filter((item) => String(item.team_id) !== targetTeamId);
+      state.teamInvitations = state.teamInvitations.filter((item) => String(item.team_id) !== targetTeamId);
+      state.mentorNotes = state.mentorNotes.filter((item) => String(item.team_id) !== targetTeamId);
+      return { dissolved: true as const };
+    });
+  }
+  let membershipQuery = admin.from("team_members").select("team_id,role").eq("user_id", userId).eq("status", "active");
+  if (teamId) membershipQuery = membershipQuery.eq("team_id", teamId);
+  const { data: membership, error: membershipError } = await membershipQuery.maybeSingle();
+  if (membershipError) throw membershipError;
+  if (!membership || membership.role !== "owner") throw new Error("Only team owner can dissolve the team");
+  const targetTeamId = membership.team_id as string;
+  const { error: memberError } = await admin.from("team_members").delete().eq("team_id", targetTeamId);
+  if (memberError) throw memberError;
+  await admin.from("team_invitations").delete().eq("team_id", targetTeamId);
+  await admin.from("mentor_notes").delete().eq("team_id", targetTeamId);
+  const { error: teamError } = await admin.from("teams").delete().eq("id", targetTeamId);
+  if (teamError) throw teamError;
+  return { dissolved: true as const };
+}
+
+// RT-008：负责人移除成员（负责人可移除导师/学习者；导师只能移除学习者；不能移除负责人）。
+export async function removeTeamMember(userId: string, teamId: string, memberId: string): Promise<TeamRow> {
+  const admin = createSupabaseAdminClient();
+  if (!admin) {
+    if (!isLocalRuntimeFallbackEnabled()) throw new Error("Team persistence is not configured");
+    return withLocalRuntimeState((state) => {
+      const caller = localActiveMember(state, teamId, userId);
+      if (!caller || caller.role === "learner") throw new Error("Team manager permission required");
+      if (userId === memberId) throw new Error("Use leave to remove yourself");
+      const target = state.teamMembers.find((item) => String(item.team_id) === teamId && String(item.user_id) === memberId);
+      if (!target) throw new Error("Member not found");
+      if (target.role === "owner") throw new Error("Team owner cannot be removed");
+      if (caller.role === "coach" && target.role !== "learner") throw new Error("Coach can only remove learners");
+      state.teamMembers = state.teamMembers.filter((item) => !(String(item.team_id) === teamId && String(item.user_id) === memberId));
+      const team = localTeamRow(state, teamId);
+      if (!team) throw new Error("Team not found");
+      return team;
+    });
+  }
+  const { data: caller, error: callerError } = await admin.from("team_members").select("role").eq("team_id", teamId).eq("user_id", userId).eq("status", "active").maybeSingle();
+  if (callerError) throw callerError;
+  if (!caller || caller.role === "learner") throw new Error("Team manager permission required");
+  if (userId === memberId) throw new Error("Use leave to remove yourself");
+  const { data: target, error: targetError } = await admin.from("team_members").select("role").eq("team_id", teamId).eq("user_id", memberId).maybeSingle();
+  if (targetError) throw targetError;
+  if (!target) throw new Error("Member not found");
+  if (target.role === "owner") throw new Error("Team owner cannot be removed");
+  if (caller.role === "coach" && target.role !== "learner") throw new Error("Coach can only remove learners");
+  const { error: deleteError } = await admin.from("team_members").delete().eq("team_id", teamId).eq("user_id", memberId);
+  if (deleteError) throw deleteError;
+  const team = await getTeamForUser(userId);
+  if (!team) throw new Error("Team not found");
+  return team;
+}
+
+// RT-005：负责人给成员设置自定义称谓（展示名）。权限角色仍由 role 决定，title 只影响展示。
+export async function setTeamMemberTitle(userId: string, teamId: string, memberId: string, title: string): Promise<TeamRow> {
+  const normalized = title.trim().slice(0, TEAM_MEMBER_TITLE_MAX);
+  const admin = createSupabaseAdminClient();
+  if (!admin) {
+    if (!isLocalRuntimeFallbackEnabled()) throw new Error("Team persistence is not configured");
+    return withLocalRuntimeState((state) => {
+      const caller = localActiveMember(state, teamId, userId);
+      if (!caller || caller.role !== "owner") throw new Error("Only team owner can set member titles");
+      const target = state.teamMembers.find((item) => String(item.team_id) === teamId && String(item.user_id) === memberId);
+      if (!target) throw new Error("Member not found");
+      if (target.role === "owner") throw new Error("Owner title cannot be changed");
+      state.teamMembers = state.teamMembers.map((item) =>
+        String(item.team_id) === teamId && String(item.user_id) === memberId ? { ...item, title: normalized || null } : item
+      );
+      const team = localTeamRow(state, teamId);
+      if (!team) throw new Error("Team not found");
+      return team;
+    });
+  }
+  const { data: caller, error: callerError } = await admin.from("team_members").select("role").eq("team_id", teamId).eq("user_id", userId).eq("status", "active").maybeSingle();
+  if (callerError) throw callerError;
+  if (!caller || caller.role !== "owner") throw new Error("Only team owner can set member titles");
+  const { data: target, error: targetError } = await admin.from("team_members").select("role").eq("team_id", teamId).eq("user_id", memberId).maybeSingle();
+  if (targetError) throw targetError;
+  if (!target) throw new Error("Member not found");
+  if (target.role === "owner") throw new Error("Owner title cannot be changed");
+  const { error: updateError } = await admin.from("team_members").update({ title: normalized || null }).eq("team_id", teamId).eq("user_id", memberId);
   if (updateError) throw updateError;
   const team = await getTeamForUser(userId);
   if (!team) throw new Error("Team not found");

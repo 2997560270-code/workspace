@@ -1,4 +1,4 @@
-﻿import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import type { FullConfig } from "@playwright/test";
 
 const SERVER_URL = "http://127.0.0.1:3100";
@@ -39,6 +39,13 @@ export default async function globalSetup(_config: FullConfig) {
     env: {
       ...process.env,
       ...modelEnv,
+      // FB-014：生产构建下评分签名 fail-closed，必须显式给测试服务器一个密钥，
+      // 否则历史记录读取会抛错、能力页无法渲染（会连带拖垮一批 e2e 用例）。
+      INTEGRITY_SECRET: "product-drill-e2e-integrity-secret",
+      // 本机 .env.local 配置了真实 Supabase：生产构建会把 NEXT_PUBLIC_SUPABASE_URL
+      // 内联进产物，导致 createSupabaseAdminClient() 返回真实客户端、数据 API 全部 503。
+      // service role key 是运行时读取的，这里强制置空即可让 e2e 走本地运行时回退。
+      SUPABASE_SERVICE_ROLE_KEY: "",
       ALLOW_DEMO_AUTH: "true",
       E2E_ISOLATED_USERS: "true",
       PORT: "3100",

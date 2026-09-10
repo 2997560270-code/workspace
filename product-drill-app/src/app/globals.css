@@ -353,6 +353,8 @@ p { color: var(--ink-2); line-height: 1.66; }
 .custom-facts h3 { margin: 6px 0 0; font-size: var(--fs-title); }
 .form-error { margin: 18px 0 0; color: var(--coral-strong); font-size: var(--fs-body-sm); }
 .login-form .form-error { margin: 6px 0 0; }
+/* FB-001：按钮置灰原因；FB-010：盲评字数实时提示。 */
+.form-hint, .login-hint { margin: 6px 0 0; color: var(--ink-2); font-size: var(--fs-aux-sm); }
 .course-entry { padding: 26px; display: flex; align-items: center; justify-content: space-between; gap: 24px; border-left: 4px solid var(--sage-strong); }
 .course-entry h2 { margin: 8px 0; font-size: var(--fs-title); }
 .course-entry p, .course-intro > p { margin: 0; color: var(--ink-2); font-size: var(--fs-body-sm); }
@@ -612,13 +614,19 @@ p { color: var(--ink-2); line-height: 1.66; }
 .review-submission { margin-bottom: 20px; padding: 16px 20px; border: 1px solid var(--line); border-radius: var(--radius); background: #f7f6f1; }
 .review-submission summary { cursor: pointer; font-weight: 600; font-size: var(--fs-body-sm); }
 .review-submission[open] summary { margin-bottom: 14px; }
-.review-submission-block { display: grid; gap: 8px; padding-top: 12px; border-top: 1px dashed var(--line); }
+/* RT-003：长文本溢出的真正原因不是块内换行，而是这里的网格结构。
+   DOM 是 dl > div > (dt + dd)，包装 div 默认只占一个网格单元，
+   于是 max-content 那一列被整段不可断的长文本撑到 1000px 以上，把整页顶宽。
+   让包装 div 不生成盒子（display: contents），dt / dd 直接成为网格项，
+   max-content 列就只由短标签决定，dd 落在 minmax(0, 1fr) 里正常换行。 */
+.review-submission-block { display: grid; gap: 8px; min-width: 0; padding-top: 12px; border-top: 1px dashed var(--line); }
 .review-submission-block + .review-submission-block { margin-top: 12px; }
-.review-submission-block dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; font-size: var(--fs-body-sm); }
-.review-submission-block dl > div { min-width: 0; }
+.review-submission-block dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; margin: 0; min-width: 0; font-size: var(--fs-body-sm); }
+.review-submission-block dl > div { display: contents; }
 .review-submission-block dt { color: var(--ink-2); }
 .review-submission-block dd { margin: 0; min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
-.review-submission-block ol { display: grid; gap: 10px; margin: 0; padding-left: 20px; font-size: var(--fs-body-sm); }
+.review-submission-block ol { display: grid; gap: 10px; margin: 0; min-width: 0; padding-left: 20px; font-size: var(--fs-body-sm); }
+.review-submission-block li { min-width: 0; }
 .review-submission-block li strong { display: block; color: var(--ink-2); font-size: var(--fs-aux-sm); }
 .review-submission-block li p { margin: 2px 0 0; min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
 .team-workspace-panel { padding: 24px; }
@@ -661,12 +669,14 @@ p { color: var(--ink-2); line-height: 1.66; }
 .team-notes blockquote span { font-size: var(--fs-body-sm); }
 .team-notes blockquote small { color: var(--ink-3); font-size: var(--fs-aux-sm); }
 .review-team-notes { margin-top: 0; padding: 16px 20px; border: 1px solid var(--line); border-top: 1px solid var(--line); border-radius: var(--radius); background: #f7f6f1; }
-.review-evidence { display: grid; gap: 12px; }
-.review-evidence article { padding: 22px; border: 1px solid var(--line); border-radius: 9px; }
+/* RT-003：复盘的证据区会原样引用用户提交的文本（可能是超长 URL / 无空格长串），
+   同样需要能收缩并把长串断开，否则会把 .review-detail 一路顶宽。 */
+.review-evidence { display: grid; gap: 12px; min-width: 0; }
+.review-evidence article { min-width: 0; padding: 22px; border: 1px solid var(--line); border-radius: 9px; }
 .review-evidence article > span { color: var(--coral-strong); font-family: var(--font-mono); font-size: var(--fs-aux-sm); font-weight: 600; letter-spacing: 0.04em; }
-.review-evidence h3 { margin: 8px 0 14px; font-size: var(--fs-title-sm); }
-.review-evidence blockquote { max-width: 65ch; margin: 0 0 12px; color: var(--ink-2); font-size: var(--fs-body-sm); line-height: 1.6; }
-.review-evidence p { margin-bottom: 0; font-size: var(--fs-body-sm); }
+.review-evidence h3 { margin: 8px 0 14px; font-size: var(--fs-title-sm); overflow-wrap: anywhere; }
+.review-evidence blockquote { max-width: 65ch; min-width: 0; margin: 0 0 12px; color: var(--ink-2); font-size: var(--fs-body-sm); line-height: 1.6; overflow-wrap: anywhere; }
+.review-evidence p { margin-bottom: 0; font-size: var(--fs-body-sm); overflow-wrap: anywhere; }
 .scenario-comparison { margin-bottom: 24px; padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius); background: #f7f6f1; }
 .scenario-comparison-heading { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; }
 .scenario-comparison-heading span { color: var(--ink-2); font-size: var(--fs-aux); font-weight: 600; }

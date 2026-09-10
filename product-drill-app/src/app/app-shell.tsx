@@ -888,7 +888,7 @@ function TrainingWorkspace({
           <div className="briefing-list">
             {scenario.briefing.map((item) => <div key={item}><CheckMark /> {item}</div>)}
           </div>
-          <div className="mode-switch" aria-label="训练模式">
+          <div className="mode-switch" aria-label="模式选择">
             {TRAINING_MODE_OPTIONS.map((mode) => (
               <button
                 aria-pressed={session.mode === mode}
@@ -1082,7 +1082,7 @@ function ReviewPanel({
           ) : null}
           <div className="review-metrics">
             <div><span>行为证据分</span><strong>{selectedTampered ? "不可信" : selected.totalScore}</strong></div>
-            <div><span>训练模式</span><strong>{selected.mode}</strong></div>
+            <div><span>诊断模式</span><strong>{selected.mode}</strong></div>
             <div><span>复练结果</span><strong>{selected.retry?.improved ? "改善" : selected.retry ? "未达标" : "未复练"}</strong></div>
           </div>
           {/* FB-006：复盘必须能回看这次训练实际提交的对话与判断内容 */}

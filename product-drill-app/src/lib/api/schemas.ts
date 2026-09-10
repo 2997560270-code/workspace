@@ -1,10 +1,10 @@
 ﻿import { z } from "zod";
 import { EvidenceLevelSchema, SkillIdSchema } from "../ai/schemas";
 
-// 「独立」是历史遗留模式名（现称「训练」）：仅允许旧记录通过校验，统一归一化为「训练」。
+// 「训练」「独立」是历史遗留模式名（现称「诊断」）：仅允许旧记录通过校验，统一归一化为「诊断」。
 export const TrainingModeSchema = z
-  .enum(["训练", "严格", "练习", "独立"])
-  .transform((mode) => (mode === "独立" ? "训练" : mode));
+  .enum(["诊断", "严格", "练习", "训练", "独立"])
+  .transform((mode) => (mode === "训练" || mode === "独立" ? "诊断" : mode));
 export const TrainingEngineSchema = z.enum(["openai", "deterministic"]);
 export const TrainingStageSchema = z.enum(["interview", "judgment", "feedback", "retry", "complete"]);
 

@@ -6,7 +6,7 @@ import { buildWeeklyTrainingSummary } from "../src/lib/weekly-summary";
 
 function record(completedAt: string, message: string) {
   const session = sendTrainingMessage(
-    createTrainingSession({ scenarioId: "dashboard-request", mode: "训练" }),
+    createTrainingSession({ scenarioId: "dashboard-request", mode: "诊断" }),
     message
   );
   return { ...createTrainingHistoryRecord(session, generateEvaluation(session)), completedAt };

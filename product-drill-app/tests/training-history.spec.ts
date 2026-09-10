@@ -1,4 +1,4 @@
-﻿import { expect, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { enterApp, reachFeedback } from "./e2e-helpers";
 
 test("records a successful local retry in review", async ({ page }) => {
@@ -11,16 +11,18 @@ test("records a successful local retry in review", async ({ page }) => {
   await page.getByRole("button", { name: "完成并返回今日训练", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "复盘与复练" })).toBeVisible();
   await expect(page.locator(".status-tag", { hasText: "已改善" })).toBeVisible();
-  await page.getByLabel("点评人").fill("产品主管");
+  // FB-011：点评人已改为当前登录账号，不可手填。
+  await expect(page.getByLabel("点评人")).toBeDisabled();
+  await expect(page.getByLabel("点评人")).toHaveValue("张明");
   // FB-010：内容为空/过短时按钮置灰必须给出可见原因，不能静默禁用。
   await expect(page.getByTestId("mentor-note-hint")).toContainText("至少 4 个字");
   await expect(page.getByRole("button", { name: "保存点评", exact: true })).toBeDisabled();
   await page.getByLabel("点评内容").fill("好");
   await expect(page.getByTestId("mentor-note-hint")).toContainText("当前 1 字");
   await page.getByLabel("点评内容").fill("追问已经落到真实流程，下一次继续确认影响范围。");
-  await expect(page.getByTestId("mentor-note-hint")).toContainText("可以保存了");
+  await expect(page.getByTestId("mentor-note-hint")).toContainText("将以 张明 的身份保存");
   await page.getByRole("button", { name: "保存点评", exact: true }).click();
-  await expect(page.getByTestId("mentor-note")).toContainText("产品主管");
+  await expect(page.getByTestId("mentor-note")).toContainText("张明");
 });
 
 test("updates the training map status after completing a scenario (FB-003)", async ({ page }) => {

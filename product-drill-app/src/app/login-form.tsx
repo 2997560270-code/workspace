@@ -179,6 +179,12 @@ export function LoginForm() {
   const emailInvalid = Boolean(emailError);
   const passwordInvalid = Boolean(passwordError);
   const submitDisabled = busy || emailInvalid || passwordInvalid || Boolean(confirmError);
+  // FB-001：按钮置灰时必须给出可见原因，不能只靠禁用让用户猜为什么不能提交。
+  const submitHint = !busy && submitDisabled
+    ? mode === "register"
+      ? (emailError || passwordError || confirmError)
+      : "填写邮箱和密码后即可登录。"
+    : "";
 
   return (
     <main className="login-page">
@@ -232,6 +238,7 @@ export function LoginForm() {
             <button className="button button-primary" disabled={submitDisabled} type="submit">
               {busy ? "请稍候…" : mode === "login" ? "登录" : "注册"}
             </button>
+            {submitHint ? <p className="login-hint" data-testid="login-submit-hint" role="status">{submitHint}</p> : null}
             {status ? (
               <p aria-live="polite" className={"login-status login-status--" + status.kind}>{status.text}</p>
             ) : null}

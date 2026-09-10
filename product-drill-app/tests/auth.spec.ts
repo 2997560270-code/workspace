@@ -16,3 +16,26 @@ test("enters the app with the isolated e2e session cookie", async ({ page }) => 
   const cookies = await page.context().cookies();
   expect(cookies.some((cookie) => cookie.name === "product_drill_e2e_user")).toBe(true);
 });
+
+test("shows why the register button is disabled (FB-001)", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "注册" }).click();
+
+  const register = page.getByRole("button", { name: "注册", exact: true });
+  const hint = page.getByTestId("login-submit-hint");
+
+  // 空表单：按钮置灰，但必须给出可见原因
+  await expect(register).toBeDisabled();
+  await expect(hint).toContainText("请输入邮箱地址");
+
+  // 填了邮箱但密码为空：提示跟着更新，而不是继续置灰没下文
+  await page.getByLabel("邮箱").fill("a@example.com");
+  await expect(register).toBeDisabled();
+  await expect(hint).toContainText("请输入密码");
+
+  // 补足密码后提示消失、按钮可点
+  await page.getByLabel(/^密码/).fill("12345678");
+  await page.getByLabel("确认密码").fill("12345678");
+  await expect(register).toBeEnabled();
+  await expect(hint).toHaveCount(0);
+});

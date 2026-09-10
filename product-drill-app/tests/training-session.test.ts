@@ -1,12 +1,28 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   createTrainingSession,
   getCoveragePercent,
   moveToJudgment,
   sendTrainingMessage,
   submitJudgment,
+  TRAINING_MODE_OPTIONS,
   useTrainingHint
 } from "../src/lib/training-session";
+import { TrainingModeSchema } from "../src/lib/api/schemas";
+
+describe("RT-002 训练模式更名诊断模式", () => {
+  it("模式选项只暴露 诊断/严格/练习", () => {
+    expect(TRAINING_MODE_OPTIONS).toEqual(["诊断", "严格", "练习"]);
+  });
+
+  it("历史值 训练/独立 归一化为 诊断", () => {
+    expect(TrainingModeSchema.parse("诊断")).toBe("诊断");
+    expect(TrainingModeSchema.parse("训练")).toBe("诊断");
+    expect(TrainingModeSchema.parse("独立")).toBe("诊断");
+    expect(TrainingModeSchema.parse("练习")).toBe("练习");
+    expect(TrainingModeSchema.parse("严格")).toBe("严格");
+  });
+});
 
 describe("direction A training session", () => {
   it("starts with the selected scenario role opening", () => {
@@ -18,7 +34,7 @@ describe("direction A training session", () => {
   });
 
   it("reveals a scenario fact and records the covered skill", () => {
-    const session = createTrainingSession({ scenarioId: "dashboard-request", mode: "训练" });
+    const session = createTrainingSession({ scenarioId: "dashboard-request", mode: "诊断" });
     const updated = sendTrainingMessage(session, "你们目前的完整流程是怎么完成的？");
     expect(updated.messages.map((message) => message.role)).toEqual(["ai", "user", "ai"]);
     expect(updated.coveredSkills).toContain("workflow");

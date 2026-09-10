@@ -3,13 +3,19 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   addTeamMentorNote,
+  canRemoveTeamMember,
   createTeamWorkspace,
   findTeamByInviteCode,
   findTeamForMember,
   joinTeamWorkspace,
+  leaveTeamWorkspace,
   loadTeamDirectory,
+  removeTeamMember,
   saveTeamDirectory,
+  setTeamInviteRole,
   setTeamMemberRole,
+  setTeamMemberTitle,
+  TEAM_MEMBER_TITLE_MAX,
   type TeamMember,
   type TeamMemberRole,
   type TeamMentorNote,
@@ -27,7 +33,7 @@ type ApiTeam = {
   name: string;
   owner_id: string;
   created_at: string;
-  team_members?: Array<{ user_id: string; role: TeamMemberRole; status: "active" | "invited" | "suspended"; joined_at: string }>;
+  team_members?: Array<{ user_id: string; role: TeamMemberRole; status: "active" | "invited" | "suspended"; joined_at: string; title?: string | null }>;
 };
 
 type MemberRecordSummary = {
@@ -51,8 +57,15 @@ function mapApiTeam(team: ApiTeam, inviteCode = ""): TeamWorkspace {
       role: member.role,
       status: member.status === "active" ? "active" : "invited",
       joinedAt: member.joined_at,
+      title: member.title?.trim() ? member.title.trim() : undefined,
     })),
   };
+}
+
+// RT-005：展示名 ≠ 权限角色。有自定义称谓时「称谓 · 角色」并列展示，权限判断仍只看 role。
+function memberDisplayLabel(member: TeamMember): string {
+  const title = member.title?.trim();
+  return title ? `${title} · ${ROLE_LABELS[member.role]}` : ROLE_LABELS[member.role];
 }
 
 // FB-009：本地试用模式下，同一浏览器的每个账号各自保存训练历史，
@@ -93,6 +106,10 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
   const [noteStatus, setNoteStatus] = useState("");
   // FB-009：远程（服务端）团队下，负责人/导师按需拉取每位成员的训练概况。
   const [remoteMemberRecords, setRemoteMemberRecords] = useState<Record<string, MemberRecordSummary[]>>({});
+  // RT-008：退出 / 解散 / 移除成员的反馈文案。
+  const [lifecycleStatus, setLifecycleStatus] = useState("");
+  // RT-005：邀请身份——负责人在邀请前就能指定新成员的身份。
+  const [inviteRole, setInviteRole] = useState<TeamMemberRole>("learner");
 
   useEffect(() => {
     let active = true;
@@ -157,19 +174,51 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
 
   async function create() {
     if (teamName.trim().length < 2) return;
+    // RT-005：建队时就地指定新成员身份（后端 invite 已支持 role）。
+    const role: "coach" | "learner" = inviteRole === "coach" ? "coach" : "learner";
     if (serverConfigured) {
       const remote = await requestClientJson<{ team: ApiTeam }>("/api/teams", { method: "POST", body: JSON.stringify({ action: "create", name: teamName }) });
       if (remote?.team) {
-        const invitation = await requestClientJson<{ invitation: { code: string } }>("/api/teams", { method: "POST", body: JSON.stringify({ action: "invite", teamId: remote.team.id, role: "learner" }) });
-        setTeam(mapApiTeam(remote.team, invitation?.invitation.code ?? ""));
+        const invitation = await requestClientJson<{ invitation: { code: string } }>("/api/teams", { method: "POST", body: JSON.stringify({ action: "invite", teamId: remote.team.id, role }) });
+        setTeam({ ...mapApiTeam(remote.team, invitation?.invitation.code ?? ""), inviteRole: role });
         setIsRemoteTeam(true);
         setTeamName("");
         return;
       }
     }
-    persist(createTeamWorkspace({ ownerId: userId, ownerName: userName, name: teamName }));
+    persist(createTeamWorkspace({ ownerId: userId, ownerName: userName, name: teamName, inviteRole: role }));
     setIsRemoteTeam(false);
     setTeamName("");
+  }
+
+  // RT-005：负责人切换邀请身份；远程团队会重新签发一张该身份的邀请码。
+  async function changeInviteRole(role: TeamMemberRole) {
+    if (!team || role === "owner") return;
+    setInviteRole(role);
+    const invitationRole: "coach" | "learner" = role === "coach" ? "coach" : "learner";
+    if (isRemoteTeam) {
+      const invitation = await requestClientJson<{ invitation: { code: string } }>("/api/teams", { method: "POST", body: JSON.stringify({ action: "invite", teamId: team.id, role: invitationRole }) });
+      setTeam({ ...team, inviteCode: invitation?.invitation.code ?? team.inviteCode, inviteRole: role });
+      return;
+    }
+    persist(setTeamInviteRole(team, userId, role));
+  }
+
+  // RT-005：负责人给成员设置自定义称谓（展示名，不改变权限角色）。
+  async function changeTitle(memberId: string, title: string) {
+    if (!team) return;
+    if (isRemoteTeam) {
+      const remote = await requestClientJson<{ team: ApiTeam }>("/api/teams", { method: "POST", body: JSON.stringify({ action: "set_title", teamId: team.id, memberId, title }) });
+      if (!remote?.team) {
+        setLifecycleStatus("称谓保存失败：只有团队负责人可以设置成员称谓。");
+        return;
+      }
+      setTeam({ ...mapApiTeam(remote.team, team.inviteCode), inviteRole: team.inviteRole });
+      setLifecycleStatus("已保存成员称谓。");
+      return;
+    }
+    persist(setTeamMemberTitle(team, userId, memberId, title));
+    setLifecycleStatus("已保存成员称谓。");
   }
 
   async function join() {
@@ -228,6 +277,64 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
     persist(setTeamMemberRole(team, memberId, role));
   }
 
+  // RT-008：成员自愿退出团队。负责人还有成员时会被服务端拒绝，需改用「解散团队」。
+  async function leave() {
+    if (!team) return;
+    if (isRemoteTeam) {
+      const remote = await requestClientJson<{ dissolved: boolean }>("/api/teams", { method: "POST", body: JSON.stringify({ action: "leave", teamId: team.id }) });
+      if (!remote) {
+        setLifecycleStatus("退出失败：负责人还有成员时需要先解散团队。");
+        return;
+      }
+    } else {
+      const nextTeam = leaveTeamWorkspace(team, userId);
+      const directory = loadTeamDirectory().filter((item) => item.id !== team.id);
+      saveTeamDirectory(nextTeam ? [...directory, nextTeam] : directory);
+    }
+    setTeam(null);
+    setIsRemoteTeam(false);
+    setLifecycleStatus("已退出团队。");
+  }
+
+  // RT-008：负责人解散团队（清空成员与邀请码）。
+  async function dissolve() {
+    if (!team) return;
+    if (isRemoteTeam) {
+      const remote = await requestClientJson<{ dissolved: boolean }>("/api/teams", { method: "POST", body: JSON.stringify({ action: "dissolve", teamId: team.id }) });
+      if (!remote) {
+        setLifecycleStatus("解散失败：只有团队负责人可以解散团队。");
+        return;
+      }
+    } else {
+      saveTeamDirectory(loadTeamDirectory().filter((item) => item.id !== team.id));
+    }
+    setTeam(null);
+    setIsRemoteTeam(false);
+    setLifecycleStatus("团队已解散。");
+  }
+
+  // RT-008：负责人移除成员（负责人可移除导师/学习者；导师只能移除学习者；不能移除负责人）。
+  async function removeMember(memberId: string) {
+    if (!team) return;
+    if (isRemoteTeam) {
+      const remote = await requestClientJson<{ team: ApiTeam }>("/api/teams", { method: "POST", body: JSON.stringify({ action: "remove", teamId: team.id, memberId }) });
+      if (!remote?.team) {
+        setLifecycleStatus("移除失败：只有负责人或导师可以移除成员。");
+        return;
+      }
+      setTeam(mapApiTeam(remote.team, team.inviteCode));
+      setLifecycleStatus("已移除该成员。");
+      return;
+    }
+    const nextTeam = removeTeamMember(team, userId, memberId);
+    if (nextTeam === team) {
+      setLifecycleStatus(canRemoveTeamMember(team, userId, memberId).ok ? "移除失败，请重试。" : "移除失败：只有负责人或导师可以移除成员。");
+      return;
+    }
+    persist(nextTeam);
+    setLifecycleStatus("已移除该成员。");
+  }
+
   if (!ready) return null;
 
   return (
@@ -244,14 +351,31 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
         <>
           <div className="team-invite-strip">
             <div><span>团队邀请码</span><strong data-testid="team-invite-code">{team.inviteCode || "由服务端管理"}</strong></div>
-            <p>把邀请码交给成员，他们可在同一浏览器的团队入口加入。</p>
+            {/* RT-005：邀请前就指定新成员身份，避免「先加入再改角色」 */}
+            <div>
+              <span>新成员身份</span>
+              {myRole === "owner" ? (
+                <select
+                  aria-label="新成员身份"
+                  data-testid="team-invite-role"
+                  onChange={(event) => { void changeInviteRole(event.target.value as TeamMemberRole); }}
+                  value={team.inviteRole ?? inviteRole}
+                >
+                  <option value="learner">学习者</option>
+                  <option value="coach">导师</option>
+                </select>
+              ) : (
+                <strong data-testid="team-invite-role-label">{ROLE_LABELS[team.inviteRole ?? inviteRole]}</strong>
+              )}
+            </div>
+            <p>把邀请码交给成员，他们可在同一浏览器的团队入口加入；加入时即获得上面选定的身份。</p>
           </div>
           {/* FB-009：任何成员都能看到完整成员列表与自己的角色定位 */}
           <div className="team-member-list" data-testid="team-member-list">
             {team.members.map((member) => (
               <div className="team-member" data-testid={`team-member-${member.id}`} key={member.id}>
                 <span>{member.name}{member.id === userId ? "（你）" : ""}</span>
-                <small>{ROLE_LABELS[member.role]} · {member.status === "active" ? "已加入" : "待加入"}</small>
+                <small>{memberDisplayLabel(member)} · {member.status === "active" ? "已加入" : "待加入"}</small>
                 {/* RT-005：负责人可在 learner/coach 之间调整成员角色（不能改 owner） */}
                 {myRole === "owner" && member.role !== "owner" ? (
                   <select
@@ -264,8 +388,40 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
                     <option value="coach">导师</option>
                   </select>
                 ) : null}
+                {/* RT-005：负责人给成员自定义称谓（展示名，不改变权限角色） */}
+                {myRole === "owner" && member.role !== "owner" ? (
+                  <input
+                    aria-label={`设置 ${member.name} 的称谓`}
+                    data-testid={`team-member-title-${member.id}`}
+                    defaultValue={member.title ?? ""}
+                    key={`title-${member.id}-${member.title ?? ""}`}
+                    maxLength={TEAM_MEMBER_TITLE_MAX}
+                    onBlur={(event) => { void changeTitle(member.id, event.target.value); }}
+                    placeholder="自定义称谓（如 产品总监）"
+                    type="text"
+                  />
+                ) : null}
+                {/* RT-008：负责人/导师移除成员（越权校验见 canRemoveTeamMember） */}
+                {canRemoveTeamMember(team, userId, member.id).ok ? (
+                  <button
+                    className="text-button"
+                    data-testid={`team-member-remove-${member.id}`}
+                    onClick={() => { void removeMember(member.id); }}
+                    type="button"
+                  >
+                    移除
+                  </button>
+                ) : null}
               </div>
             ))}
+          </div>
+          {/* RT-008：团队生命周期——成员退出、负责人解散团队 */}
+          <div className="team-lifecycle-actions" data-testid="team-lifecycle-actions">
+            {myRole === "owner" ? (
+              <button className="button button-secondary" data-testid="team-dissolve" onClick={() => { void dissolve(); }} type="button">解散团队</button>
+            ) : (
+              <button className="button button-secondary" data-testid="team-leave" onClick={() => { void leave(); }} type="button">退出团队</button>
+            )}
           </div>
           {/* FB-009/FB-011：负责人与导师查看成员训练概况，并直接以自己账号点评（本地与远程团队均可用） */}
           {isManager ? (
@@ -278,7 +434,7 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
                 <article className="team-member-overview" data-testid={`team-member-overview-${member.id}`} key={member.id}>
                   <div className="team-member-overview-heading">
                     <strong>{member.name}{member.id === userId ? "（你）" : ""}</strong>
-                    <span>{ROLE_LABELS[member.role]} · 已完成 {records.length} 次训练</span>
+                    <span>{memberDisplayLabel(member)} · 已完成 {records.length} 次训练</span>
                   </div>
                   {records.length ? (
                     <ul>
@@ -305,7 +461,7 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
                     >
                       <option value="">选择成员</option>
                       {team.members.filter((member) => member.status === "active").map((member) => (
-                        <option key={member.id} value={member.id}>{member.name}（{ROLE_LABELS[member.role]}）</option>
+                        <option key={member.id} value={member.id}>{member.name}（{memberDisplayLabel(member)}）</option>
                       ))}
                     </select>
                   </label>
@@ -369,6 +525,19 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
         <div className="team-actions">
           <label><span>团队名称</span><input aria-label="团队名称" onChange={(event) => setTeamName(event.target.value)} placeholder="例如：产品新人训练小组" value={teamName} /></label>
           {teamName.trim() && teamName.trim().length < 2 ? <p className="mentor-note-hint" data-testid="team-name-hint" role="status">团队名称至少 2 个字（当前 {teamName.trim().length} 字）。</p> : null}
+          {/* RT-005：建队时即指定被邀请者的身份（创建者提供称谓/身份，而不是只能事后改） */}
+          <label>
+            <span>邀请身份</span>
+            <select
+              aria-label="邀请身份"
+              data-testid="team-create-invite-role"
+              onChange={(event) => setInviteRole(event.target.value as TeamMemberRole)}
+              value={inviteRole}
+            >
+              <option value="learner">学习者</option>
+              <option value="coach">导师</option>
+            </select>
+          </label>
           <button className="button button-primary" disabled={teamName.trim().length < 2} onClick={create} type="button">创建团队</button>
           <div className="team-divider"><span>或</span></div>
           <label><span>已有邀请码</span><input aria-label="团队邀请码" onChange={(event) => setInviteCode(event.target.value)} placeholder="输入 4–16 位邀请码（字母数字）" value={inviteCode} /></label>
@@ -377,6 +546,8 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
           {joinError ? <p className="form-error" role="alert">{joinError}</p> : null}
         </div>
       )}
+      {/* RT-008：退出/移除/解散的反馈要留在团队消失之后也可见 */}
+      {lifecycleStatus ? <p className="team-lifecycle-status" data-testid="team-lifecycle-status" role="status">{lifecycleStatus}</p> : null}
     </section>
   );
 }

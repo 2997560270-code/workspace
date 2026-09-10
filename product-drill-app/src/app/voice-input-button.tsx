@@ -11,11 +11,32 @@ type SpeechRecognitionLike = {
   onend: (() => void) | null;
   start: () => void;
   stop: () => void;
+  abort: () => void;
 };
 
 type SpeechWindow = Window & { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike };
 
 type VoiceStatus = "idle" | "listening" | "unsupported" | "error";
+
+// RT-007：识别报错后必须主动释放麦克风，否则标签页会一直显示「正在录音」。
+// abort() 比 stop() 更快断开音频采集，但只有运行中的识别器才能调用，
+// 因此统一走这个容错封装，并在失败时退回 stop()。同一个识别器只释放一次
+// （onerror 与 onend 可能先后触发，卸载清理也可能再调一次）。
+const releasedRecognitions = new WeakSet<SpeechRecognitionLike>();
+
+function releaseRecognition(recognition: SpeechRecognitionLike | null): void {
+  if (!recognition || releasedRecognitions.has(recognition)) return;
+  releasedRecognitions.add(recognition);
+  try {
+    recognition.abort();
+  } catch {
+    try {
+      recognition.stop();
+    } catch {
+      // 识别器已经结束，无需再释放。
+    }
+  }
+}
 
 // 失败原因对用户不可见是 FB-002 的核心问题：这里把浏览器错误码翻译成人话，
 // 并始终保留文字输入路径（需求 4.5）。
@@ -32,7 +53,8 @@ export function VoiceInputButton({ onTranscript, disabled }: { onTranscript: (te
   const [status, setStatus] = useState<VoiceStatus>("idle");
   const [errorDetail, setErrorDetail] = useState("");
 
-  useEffect(() => () => recognitionRef.current?.stop(), []);
+  // RT-007：卸载时也要真正释放设备，stop() 在 network 错误态下不足以断开采集。
+  useEffect(() => () => releaseRecognition(recognitionRef.current), []);
 
   function toggle() {
     if (disabled) return;
@@ -55,12 +77,20 @@ export function VoiceInputButton({ onTranscript, disabled }: { onTranscript: (te
       const transcript = Array.from({ length: event.results.length }, (_, index) => event.results[index]?.[0]?.transcript ?? "").join("").trim();
       if (transcript) onTranscript(transcript);
     };
+    // RT-007：network 错误下 Chrome 可能不触发 onend，必须在这里主动 abort()，
+    // 否则提示「用不了」的同时麦克风仍在采集（标签页持续显示录音图标）。
     recognition.onerror = (event) => {
       setErrorDetail(ERROR_MESSAGES[event?.error ?? ""] ?? "语音识别失败");
       setStatus("error");
+      releaseRecognition(recognition);
+      recognitionRef.current = null;
     };
     // onend 会在 onerror 之后触发：若已进入错误/不支持状态，保留提示而不是悄悄复位。
-    recognition.onend = () => setStatus((current) => (current === "listening" ? "idle" : current));
+    // RT-007：同时兜底释放，保证任何结束路径都不残留设备占用。
+    recognition.onend = () => {
+      releaseRecognition(recognition);
+      setStatus((current) => (current === "listening" ? "idle" : current));
+    };
     recognitionRef.current = recognition;
     setErrorDetail("");
     setStatus("listening");

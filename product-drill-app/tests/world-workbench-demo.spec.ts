@@ -7,20 +7,37 @@ const WORLD_TITLES = [
   "增长指标下降后的竞品功能跟进",
 ];
 
-async function completeCurrentWorld(page: import("@playwright/test").Page, action: string) {
+// FB-013：进入决策阶段前必须确认至少一条世界事实（evidence_eligible）。
+// 每个世界按维度给出能命中揭示条件触发词的问题；世界 3 需三个维度都有证据，
+// 复盘才会出现「三个维度」，世界 1 则故意不查替代方案、让「已有替代方案」进入缺失清单。
+const WORLD_PROBES: Array<{ workflow: string; consequence: string; alternative?: string }> = [
+  {
+    workflow: "现有摘要的使用情况怎么样？使用率是多少？",
+    consequence: "如果不解决入口路径问题，会有什么影响？",
+  },
+  {
+    workflow: "现在哪些核心用户在用？活跃用户的使用数据如何？",
+    consequence: "如果客户不续签，会有什么影响？",
+  },
+  {
+    workflow: "竞品功能的实际使用数据和用户群分布如何？",
+    consequence: "如果跟进竞品，工程量和技术成本有多大？会影响路线图吗？",
+    alternative: "有没有做过流失访谈？用户为什么流失？",
+  },
+];
+
+async function completeCurrentWorld(page: import("@playwright/test").Page, worldIndex: number) {
+  const probes = WORLD_PROBES[worldIndex];
   const input = page.getByPlaceholder("提出调查问题或采取行动，Enter 发送，Shift+Enter 换行");
   await page.getByRole("button", { name: "当前流程", exact: true }).click();
-  await input.fill(`${action}（当前流程）`);
+  await input.fill(probes.workflow);
   await page.getByRole("button", { name: "发送", exact: true }).click();
   await page.getByRole("button", { name: "问题影响", exact: true }).click();
-  await input.fill(`${action}（问题影响）`);
+  await input.fill(probes.consequence);
   await page.getByRole("button", { name: "发送", exact: true }).click();
-  // World 3 is the only transfer test; cover all dimensions there so the
-  // production transfer judge can persist an independent transfer record.
-  const worldHeading = page.getByRole("heading", { level: 2, name: WORLD_TITLES[2] });
-  if (await worldHeading.isVisible().catch(() => false)) {
+  if (probes.alternative) {
     await page.getByRole("button", { name: "替代方案", exact: true }).click();
-    await input.fill(`${action}（替代方案）`);
+    await input.fill(probes.alternative);
     await page.getByRole("button", { name: "发送", exact: true }).click();
   }
   await page.getByRole("button", { name: "完成调查，提交决策", exact: true }).click();
@@ -89,7 +106,7 @@ test("short learner messages keep a content-sized bubble", async ({ page }) => {
   expect(dimensions.textAlign).toBe("left");
 
   await page.getByRole("button", { name: "完成调查，提交决策", exact: true }).click();
-  await expect(page.getByText("尚无调查事件可引用", { exact: true })).toBeVisible();
+  await expect(page.locator(".wb-error-banner")).toContainText("你还没有获得任何有效调查证据");
 });
 
 test("desktop completes world 1 to 2 to 3 and opens the judgment profile", async ({ page }) => {
@@ -98,7 +115,7 @@ test("desktop completes world 1 to 2 to 3 and opens the judgment profile", async
 
   for (let index = 0; index < WORLD_TITLES.length; index += 1) {
     await expect(page.getByRole("heading", { level: 2, name: WORLD_TITLES[index] })).toBeVisible();
-    await completeCurrentWorld(page, "请核查当前使用数据、真实问题和现有替代方案");
+    await completeCurrentWorld(page, index);
     if (index === 0) {
       await expect(page.locator(".wb-reflect")).toContainText("已有替代方案");
     }
@@ -156,7 +173,8 @@ test("rejects meaningless decision input instead of revealing positive consequen
   await enterApp(page);
   await page.getByRole("button", { name: "进入世界工作台" }).click();
   const input = page.getByPlaceholder("提出调查问题或采取行动，Enter 发送，Shift+Enter 换行");
-  await input.fill("先了解当前的真实流程");
+  // 先取得一条有效调查证据，才能进入决策阶段（FB-013 的闸门）。
+  await input.fill("现有摘要的使用情况怎么样？使用率是多少？");
   await page.getByRole("button", { name: "发送", exact: true }).click();
   await page.getByRole("button", { name: "完成调查，提交决策", exact: true }).click();
 
@@ -213,7 +231,7 @@ test("mobile viewport can complete the governed three-world loop", async ({ page
 
   for (let index = 0; index < WORLD_TITLES.length; index += 1) {
     await expect(page.locator(".wb-header h2")).toHaveCount(1);
-    await completeCurrentWorld(page, "请先调查真实问题、当前流程和替代方案");
+    await completeCurrentWorld(page, index);
     const finishButton = page.locator(".wb-reflect .button-primary");
     await expect(finishButton).toHaveCount(1);
     await finishButton.click();
