@@ -1,7 +1,8 @@
 import { createSupabaseAdminClient } from "../supabase/admin";
 import { isLocalRuntimeFallbackEnabled, withLocalRuntimeState } from "../local-runtime-store";
 import { TEAM_MEMBER_TITLE_MAX } from "../team-workspace";
-import { getHistoryRecords } from "./training-repository";
+import { getHistoryRecord, getHistoryRecords } from "./training-repository";
+import type { TrainingHistoryRecord } from "../training-history";
 
 export type TeamRow = {
   id: string;
@@ -346,6 +347,32 @@ export async function listMemberRecords(
     totalScore: record.totalScore,
     completedAt: record.completedAt,
   }));
+}
+
+// FB-012：负责人/导师查看成员某一条完整训练记录（仅同团队、且调用者为 owner/coach 才可读）。
+export async function getMemberRecord(
+  callerUserId: string,
+  teamId: string,
+  memberUserId: string,
+  sessionId: string
+): Promise<TrainingHistoryRecord | null> {
+  const admin = createSupabaseAdminClient();
+  if (!admin) {
+    if (!isLocalRuntimeFallbackEnabled()) return null;
+    return withLocalRuntimeState((state) => {
+      const caller = localActiveMember(state, teamId, callerUserId);
+      if (!caller || !["owner", "coach"].includes(String(caller.role))) throw new Error("Team manager permission required");
+      if (!state.teamMembers.some((item) => item.team_id === teamId && String(item.user_id) === memberUserId)) throw new Error("Member not in team");
+      return null;
+    });
+  }
+  const callerMembership = await admin.from("team_members").select("role").eq("team_id", teamId).eq("user_id", callerUserId).eq("status", "active").maybeSingle();
+  if (callerMembership.error) throw callerMembership.error;
+  if (!callerMembership.data || !["owner", "coach"].includes(callerMembership.data.role)) throw new Error("Team manager permission required");
+  const memberMembership = await admin.from("team_members").select("user_id").eq("team_id", teamId).eq("user_id", memberUserId).eq("status", "active").maybeSingle();
+  if (memberMembership.error) throw memberMembership.error;
+  if (!memberMembership.data) throw new Error("Member not in team");
+  return getHistoryRecord(memberUserId, sessionId);
 }
 
 export async function listMentorNotesForSession(userId: string, sessionId: string) {

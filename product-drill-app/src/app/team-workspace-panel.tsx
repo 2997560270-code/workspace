@@ -23,6 +23,7 @@ import {
 } from "../lib/team-workspace";
 import { requestClientJson } from "../lib/client-api";
 import { StoredHistorySchema } from "../lib/api/schemas";
+import type { TrainingHistoryRecord } from "../lib/training-history";
 
 const ROLE_LABELS: Record<TeamMemberRole, string> = { owner: "负责人", coach: "导师", learner: "学习者" };
 // 与 app-shell 的 STORAGE_KEY 保持一致：本地试用模式下按账号读取训练历史。
@@ -42,6 +43,8 @@ type MemberRecordSummary = {
   mode: string;
   totalScore: number;
   completedAt: string;
+  // 本地试用模式下可直接拿到完整记录，用于跳转复盘视图；远程团队按需拉取。
+  record?: TrainingHistoryRecord;
 };
 
 function mapApiTeam(team: ApiTeam, inviteCode = ""): TeamWorkspace {
@@ -84,6 +87,7 @@ function loadMemberRecords(memberId: string): MemberRecordSummary[] {
         mode: record.mode,
         totalScore: record.totalScore,
         completedAt: record.completedAt,
+        record,
       }))
       .sort((a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt));
   } catch {
@@ -91,7 +95,27 @@ function loadMemberRecords(memberId: string): MemberRecordSummary[] {
   }
 }
 
-export function TeamWorkspacePanel({ userId, userName }: { userId: string; userName: string }) {
+// FB-012：点评草稿（成员/记录/内容）由外层持有，跳转查看记录后返回仍保留选择。
+export type TeamMentorDraft = {
+  memberId: string;
+  sessionId: string;
+  content: string;
+};
+
+export function TeamWorkspacePanel({
+  userId,
+  userName,
+  onViewRecord,
+  draft,
+  onDraftChange
+}: {
+  userId: string;
+  userName: string;
+  // FB-012：点评前可直接跳到「复盘与复练」查看这条训练记录，不必来回切换视图。
+  onViewRecord?: (record: TrainingHistoryRecord) => void;
+  draft: TeamMentorDraft;
+  onDraftChange: (draft: TeamMentorDraft) => void;
+}) {
   const [team, setTeam] = useState<TeamWorkspace | null>(null);
   const [isRemoteTeam, setIsRemoteTeam] = useState(false);
   const [serverConfigured, setServerConfigured] = useState(false);
@@ -99,10 +123,8 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
   const [inviteCode, setInviteCode] = useState("");
   const [joinError, setJoinError] = useState("");
   const [ready, setReady] = useState(false);
-  // FB-011：负责人/导师以自己账号点评成员训练记录。
-  const [noteMemberId, setNoteMemberId] = useState("");
-  const [noteSessionId, setNoteSessionId] = useState("");
-  const [noteContent, setNoteContent] = useState("");
+  // FB-011：负责人/导师以自己账号点评成员训练记录；草稿状态由外层保留（FB-012）。
+  const { memberId: noteMemberId, sessionId: noteSessionId, content: noteContent } = draft;
   const [noteStatus, setNoteStatus] = useState("");
   // FB-009：远程（服务端）团队下，负责人/导师按需拉取每位成员的训练概况。
   const [remoteMemberRecords, setRemoteMemberRecords] = useState<Record<string, MemberRecordSummary[]>>({});
@@ -161,6 +183,15 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
   }, [team, isRemoteTeam, remoteMemberRecords]);
 
   const noteMemberRecords = memberOverviews.find((item) => item.member.id === noteMemberId)?.records ?? [];
+  const updateDraft = (patch: Partial<TeamMentorDraft>) => onDraftChange({ ...draft, ...patch });
+  // FB-013：点评记录要能追溯到具体训练——按 sessionId 找到所属成员与记录摘要。
+  const noteRecordIndex = useMemo(() => {
+    const map = new Map<string, { memberId: string; summary: MemberRecordSummary }>();
+    memberOverviews.forEach(({ member, records }) => {
+      records.forEach((record) => map.set(record.id, { memberId: member.id, summary: record }));
+    });
+    return map;
+  }, [memberOverviews]);
   const teamNotes: TeamMentorNote[] = useMemo(
     () => [...(team?.mentorNotes ?? [])].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
     [team]
@@ -255,7 +286,7 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
       });
       if (remote?.note) {
         setNoteStatus(`点评已保存，点评人为 ${userName}（${ROLE_LABELS[myRole ?? "learner"]}）。`);
-        setNoteContent("");
+        updateDraft({ content: "" });
         return;
       }
       setNoteStatus("点评保存失败：只有团队负责人或导师可以点评，请稍后重试。");
@@ -263,7 +294,7 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
     }
     persist(addTeamMentorNote(team, { sessionId: noteSessionId, authorId: userId, authorName: userName, content: noteContent }));
     setNoteStatus(`点评已保存，点评人为 ${userName}（${ROLE_LABELS[myRole ?? "learner"]}）。`);
-    setNoteContent("");
+    updateDraft({ content: "" });
   }
 
   // RT-005：负责人调整成员角色（仅在 learner/coach 之间；owner 角色不可改）。
@@ -275,6 +306,51 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
       return;
     }
     persist(setTeamMemberRole(team, memberId, role));
+  }
+
+  // FB-012：点评前先查看这条训练记录——本地模式直接用成员本机完整记录，
+  // 远程团队按需向服务端拉取，再交给外层跳转到「复盘与复练」视图。
+  const [viewingRecord, setViewingRecord] = useState(false);
+  async function viewSelectedRecord() {
+    if (!onViewRecord || !noteSessionId) return;
+    const local = noteMemberRecords.find((item) => item.id === noteSessionId)?.record;
+    if (local) {
+      onViewRecord(local);
+      return;
+    }
+    if (!isRemoteTeam || !team || !noteMemberId) return;
+    setViewingRecord(true);
+    try {
+      const remote = await requestClientJson<{ record: TrainingHistoryRecord | null }>(
+        `/api/teams?teamId=${encodeURIComponent(team.id)}&memberId=${encodeURIComponent(noteMemberId)}&sessionId=${encodeURIComponent(noteSessionId)}`
+      );
+      if (remote?.record) onViewRecord(remote.record);
+    } finally {
+      setViewingRecord(false);
+    }
+  }
+
+  // FB-013：点击团队点评记录跳到它对应的训练记录（同 FB-012 的本地/远程两条路径）。
+  const [viewingNoteId, setViewingNoteId] = useState("");
+  async function viewNoteRecord(note: TeamMentorNote) {
+    if (!onViewRecord || !team) return;
+    const entry = noteRecordIndex.get(note.sessionId);
+    if (!entry) return;
+    const local = entry.summary.record;
+    if (local) {
+      onViewRecord(local);
+      return;
+    }
+    if (!isRemoteTeam) return;
+    setViewingNoteId(note.id);
+    try {
+      const remote = await requestClientJson<{ record: TrainingHistoryRecord | null }>(
+        `/api/teams?teamId=${encodeURIComponent(team.id)}&memberId=${encodeURIComponent(entry.memberId)}&sessionId=${encodeURIComponent(note.sessionId)}`
+      );
+      if (remote?.record) onViewRecord(remote.record);
+    } finally {
+      setViewingNoteId("");
+    }
   }
 
   // RT-008：成员自愿退出团队。负责人还有成员时会被服务端拒绝，需改用「解散团队」。
@@ -456,7 +532,7 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
                     <select
                       aria-label="选择要点评的成员"
                       data-testid="team-mentor-member"
-                      onChange={(event) => { setNoteMemberId(event.target.value); setNoteSessionId(""); }}
+                      onChange={(event) => updateDraft({ memberId: event.target.value, sessionId: "" })}
                       value={noteMemberId}
                     >
                       <option value="">选择成员</option>
@@ -471,7 +547,7 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
                       aria-label="选择要点评的训练记录"
                       data-testid="team-mentor-session"
                       disabled={!noteMemberId}
-                      onChange={(event) => setNoteSessionId(event.target.value)}
+                      onChange={(event) => updateDraft({ sessionId: event.target.value })}
                       value={noteSessionId}
                     >
                       <option value="">{noteMemberId ? "选择训练记录" : "先选择成员"}</option>
@@ -479,11 +555,21 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
                         <option key={record.id} value={record.id}>{record.title}（{record.mode} · {record.totalScore} 分）</option>
                       ))}
                     </select>
+                    {/* FB-012：选中记录后可直接跳到复盘视图查看详情，再回来点评 */}
+                    {onViewRecord ? (
+                      <button
+                        className="text-button"
+                        data-testid="team-mentor-view-record"
+                        disabled={!noteSessionId || viewingRecord}
+                        onClick={() => { void viewSelectedRecord(); }}
+                        type="button"
+                      >查看这条训练记录</button>
+                    ) : null}
                   </label>
                 </div>
                 <textarea
                   aria-label="点评内容"
-                  onChange={(event) => setNoteContent(event.target.value)}
+                  onChange={(event) => updateDraft({ content: event.target.value })}
                   placeholder="写下对这次训练的具体建议（至少 4 个字）"
                   rows={3}
                   value={noteContent}
@@ -511,13 +597,33 @@ export function TeamWorkspacePanel({ userId, userName }: { userId: string; userN
           {teamNotes.length ? (
             <div className="team-notes" data-testid="team-notes">
               <h3>团队点评记录</h3>
-              {teamNotes.slice(0, 5).map((note) => (
-                <blockquote data-testid={`team-note-${note.id}`} key={note.id}>
-                  <strong>{note.authorName}</strong>
-                  <span>{note.content}</span>
-                  <small>{new Date(note.createdAt).toLocaleString("zh-CN")}</small>
-                </blockquote>
-              ))}
+              {teamNotes.slice(0, 5).map((note) => {
+                const entry = noteRecordIndex.get(note.sessionId);
+                return (
+                  <blockquote data-testid={`team-note-${note.id}`} key={note.id}>
+                    <strong>{note.authorName}</strong>
+                    <span>{note.content}</span>
+                    {/* FB-013：点评可追溯到具体训练，并能直接跳去查看那条记录 */}
+                    {entry ? (
+                      <small data-testid={`team-note-record-${note.id}`}>
+                        针对训练：{entry.summary.title}（{entry.summary.mode} · {entry.summary.totalScore} 分 · {new Date(entry.summary.completedAt).toLocaleString("zh-CN")}）
+                      </small>
+                    ) : (
+                      <small>对应的训练记录暂不可见。</small>
+                    )}
+                    <small>{new Date(note.createdAt).toLocaleString("zh-CN")}</small>
+                    {onViewRecord && isManager && entry ? (
+                      <button
+                        className="text-button"
+                        data-testid={`team-note-view-${note.id}`}
+                        disabled={viewingNoteId === note.id}
+                        onClick={() => { void viewNoteRecord(note); }}
+                        type="button"
+                      >查看这条训练记录</button>
+                    ) : null}
+                  </blockquote>
+                );
+              })}
             </div>
           ) : null}
         </>

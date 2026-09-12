@@ -58,8 +58,61 @@ test("manager views member training overview and leaves notes under own account 
   await expect(page.getByTestId("team-mentor-status")).toContainText("点评已保存");
   await expect(page.getByTestId("team-notes")).toContainText(NOTE_CONTENT);
 
+  // FB-013：点评记录可追溯到具体训练，并能直接跳转查看那条记录
+  const firstNote = page.getByTestId("team-notes").locator("blockquote").first();
+  await expect(firstNote).toContainText("针对训练：");
+  await firstNote.getByRole("button", { name: "查看这条训练记录" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "复盘与复练" })).toBeVisible();
+  await expect(page.locator(".review-list button.active")).toHaveCount(1);
+  await expect(page.locator(".review-detail")).toBeVisible();
+
   // 学习者在自己账号的复盘中看到负责人留下的点评
   await loginAs(page, LEARNER);
   await page.getByRole("button", { name: /复盘与复练/ }).click();
   await expect(page.getByTestId("review-team-notes")).toContainText(NOTE_CONTENT);
+});
+
+// FB-012：点评前从「点评成员训练」直接跳到复盘视图查看这条训练记录。
+test("manager jumps from mentor form to review view for the selected record (FB-012)", async ({ page }) => {
+  const owner = "e2e-owner-fb012";
+  const learner = "e2e-learner-fb012";
+
+  await loginAs(page, owner);
+  await page.getByRole("button", { name: /我的能力/ }).click();
+  await page.getByTestId("team-workspace-panel").waitFor();
+  await page.getByLabel("团队名称").fill("FB012 训练小组");
+  await page.getByRole("button", { name: "创建团队" }).click();
+  const inviteCode = (await page.getByTestId("team-invite-code").innerText()).trim();
+
+  await loginAs(page, learner);
+  await page.getByRole("button", { name: /我的能力/ }).click();
+  await page.getByTestId("team-workspace-panel").waitFor();
+  await page.getByLabel("团队邀请码").fill(inviteCode);
+  await page.getByRole("button", { name: "加入团队" }).click();
+
+  await page.getByRole("button", { name: /今日训练/ }).click();
+  await reachFeedback(page);
+
+  await loginAs(page, owner);
+  await page.getByRole("button", { name: /我的能力/ }).click();
+  await page.getByTestId("team-mentor-member").selectOption(learner);
+  const sessionSelect = page.getByTestId("team-mentor-session");
+  await expect(sessionSelect).toBeEnabled();
+  await sessionSelect.selectOption({ index: 1 });
+  await expect(page.getByTestId("team-mentor-view-record")).toBeEnabled();
+
+  await page.getByTestId("team-mentor-view-record").click();
+
+  // 直接跳到「复盘与复练」视图，并选中刚才选中的那条记录
+  await expect(page.getByRole("heading", { level: 1, name: "复盘与复练" })).toBeVisible();
+  await expect(page.locator(".review-list button.active")).toHaveCount(1);
+  await expect(page.locator(".review-detail")).toBeVisible();
+  await expect(page.getByText("还没有可以复盘的训练")).toHaveCount(0);
+
+  // 返回「我的能力」后，点评表单仍保留刚才的成员与记录选择（FB-012）
+  await page.getByRole("button", { name: /我的能力/ }).click();
+  await expect(page.getByTestId("team-mentor-member")).toHaveValue(learner);
+  const sessionValue = await sessionSelect.inputValue();
+  expect(sessionValue.length).toBeGreaterThan(0);
+  await expect(page.getByTestId("team-mentor-view-record")).toBeEnabled();
 });

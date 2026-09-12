@@ -28,7 +28,7 @@ import { compareScenarioRecords } from "../lib/scenario-comparison";
 import { buildWeeklyTrainingSummary } from "../lib/weekly-summary";
 import { ProductMaterialExperiment } from "./product-material-experiment";
 import { CustomScenarioBuilder } from "./custom-scenario-builder";
-import { TeamWorkspacePanel } from "./team-workspace-panel";
+import { TeamWorkspacePanel, type TeamMentorDraft } from "./team-workspace-panel";
 import { CoursePanel } from "./course-panel";
 import { VoiceInputButton } from "./voice-input-button";
 import { FeedbackWidget } from "./feedback-widget";
@@ -992,15 +992,20 @@ function ReviewPanel({
   onStart,
   onMentorNote,
   integrity,
-  userName
+  userName,
+  focusRecordId
 }: {
   records: TrainingHistoryRecord[];
   onStart: (scenarioId: string, mode?: TrainingSession["mode"]) => void;
   onMentorNote: (recordId: string, note: MentorNote) => void;
   integrity: Record<string, "valid" | "invalid">;
   userName: string;
+  // FB-012：从团队点评跳转过来时直接选中这条记录。
+  focusRecordId?: string;
 }) {
-  const [selectedId, setSelectedId] = useState(records[0]?.id ?? "");
+  const [selectedId, setSelectedId] = useState(
+    focusRecordId && records.some((record) => record.id === focusRecordId) ? focusRecordId : records[0]?.id ?? ""
+  );
   const [mentorContent, setMentorContent] = useState("");
   const selected = records.find((record) => record.id === selectedId) ?? records[0];
   const comparison = selected ? compareScenarioRecords(records, selected) : null;
@@ -1296,6 +1301,11 @@ export function AppShell({
   const [nextChallengeSelection, setNextChallengeSelection] = useState<NextChallengeSelection | null>(null);
   const [worldProgressReady, setWorldProgressReady] = useState(false);
   const [historyRecords, setHistoryRecords] = useState<TrainingHistoryRecord[]>([]);
+  // FB-012：从团队点评跳转复盘时，被查看成员的记录只进入视图，不写入负责人本地历史。
+  const [teamViewRecords, setTeamViewRecords] = useState<TrainingHistoryRecord[]>([]);
+  const [reviewFocusRecordId, setReviewFocusRecordId] = useState("");
+  // FB-012：点评草稿（成员/记录/内容）跨视图保留，跳转查看记录后返回不用重选。
+  const [mentorDraft, setMentorDraft] = useState<TeamMentorDraft>({ memberId: "", sessionId: "", content: "" });
   const [storageReady, setStorageReady] = useState(false);
   // FB-014：服务端签名校验结果（本地记录可能被篡改，校验只能在服务端完成）。
   const [integrityResults, setIntegrityResults] = useState<Record<string, "valid" | "invalid">>({});
@@ -1410,6 +1420,21 @@ export function AppShell({
     setActiveTraining({ scenarioId, mode });
   }
 
+  // FB-012：负责人/导师点评前直接跳到「复盘与复练」查看成员的这条训练记录。
+  function viewTeamRecord(record: TrainingHistoryRecord) {
+    setTeamViewRecords((current) => current.some((item) => item.id === record.id) ? current : [record, ...current]);
+    setReviewFocusRecordId(record.id);
+    setActiveTraining(null);
+    setActiveWorkbenchWorldId(null);
+    setProductExperimentOpen(false);
+    setCustomScenarioBuilderOpen(false);
+    setCourseOpen(false);
+    setMultiRoleOpen(false);
+    setResourceHubOpen(false);
+    setLlmConfigOpen(false);
+    setView("review");
+  }
+
   function addRecord(record: TrainingHistoryRecord) {
     setHistoryRecords((current) => mergeHistoryRecords([record], current));
     if (record.engine === "deterministic") {
@@ -1493,6 +1518,11 @@ export function AppShell({
     ? "整理产品判断，但不把实验草稿当作真实市场结论。"
     : meta.description;
   const completedThisWeek = useMemo(() => historyRecords.length, [historyRecords.length]);
+  // FB-012：复盘视图同时展示本人记录与从团队点评跳转查看的成员记录（按 id 去重）。
+  const reviewRecords = useMemo(
+    () => mergeHistoryRecords(teamViewRecords, historyRecords),
+    [teamViewRecords, historyRecords]
+  );
   // FB-014：只有服务端签名且校验通过的记录才作为正式能力证据；
   // 被篡改的记录（invalid）与本地降级/无签名记录（undefined）都不计入正式能力趋势。
   const trustedRecords = useMemo(
@@ -1535,6 +1565,7 @@ export function AppShell({
                 setMultiRoleOpen(false);
                 setResourceHubOpen(false);
                 setLlmConfigOpen(false);
+                setReviewFocusRecordId("");
                 setView(item.view);
               }}
               type="button"
@@ -1668,13 +1699,13 @@ export function AppShell({
           ) : view === "review" ? (
             <div className="stack-lg">
               <WorldDecisionHistoryPanel localCompletedWorldIds={completedWorldIds} />
-              <ReviewPanel integrity={integrityResults} onMentorNote={updateMentorNote} onStart={startTraining} records={historyRecords} userName={userName} />
+              <ReviewPanel focusRecordId={reviewFocusRecordId} integrity={integrityResults} onMentorNote={updateMentorNote} onStart={startTraining} records={reviewRecords} userName={userName} />
             </div>
           ) : view === "ability" ? (
             // #6 新链路：判断证据画像（替换旧 totalScore / 雷达图）
             // 旧 AbilityPanel 保留供旧训练链路使用
             <div className="stack-lg">
-              <TeamWorkspacePanel userId={userId} userName={userName} />
+              <TeamWorkspacePanel draft={mentorDraft} onDraftChange={setMentorDraft} onViewRecord={viewTeamRecord} userId={userId} userName={userName} />
               <div className="ability-layout">
                 <JudgmentProfilePanel />
                 <AbilityPanel onOpenReview={() => setView("review")} records={trustedRecords} />

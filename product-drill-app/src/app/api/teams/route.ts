@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { apiError, parseJsonBody, requireApiUser } from "@/lib/api/server";
 import { captureServerException } from "@/lib/monitoring/server";
-import { createTeamInvitation, createTeamWithOwner, dissolveTeam, getTeamForUser, joinTeamByInvitation, leaveTeam, listMemberRecords, listMentorNotesForSession, removeTeamMember, saveMentorNote, setTeamMemberRole, setTeamMemberTitle } from "@/lib/repositories/team-repository";
+import { createTeamInvitation, createTeamWithOwner, dissolveTeam, getMemberRecord, getTeamForUser, joinTeamByInvitation, leaveTeam, listMemberRecords, listMentorNotesForSession, removeTeamMember, saveMentorNote, setTeamMemberRole, setTeamMemberTitle } from "@/lib/repositories/team-repository";
 
 const TeamActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("create"), name: z.string().trim().min(2).max(120) }),
@@ -26,6 +26,10 @@ export async function GET(request?: Request) {
     const memberId = url?.searchParams.get("memberId") ?? null;
     const teamId = url?.searchParams.get("teamId") ?? null;
     if (sessionId) {
+      // FB-012：负责人/导师查看成员的某条完整训练记录（用于点评前跳转复盘视图）。
+      if (memberId && teamId) {
+        return Response.json({ record: await getMemberRecord(user.id, teamId, memberId, sessionId) });
+      }
       return Response.json({ team: await getTeamForUser(user.id), mentorNotes: await listMentorNotesForSession(user.id, sessionId), configured: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY) });
     }
     if (memberId && teamId) {
