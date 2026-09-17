@@ -22,7 +22,7 @@ export const INK = {
   provenance: "rgb(123, 130, 144)",
   onDarkClaim: "rgb(245, 242, 234)",
   onDarkProvenance: "rgb(141, 150, 166)",
-  sage: "rgb(46, 106, 79)",
+  sage: "rgb(31, 111, 84)",
   coral: "rgb(176, 67, 47)",
 } as const;
 
