@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { FeedbackApiError, submitFeedback } from "../lib/api/feedback-client";
 import { FEEDBACK_CATEGORIES, type FeedbackCategory } from "../lib/api/feedback-schemas";
+import { useDialogA11y } from "../lib/dialog-a11y";
 
 const CATEGORY_LABELS: Record<FeedbackCategory, string> = {
   bug: "遇到问题",
@@ -60,6 +61,8 @@ export function FeedbackWidget() {
     setErrorMsg("");
   }
 
+  const dialog = useDialogA11y(close, open);
+
   return (
     <>
       <button
@@ -73,7 +76,15 @@ export function FeedbackWidget() {
       </button>
 
       {open ? (
-        <div aria-label="用户反馈" className="feedback-fab-panel surface" role="dialog">
+        <div
+          aria-label="用户反馈"
+          aria-modal="true"
+          className="feedback-fab-panel surface"
+          onKeyDown={dialog.onKeyDown}
+          ref={dialog.ref}
+          role="dialog"
+          tabIndex={-1}
+        >
           <div className="feedback-fab-header">
             <div>
               <span className="section-kicker">使用反馈</span>

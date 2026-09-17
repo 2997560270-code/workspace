@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { fetchLlmConfigs, LlmConfigApiError, saveLlmConfig, testLlmConnection } from "../lib/api/llm-config-client";
 import { LLM_PROVIDER_PRESETS, providerName, type LlmConfigPublic } from "../lib/api/llm-config-schemas";
+import { useDialogA11y } from "../lib/dialog-a11y";
 
 type Status = "idle" | "loading" | "saving" | "testing" | "error";
 
@@ -24,6 +25,7 @@ export function LlmConfigPanel({ onClose }: { onClose: () => void }) {
   const [hasApiKey, setHasApiKey] = useState(false);
   const [apiKeyMasked, setApiKeyMasked] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const dialog = useDialogA11y(onClose);
 
   const active = configs[0] ?? null;
 
@@ -110,7 +112,16 @@ export function LlmConfigPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="settings-overlay" onMouseDown={onClose}>
-      <div aria-label="模型设置" className="settings-drawer settings-drawer--slim" role="dialog" onMouseDown={(event) => event.stopPropagation()}>
+      <div
+        aria-label="模型设置"
+        aria-modal="true"
+        className="settings-drawer settings-drawer--slim"
+        onKeyDown={dialog.onKeyDown}
+        ref={dialog.ref}
+        role="dialog"
+        tabIndex={-1}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
         <div className="settings-main">
           <div className="settings-main-header">
             <div>
@@ -123,7 +134,7 @@ export function LlmConfigPanel({ onClose }: { onClose: () => void }) {
           {active ? (
             <p className="llm-current" data-testid="llm-current-model">当前模型：{active.label || providerName(active.provider)} · {active.model}{enabled ? "（已启用）" : "（已停用）"}</p>
           ) : (
-            <p className="llm-current muted">还没有配置模型，填写下方信息并保存即可使用。</p>
+            <p className="llm-current muted">不配置也能用：当前为演示模式，回复为示例剧本。配置模型后开始真实训练。</p>
           )}
 
           <div className="llm-form surface">
