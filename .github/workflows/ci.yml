@@ -2,7 +2,7 @@
 
 on:
   push:
-    branches: [master, "codex/**"]
+    branches: [master, "codex/**", "feat/**"]
   pull_request:
 
 concurrency:

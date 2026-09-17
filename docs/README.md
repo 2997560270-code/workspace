@@ -8,6 +8,13 @@
 - [方向 A 产品优化方案](./product/direction-a-product-optimization.md)
 - [全项目测试优化清单（2026-08-04）](./product/full-project-test-optimization-checklist-2026-08-04.md)
 
+## 设计与体验
+
+- [前端 UI/UX 审查报告（2026-09-17）](./design/ui-ux-review-2026-09-17.md)
+- [文案歧义诊断与最终 UI 改法（2026-09-17）](./design/copy-and-ui-plan-2026-09-17.md)
+- [设计契约（DESIGN.md）](./design/DESIGN.md)
+- [UI/UX 改造实施日志（2026-09-17）](./design/implementation-log-2026-09-17.md)
+
 ## 架构与领域
 
 - [领域词汇与边界](../CONTEXT.md)
