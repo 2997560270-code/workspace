@@ -48,10 +48,11 @@
   --indigo: #3b4aa8;
 
   /* ── Type families (one per tier). Local stacks — no external webfont, so
-        the hierarchy holds offline and behind the GFW. A premium face is used
-        when installed, otherwise the platform's native serif / sans / mono. ── */
-  --font-display: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSongti", "STSong", "SimSun", "NSimSun", serif;
-  --font-body: "Inter", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, -apple-system, "Segoe UI", sans-serif;
+        the hierarchy holds offline and behind the GFW. Software UI: sans for
+        claims (weight/tracking carry hierarchy), sans for evidence, mono for
+        provenance. Serif is banned in product UI per DESIGN.md. ── */
+  --font-display: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", "JetBrains Mono", "Cascadia Code", "SF Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
 
   /* ── Type scale: deliberate jumps between tiers ──────────────────────── */

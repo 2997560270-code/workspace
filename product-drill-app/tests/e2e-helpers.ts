@@ -11,8 +11,8 @@ export type ViewId = "today" | "map" | "review" | "ability";
 
 /** 设计令牌在 e2e 的单一事实来源：批次4 改字体/颜色时只改这里。 */
 export const FONTS = {
-  display: '"Noto Serif SC", "Source Han Serif SC", "Songti SC", STSongti, STSong, SimSun, NSimSun, serif',
-  body: 'Inter, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, -apple-system, "Segoe UI", sans-serif',
+  display: '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, -apple-system, "Segoe UI", sans-serif',
+  body: '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, -apple-system, "Segoe UI", sans-serif',
   mono: '"IBM Plex Mono", "JetBrains Mono", "Cascadia Code", "SF Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
 } as const;
 
