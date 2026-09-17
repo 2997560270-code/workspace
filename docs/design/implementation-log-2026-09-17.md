@@ -47,3 +47,15 @@
 
 批次验证（tag `uiux/copy` 前）：typecheck ✅ · vitest 435/435 ✅ · golden 31/31 ✅ · rls ✅ · e2e 58/58 ✅。
 批次回退：`git reset --hard uiux/copy` 或 `git revert uiux/harness..uiux/copy`。
+
+## 批次 3 · P0 交互（tag `uiux/p0`）
+
+| hash | 提交 | 覆盖 | 回退 |
+|---|---|---|---|
+| `554d1b6` | P0-2 禁用态可读配色 + 解锁提示 | 去全局 opacity 洗白；发送/结束/复练补说明 | `git revert 554d1b6` |
+| `32146a1` | P0-6 FAB 安全区 | .content 底留白 96px；右栏 84px | `git revert 32146a1` |
+| `03310d6` | P0-7 弹窗 dialog 语义 | 新增 useDialogA11y；模型设置首屏演示模式说明 | `git revert 03310d6` |
+| `96776ad` | P0-8 页头焦点环 | 抑制 tabIndex=-1 的 :focus-visible 环 | `git revert 96776ad` |
+
+批次验证（tag `uiux/p0` 前）：typecheck ✅ · vitest 435/435 ✅ · golden 31/31 ✅ · rls ✅ · e2e 58/58 ✅。
+批次回退：`git reset --hard uiux/p0` 或 `git revert uiux/copy..uiux/p0`。
