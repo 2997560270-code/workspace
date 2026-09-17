@@ -30,7 +30,7 @@ export function SignOutButton() {
 
   return (
     <button className="sidebar-signout" data-testid="sign-out" disabled={busy} onClick={handleSignOut} type="button">
-      {busy ? "正在退出…" : "切换账号 / 退出"}
+      {busy ? "正在退出…" : "退出登录"}
     </button>
   );
 }
