@@ -135,9 +135,9 @@ export function DecisionTimelinePanel({
       {status === "loaded" && timeline ? (
         <>
           <dl className="decision-provenance" aria-label="版本追溯">
-            <div><dt>World</dt><dd>{timeline.world_id} · {timeline.world_version}</dd></div>
-            <div><dt>Rubric</dt><dd>{timeline.rubric_version}</dd></div>
-            <div><dt>Model</dt><dd>{timeline.model_version}</dd></div>
+            <div><dt>情境</dt><dd>{timeline.world_id} · {timeline.world_version}</dd></div>
+            <div><dt>评分版本</dt><dd>{timeline.rubric_version}</dd></div>
+            <div><dt>模型</dt><dd>{timeline.model_version}</dd></div>
             <div><dt>完成时间</dt><dd>{formatDateTime(timeline.completed_at)}</dd></div>
           </dl>
 
@@ -295,10 +295,10 @@ function HypothesisCard({
         </div>
       )}
 
-      <div className="jp-rubric provenance">Rubric {item.rubric_version}</div>
+      <div className="jp-rubric provenance">评分版本 {item.rubric_version}</div>
 
       {!hasAnyEvidence && (
-        <p className="jp-no-evidence">尚无证据，完成世界工作台训练后自动更新。</p>
+        <p className="jp-no-evidence">尚无证据，完成情境对话后自动更新。</p>
       )}
 
       {expanded && hasAnyEvidence && (
@@ -568,7 +568,7 @@ export function WorldDecisionHistoryPanel({
                 <small>{record.chosen_action}</small>
               </span>
               <span className="world-history-meta">
-                <small>World {record.world_version}</small>
+                <small>情境 {record.world_version}</small>
                 {record.source === "local_demo" ? (
                   <small className="world-history-local" data-testid="world-history-local">本地演示记录</small>
                 ) : (

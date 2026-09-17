@@ -424,7 +424,7 @@ function JudgmentForm({
           <span className="section-kicker">产品判断画布</span>
           <h2>把对话信息转成一个可以验证的判断</h2>
         </div>
-        <span className="quiet">至少填写核心问题与建议行动</span>
+        <span className="quiet">把对话里的信息整理成你的判断</span>
       </div>
       <div className="judgment-grid">
         {fields.map((field) => (
@@ -442,15 +442,18 @@ function JudgmentForm({
         ))}
       </div>
       <div className="judgment-actions">
-        {isSubmitting ? (
-          <p aria-live="polite" data-testid="judgment-submit-status" role="status">
-            {submissionStage === "submitting"
-              ? "正在保存你的判断，请稍候…"
-              : "判断已保存，正在生成证据反馈…"}
-          </p>
-        ) : (
-          <p>“信息不足，暂不做决定”也是合理判断，只要说明还缺少什么证据。</p>
-        )}
+        <div>
+          {isSubmitting ? (
+            <p aria-live="polite" data-testid="judgment-submit-status" role="status">
+              {submissionStage === "submitting"
+                ? "正在保存你的判断，请稍候…"
+                : "判断已保存，正在生成证据反馈…"}
+            </p>
+          ) : (
+            <p>“信息不足，暂不做决定”也是合理判断，只要说明还缺少什么证据。</p>
+          )}
+          <span className="judgment-require">提交前需填写：核心问题、建议行动</span>
+        </div>
         <button
           aria-busy={isSubmitting}
           className="button button-primary"
@@ -493,7 +496,7 @@ function FeedbackPanel({
         <div>
           <span className="section-kicker light">本次训练结果</span>
           <h2>{evaluation.summary}</h2>
-          <p>评分置信度：{evaluation.confidence}。数字只作为辅助，下面的行为证据更重要。</p>
+          <p>系统把握度：{evaluation.confidence}；判断依据见下方行为证据。</p>
         </div>
         <div className="score-orbit">
           <strong>{evaluation.totalScore}</strong>
@@ -641,7 +644,7 @@ function TrainingWorkspace({
       setSession(createTrainingSession({ scenarioId, scenario: scenarioDefinition, mode: initialMode }));
       applyStrictDeadline(initialMode === "严格" ? Date.now() + scenarioDefinition.duration * 60 * 1000 : null);
       setRuntimeStatus("fallback");
-      setActionError("这是本地自定义场景，反馈由本地练习引擎生成，不计入正式能力趋势。");
+      setActionError("这是本地自定义场景，反馈由本地练习引擎生成，不计入你的能力记录。");
       setBusy(false);
       return () => { cancelled = true; };
     }
@@ -682,7 +685,7 @@ function TrainingWorkspace({
       setSession(createTrainingSession({ scenarioId, scenario: scenarioDefinition, mode }));
       applyStrictDeadline(mode === "严格" ? Date.now() + scenarioDefinition.duration * 60 * 1000 : null);
       setRuntimeStatus("fallback");
-      setActionError("这是本地自定义场景，反馈由本地练习引擎生成，不计入正式能力趋势。");
+      setActionError("这是本地自定义场景，反馈由本地练习引擎生成，不计入你的能力记录。");
       setBusy(false);
       return;
     }
@@ -699,7 +702,7 @@ function TrainingWorkspace({
         ? Date.now() + getScenario(scenarioId).duration * 60 * 1000
         : null);
       setRuntimeStatus("fallback");
-      setActionError("模式已在本地切换，当前结果不会计入正式能力趋势。");
+      setActionError("模式已在本地切换，当前结果不会计入你的能力记录。");
     } finally {
       setBusy(false);
     }
@@ -715,7 +718,7 @@ function TrainingWorkspace({
     if (scenarioDefinition) {
       setSession((current) => sendTrainingMessage(current, content));
       setRuntimeStatus("fallback");
-      setActionError("这是本地自定义场景，反馈由本地练习引擎生成，不计入正式能力趋势。");
+      setActionError("这是本地自定义场景，反馈由本地练习引擎生成，不计入你的能力记录。");
       setPendingReply(null);
       setBusy(false);
       return;
@@ -754,7 +757,7 @@ function TrainingWorkspace({
       setEvaluation(nextEvaluation);
       setRecord(nextRecord);
       setRuntimeStatus("fallback");
-      setActionError("自定义场景已完成本地评估，不会进入正式能力趋势。");
+      setActionError("自定义场景已完成本地评估，不会计入你的能力记录。");
       onRecord(nextRecord);
       setJudgmentSubmissionStage("idle");
       setBusy(false);
@@ -778,7 +781,7 @@ function TrainingWorkspace({
       setEvaluation(nextEvaluation);
       setRecord(nextRecord);
       setRuntimeStatus("fallback");
-      setActionError("服务端评估不可用，已生成本地练习反馈；该结果不会进入正式能力趋势。");
+      setActionError("服务端评估不可用，已生成本地练习反馈；该结果不会计入你的能力记录。");
       onRecord(nextRecord);
     } finally {
       setJudgmentSubmissionStage("idle");
@@ -819,7 +822,7 @@ function TrainingWorkspace({
       const nextRecord = addRetryToHistory(record, retry);
       setRecord(nextRecord);
       setRuntimeStatus("fallback");
-      setActionError("自定义场景复练由本地规则评估，不会进入正式能力趋势。");
+      setActionError("自定义场景复练由本地规则评估，不会计入你的能力记录。");
       onRetry(record.id, retry);
       setBusy(false);
       return;
@@ -1061,7 +1064,7 @@ function ReviewPanel({
       <section className="empty-state surface">
         <span className="empty-number">01</span>
         <h2>还没有可以复盘的训练</h2>
-        <p>先完成一次能力诊断，系统会把具体失误时刻带到这里。</p>
+        <p>完成第一次练习后，这里会出现你可以重练的具体环节。</p>
         <button className="button button-primary" onClick={() => onStart(DEFAULT_SCENARIO_ID)} type="button">开始首次训练</button>
       </section>
     );
@@ -1103,13 +1106,13 @@ function ReviewPanel({
           {selectedTampered ? (
             <div className="integrity-warning" data-testid="review-tamper-warning" role="alert">
               <strong>完整性校验失败</strong>
-              <p>这条记录与本地签名不一致（评分可能被人为修改），分数已标记为不可信，且不再计入能力证据与统计。</p>
+              <p>这条记录的分数与服务器签名对不上，可能被人改过；已标记为不可信，也不计入你的能力统计。</p>
             </div>
           ) : selectedVerified ? (
-            <p className="integrity-badge" data-testid="review-integrity-badge">评分由服务端计算并签名，完整性校验通过。</p>
+            <p className="integrity-badge" data-testid="review-integrity-badge">分数由服务器计算并签名，校验通过。</p>
           ) : null}
           <div className="review-metrics">
-            <div><span>行为证据分</span><strong>{selectedTampered ? "不可信" : selected.totalScore}</strong></div>
+            <div><span>本次得分（附证据）</span><strong>{selectedTampered ? "不可信" : selected.totalScore}</strong></div>
             <div><span>诊断模式</span><strong>{selected.mode}</strong></div>
             <div><span>复练结果</span><strong>{selected.retry?.improved ? "改善" : selected.retry ? "未达标" : "未复练"}</strong></div>
           </div>
@@ -1152,7 +1155,7 @@ function ReviewPanel({
           {teamNotes.length ? (
             <div className="team-notes review-team-notes" data-testid="review-team-notes">
               <span className="section-kicker">团队负责人 / 导师点评</span>
-              <p>以下点评由团队成员以他们自己的账号留下，不改变模型评分。</p>
+              <p>点评由团队负责人或导师以他们自己的账号留下，不改变模型评分。</p>
               {teamNotes.map((note) => (
                 <blockquote data-testid={`review-team-note-${note.id}`} key={note.id}>
                   <strong>{note.author}</strong>
@@ -1165,7 +1168,7 @@ function ReviewPanel({
           <div className="mentor-note-panel">
             <div>
               <span className="section-kicker">本账号备注</span>
-              <p>这里只以当前账号保存个人备注，不改变模型评分；负责人/导师对成员的点评请在团队面板以他们自己的账号留下。</p>
+              <p>备注只保存在当前账号，不改变模型评分。</p>
             </div>
             {selected.mentorNote ? (
               <blockquote data-testid="mentor-note">
@@ -1255,8 +1258,8 @@ function AbilityPanel({
       <section className="ability-summary surface-dark">
         <div>
           <span className="section-kicker light">专项训练证据</span>
-          <h2>{practiceProfile.completedCount ? `专项训练已留下 ${practiceProfile.completedCount} 条记录，其中 ${formalProfile.completedCount} 条进入正式能力趋势` : "完成首次专项训练，建立能力基线"}</h2>
-          <p>{practiceProfile.completedCount ? practiceProfile.nextTraining : "这里仅统计今日训练和训练地图中的专项练习，不包含上方的世界工作台判断证据。离线或降级结果只作为练习反馈。"}</p>
+          <h2>{practiceProfile.completedCount ? `专项训练已留下 ${practiceProfile.completedCount} 条记录，其中 ${formalProfile.completedCount} 条计入能力记录` : "完成首次专项训练，建立能力基线"}</h2>
+          <p>{practiceProfile.completedCount ? practiceProfile.nextTraining : "这里只统计今日训练和训练地图里的专项练习，不包含上面情境对话的判断记录；演示或降级的结果只作为练习反馈。"}</p>
           <p className="ability-summary-note">
             {latestImprovementSkill ? `最近改善：${latestImprovementSkill}。` : "最近改善：完成一次复练后显示。"}
             {formalProfile.completedCount ? " 正式趋势只统计模型完成的训练。" : " 当前状态包含练习反馈，正式趋势仍需模型训练证据。"}
@@ -1267,7 +1270,7 @@ function AbilityPanel({
         </div>
         <div className="summary-stats">
           <div><strong>{practiceProfile.completedCount}</strong><span>专项练习记录</span></div>
-          <div><strong>{formalProfile.completedCount}</strong><span>进入正式趋势</span></div>
+          <div><strong>{formalProfile.completedCount}</strong><span>计入能力记录的次数</span></div>
           <div><strong>{formalProfile.improvedCount}</strong><span>专项练习改善</span></div>
         </div>
       </section>
@@ -1543,7 +1546,7 @@ export function AppShell({
     [teamViewRecords, historyRecords]
   );
   // FB-014：只有服务端签名且校验通过的记录才作为正式能力证据；
-  // 被篡改的记录（invalid）与本地降级/无签名记录（undefined）都不计入正式能力趋势。
+  // 被篡改的记录（invalid）与本地降级/无签名记录（undefined）都不计入你的能力记录。
   const trustedRecords = useMemo(
     () => historyRecords.filter((record) => integrityResults[record.id] === "valid"),
     [historyRecords, integrityResults]

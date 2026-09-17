@@ -554,6 +554,7 @@ p { color: var(--ink-2); line-height: 1.66; }
 .judgment textarea, .retry-form textarea { padding: 12px; }
 .judgment-actions { margin-top: 28px; padding-top: 24px; display: flex; align-items: center; justify-content: space-between; gap: 24px; border-top: 1px solid var(--line); }
 .judgment-actions p { margin: 0; font-size: var(--fs-body-sm); }
+.judgment-require { display: block; margin-top: 6px; color: var(--ink-3); font-size: var(--fs-aux-sm); }
 .judgment-actions .button { min-width: 210px; }
 
 /* ══════════════════════════ FEEDBACK ═══════════════════════════════════ */

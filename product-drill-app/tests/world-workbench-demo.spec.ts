@@ -129,8 +129,8 @@ test("desktop completes world 1 to 2 to 3 and opens the judgment profile", async
 
   await expect(page.getByRole("heading", { level: 1, name: "我的能力" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 3, name: "premature_solution_commitment" })).toBeVisible();
-  await expect(page.getByText("Rubric 0.3.0", { exact: true })).toBeVisible();
-  await expect(page.getByText("尚无证据，完成世界工作台训练后自动更新。", { exact: true })).toBeVisible();
+  await expect(page.getByText("评分版本 0.3.0", { exact: true })).toBeVisible();
+  await expect(page.getByText("尚无证据，完成情境对话后自动更新。", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /查看证据/ })).toHaveCount(0);
 
   await page.getByRole("button", { name: /复盘与复练/ }).click();
@@ -142,9 +142,9 @@ test("desktop completes world 1 to 2 to 3 and opens the judgment profile", async
   await page.getByRole("button", { name: new RegExp(WORLD_TITLES[0]) }).first().click();
   const timeline = page.getByLabel("决策与后果时间线");
   await expect(timeline).toBeVisible();
-  await expect(timeline.getByText("World", { exact: true })).toBeVisible();
-  await expect(timeline.getByText("Rubric", { exact: true })).toBeVisible();
-  await expect(timeline.getByText("Model", { exact: true })).toBeVisible();
+  await expect(timeline.getByText("情境", { exact: true })).toBeVisible();
+  await expect(timeline.getByText("评分版本", { exact: true })).toBeVisible();
+  await expect(timeline.getByText("模型", { exact: true })).toBeVisible();
   await expect(timeline.getByText("提交决策", { exact: true })).toBeVisible();
   await expect(timeline.getByText("后果已揭示", { exact: true })).toBeVisible();
 });
