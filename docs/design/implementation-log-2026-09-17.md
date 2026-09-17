@@ -20,3 +20,14 @@
 
 批次验证（tag `uiux/base` 前）：`npm run typecheck` ✅ · `npx vitest run` 435/435 ✅ · `npm run eval:golden` 31/31 ✅ · `npm run test:rls:local` ✅ · `npm run e2e` 58/58 ✅。
 批次回退：`git reset --hard uiux/base`（未推送）或 `git revert 21c4f05..uiux/base`（已推送）。
+
+## 批次 1 · 测试脚手架（tag `uiux/harness`）
+
+| hash | 提交 | 改动 | 验证 | 回退 |
+|---|---|---|---|---|
+| `75e10a6` | test: 增量补 data-testid 脚手架，解耦 e2e 与按钮文案 | `app-shell.tsx`、`signout-button.tsx`（约 24 处 testid） | typecheck ✅ vitest 435 ✅ e2e 58 ✅（证明 accname 未变） | `git revert 75e10a6` |
+| `aefef3d` | test: e2e 导航迁 gotoView(testid)，enterApp 守卫串收敛为 UI_LABELS | `e2e-helpers.ts` + 10 个 spec | typecheck ✅ vitest 435 ✅ e2e 58 ✅ | `git revert aefef3d` |
+| `0f175ba` | test: 主流程点击迁 testid，设计令牌收敛为 FONTS/INK 常量 | `app-shell.tsx`(3 锚点)、`e2e-helpers.ts`、9 个 spec | typecheck ✅ vitest 435 ✅ | `git revert 0f175ba` |
+
+批次验证（tag `uiux/harness` 前）：typecheck ✅ · vitest 435/435 ✅ · golden 31/31 ✅ · rls ✅ · e2e 58/58 ✅。
+批次回退：`git reset --hard uiux/harness` 或 `git revert uiux/base..uiux/harness`。
