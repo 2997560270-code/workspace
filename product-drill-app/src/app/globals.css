@@ -178,17 +178,13 @@ p { color: var(--ink-2); line-height: 1.66; }
 .sidebar nav button {
   width: 100%;
   padding: 12px 10px;
-  display: grid;
-  grid-template-columns: 26px minmax(0, 1fr);
-  align-items: start;
-  gap: 8px;
+  display: block;
   text-align: left;
   border: 1px solid transparent;
   border-radius: 9px;
   color: var(--ink-2);
   background: transparent;
 }
-.sidebar nav button > span { padding-top: 2px; color: var(--ink-3); font-family: var(--font-mono); font-size: 10px; font-weight: 600; }
 .sidebar nav button strong { display: block; color: inherit; font-size: 14px; font-weight: 600; }
 .sidebar nav button small { display: block; margin-top: 4px; color: var(--ink-3); font-size: var(--fs-aux-sm); line-height: 1.45; }
 .sidebar nav button:hover { background: rgba(255, 255, 255, 0.7); border-color: var(--line); }
@@ -338,8 +334,8 @@ button:disabled { cursor: not-allowed; }
 .focus-grid { margin-top: 28px; display: grid; grid-template-columns: 1fr 1fr auto; align-items: end; gap: 32px; }
 .focus-grid p { margin: 10px 0 0; font-size: var(--fs-body); }
 .skill-rows { margin-top: 28px; border-top: 1px solid var(--line); }
-.skill-row { min-height: 88px; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 18px; border-bottom: 1px solid var(--line); }
-.skill-index { font-size: var(--fs-aux); }
+.skill-row { min-height: 88px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 18px; border-bottom: 1px solid var(--line); }
+
 .skill-row strong { font-family: var(--font-display); font-size: var(--fs-title-sm); font-weight: 600; color: var(--ink); }
 .skill-row p { margin: 5px 0 0; font-size: var(--fs-body-sm); }
 
