@@ -118,8 +118,8 @@ function RuntimeNotice({
   const text = status === "connecting"
     ? "正在连接训练服务…"
     : status === "online"
-      ? "已连接服务端；评分会记录模型、场景与 Rubric 版本。"
-      : "当前使用离线演示引擎；结果不会计入正式能力趋势。";
+      ? "训练记录已开启，评分会保存你的原始回答。"
+      : "演示模式：回复为示例剧本，本次不计入你的能力记录。配置模型后开始真实训练。";
   return (
     <div aria-live="polite" className={`runtime-notice runtime-${status}`}>
       <span>{text}</span>
@@ -712,7 +712,7 @@ function TrainingWorkspace({
     } catch {
       setSession((current) => sendTrainingMessage(current, content));
       setRuntimeStatus("fallback");
-      setActionError("本次追问由离线演示引擎回应，不会写入正式能力证据。");
+      setActionError("这条回复来自演示剧本，不计入你的能力记录。");
     } finally {
       setPendingReply(null);
       setBusy(false);
