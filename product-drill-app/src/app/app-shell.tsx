@@ -994,14 +994,14 @@ function TrainingWorkspace({
           
           <div className="coverage-number" data-testid="coverage-summary"><strong>{session.coveredSkills.length} / {SKILLS.length}</strong><span data-testid="coverage-unit">个信息维度已问到</span></div>
           <div className="coverage-bar"><i style={{ width: `${coverage}%` }} /></div>
-          <div className="coverage-list">
+          <ul className="coverage-list">
             {SKILLS.map((skill) => (
-              <div className={session.coveredSkills.includes(skill.id) ? "coverage-item hit" : "coverage-item"} data-testid={`coverage-item-${skill.id}`} key={skill.id}>
+              <li className={session.coveredSkills.includes(skill.id) ? "coverage-item hit" : "coverage-item"} data-testid={`coverage-item-${skill.id}`} key={skill.id}>
                 <CheckMark active={session.coveredSkills.includes(skill.id)} />
                 <span>{skill.name}</span>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
           <p data-testid="coverage-note">覆盖度只表示你是否问到了相关信息，不代表问题质量。</p>
           {(!strictExpired && session.messages.filter((message) => message.role === "user").length < 1) ? <span className="progress-note">至少发送一个追问后，即可提交判断</span> : null}
           <button

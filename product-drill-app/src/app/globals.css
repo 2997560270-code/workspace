@@ -552,8 +552,8 @@ button:disabled { cursor: not-allowed; }
 .coverage-number span { padding-bottom: 6px; color: var(--ink-2); font-family: var(--font-body); font-size: var(--fs-body-sm); font-weight: 400; }
 .coverage-bar { height: 6px; overflow: hidden; background: #e3e1da; border-radius: 999px; }
 .coverage-bar i { display: block; height: 100%; background: var(--sage-strong); }
-.coverage-list { margin: 30px 0; display: grid; gap: 14px; }
-.coverage-list > div { display: flex; align-items: center; gap: 10px; font-size: var(--fs-body-sm); }
+.coverage-list { margin: 30px 0; padding: 0; list-style: none; display: grid; gap: 14px; }
+.coverage-list > li { display: flex; align-items: center; gap: 10px; font-size: var(--fs-body-sm); }
 .training-progress > p { color: var(--ink-2); font-size: var(--fs-body-sm); line-height: 1.6; }
 .training-progress .button { width: 100%; margin-top: 18px; }
 
