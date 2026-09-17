@@ -1,4 +1,5 @@
 import type { MasteryState } from "./ability-profile";
+import type { TrainingSession } from "./training-session";
 import type { ScenarioTrainingStatus } from "./training-history";
 
 /** 状态值 → CSS 修饰符（纯 ASCII，永不随文案变动）。
@@ -31,4 +32,11 @@ export const SCENARIO_STATUS_LABEL: Record<ScenarioTrainingStatus, string> = {
   "未训练": "还没开始",
   "已覆盖": "已练完",
   "待复练": "可复练",
+};
+
+/** 模式 → 一句话解释（放进 aria-describedby，不进入按钮可访问名）。 */
+export const MODE_HINTS: Record<TrainingSession["mode"], string> = {
+  "诊断": "诊断：不限时，反馈计入能力记录。",
+  "严格": "严格：限时作答，检验独立判断。",
+  "练习": "练习：可用提示，结果只作练习反馈。",
 };

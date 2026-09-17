@@ -508,10 +508,12 @@ button:disabled { cursor: not-allowed; }
 .check { flex: 0 0 auto; width: 17px; height: 17px; display: inline-grid; place-items: center; color: #b7b8b3; border: 1px solid #cfcdc6; border-radius: 50%; font-size: 9px; }
 .check.active { color: var(--white); border-color: var(--sage-strong); background: var(--sage-strong); }
 .mode-switch { padding: 4px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: #f2f0ea; }
+.conversation-head .mode-switch { width: 216px; flex: 0 0 auto; }
 .mode-switch button { padding: 8px 4px; color: var(--ink-2); border: 0; border-radius: var(--radius-sm); background: transparent; font-size: var(--fs-aux-sm); font-weight: 600; }
 .mode-switch button.active { color: var(--on-dark-title); background: var(--navy); }
 .conversation { display: flex; flex-direction: column; overflow: hidden; }
-.conversation-head { padding: 24px; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 1px solid var(--line); }
+.conversation-head { padding: 24px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 1px solid var(--line); }
+.conversation-head .mode-hint { flex-basis: 100%; margin: 0; color: var(--ink-3); font-size: var(--fs-aux-sm); }
 .conversation-head h2 { margin-bottom: 0; font-size: var(--fs-title); }
 .strict-timer { color: var(--coral); font-size: var(--fs-aux); font-variant-numeric: tabular-nums; font-weight: 700; }
 .strict-timer.expired { color: var(--ink-2); }

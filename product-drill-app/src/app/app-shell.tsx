@@ -54,6 +54,7 @@ import {
 import {
   MASTERY_CLASS,
   MASTERY_LABEL,
+  MODE_HINTS,
   SCENARIO_STATUS_CLASS,
   SCENARIO_STATUS_LABEL
 } from "../lib/ui-labels";
@@ -911,20 +912,6 @@ function TrainingWorkspace({
           <div className="briefing-list">
             {scenario.briefing.map((item) => <div key={item}><CheckMark /> {item}</div>)}
           </div>
-          <div className="mode-switch" aria-label="模式选择" data-testid="mode-switch">
-            {TRAINING_MODE_OPTIONS.map((mode) => (
-              <button
-                aria-pressed={session.mode === mode}
-                className={session.mode === mode ? "active" : ""}
-                disabled={busy}
-                key={mode}
-                onClick={() => { void resetMode(mode); }}
-                type="button"
-              >
-                {mode}
-              </button>
-            ))}
-          </div>
         </section>
 
         <section className="conversation surface">
@@ -933,11 +920,27 @@ function TrainingWorkspace({
               <span className="section-kicker">AI 角色</span>
               <h2>{scenario.role}</h2>
             </div>
+            <div className="mode-switch" aria-label="模式选择" data-testid="mode-switch">
+              {TRAINING_MODE_OPTIONS.map((mode) => (
+                <button
+                  aria-pressed={session.mode === mode}
+                  aria-describedby="mode-hint"
+                  className={session.mode === mode ? "active" : ""}
+                  disabled={busy}
+                  key={mode}
+                  onClick={() => { void resetMode(mode); }}
+                  type="button"
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
             {session.mode === "严格" ? (
               <span className={`strict-timer${strictExpired ? " expired" : ""}`} data-testid="strict-timer">
                 {strictDeadline === null ? "准备计时…" : strictExpired ? "时间到" : `剩余 ${formatCountdown(strictRemaining ?? 0)}`}
               </span>
             ) : <span className="quiet">{busy ? "处理中…" : `${session.mode}模式`}</span>}
+            <p className="mode-hint" data-testid="mode-hint" id="mode-hint">{MODE_HINTS[session.mode]}</p>
           </div>
           <div className="message-list" data-testid="message-list" ref={messageListRef}>
             {session.messages.map((message) => (
