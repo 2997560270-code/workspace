@@ -58,6 +58,7 @@ import {
   SCENARIO_STATUS_CLASS,
   SCENARIO_STATUS_LABEL
 } from "../lib/ui-labels";
+import { draftJudgmentFromTranscript, mergeJudgmentDraft, type JudgmentFieldKey } from "../lib/judgment-draft";
 import {
   DEFAULT_SCENARIO_ID,
   SKILLS,
@@ -392,11 +393,13 @@ function TrainingMap({
 function JudgmentForm({
   value,
   onChange,
+  onFieldTouched,
   onSubmit,
   submissionStage,
 }: {
   value: ProductJudgment;
   onChange: (next: ProductJudgment) => void;
+  onFieldTouched?: (key: keyof ProductJudgment) => void;
   onSubmit: () => void;
   submissionStage: "idle" | "submitting" | "evaluating";
 }) {
@@ -434,7 +437,10 @@ function JudgmentForm({
             <textarea
               data-testid={`judgment-field-${field.key}`}
               disabled={isSubmitting}
-              onChange={(event) => onChange({ ...value, [field.key]: event.target.value })}
+              onChange={(event) => {
+                onFieldTouched?.(field.key);
+                onChange({ ...value, [field.key]: event.target.value });
+              }}
               placeholder={field.placeholder}
               rows={field.wide ? 3 : 2}
               value={value[field.key]}
@@ -597,6 +603,13 @@ function TrainingWorkspace({
   const [reply, setReply] = useState("");
   const [pendingReply, setPendingReply] = useState<string | null>(null);
   const [judgment, setJudgment] = useState<ProductJudgment>(EMPTY_JUDGMENT);
+  const touchedFieldsRef = useRef<Set<JudgmentFieldKey>>(new Set());
+
+  useEffect(() => {
+    if (session.stage !== "judgment") return;
+    const draft = draftJudgmentFromTranscript(session.messages, session.coveredSkills);
+    setJudgment((current) => mergeJudgmentDraft(current, draft, touchedFieldsRef.current));
+  }, [session.stage, session.messages, session.coveredSkills]);
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [record, setRecord] = useState<TrainingHistoryRecord | null>(null);
   const [retryAnswer, setRetryAnswer] = useState("");
@@ -682,6 +695,7 @@ function TrainingWorkspace({
     setPendingReply(null);
     setJudgmentSubmissionStage("idle");
     setJudgment(EMPTY_JUDGMENT);
+    touchedFieldsRef.current.clear();
     applyStrictDeadline(null);
     if (scenarioDefinition) {
       setSession(createTrainingSession({ scenarioId, scenario: scenarioDefinition, mode }));
@@ -882,6 +896,7 @@ function TrainingWorkspace({
         {notice}
         <JudgmentForm
           onChange={setJudgment}
+          onFieldTouched={(key) => touchedFieldsRef.current.add(key)}
           onSubmit={() => { void submitCurrentJudgment(); }}
           submissionStage={judgmentSubmissionStage}
           value={judgment}
