@@ -992,11 +992,11 @@ function TrainingWorkspace({
 
         <aside className="training-progress surface">
           
-          <div className="coverage-number" data-testid="coverage-summary"><strong>{coverage}%</strong><span data-testid="coverage-unit">不是最终分数</span></div>
+          <div className="coverage-number" data-testid="coverage-summary"><strong>{session.coveredSkills.length} / {SKILLS.length}</strong><span data-testid="coverage-unit">个信息维度已问到</span></div>
           <div className="coverage-bar"><i style={{ width: `${coverage}%` }} /></div>
           <div className="coverage-list">
             {SKILLS.map((skill) => (
-              <div data-testid={`coverage-item-${skill.id}`} key={skill.id}>
+              <div className={session.coveredSkills.includes(skill.id) ? "coverage-item hit" : "coverage-item"} data-testid={`coverage-item-${skill.id}`} key={skill.id}>
                 <CheckMark active={session.coveredSkills.includes(skill.id)} />
                 <span>{skill.name}</span>
               </div>

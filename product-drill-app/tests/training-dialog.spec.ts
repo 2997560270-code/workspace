@@ -10,7 +10,7 @@ test("runs an evidence-led interview and opens the judgment canvas", async ({ pa
   await page.getByRole("button", { name: "发送追问", exact: true }).click();
   await expect(page.locator(".message.ai").last()).toContainText("财务分析师");
   await expect(page.locator(".message.user p").last()).toHaveCSS("text-align", "left");
-  await expect(page.getByText("20%", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("coverage-summary")).toContainText("1 / 5");
   await page.getByTestId("finish-interview").click();
   await expect(page.getByRole("heading", { name: "把对话信息转成一个可以验证的判断" })).toBeVisible();
 });

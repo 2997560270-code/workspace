@@ -544,7 +544,11 @@ button:disabled { cursor: not-allowed; }
 .composer-actions { margin-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .training-progress { padding: 26px; }
 .coverage-number { margin: 28px 0 14px; display: flex; align-items: flex-end; justify-content: space-between; }
-.coverage-number strong { font-family: var(--font-mono); font-size: 2.375rem; font-weight: 600; color: var(--ink-3); line-height: 1; font-variant-numeric: tabular-nums; }
+.coverage-number strong { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 600; color: var(--ink-3); line-height: 1; font-variant-numeric: tabular-nums; }
+.coverage-item.hit { animation: coverage-hit 180ms cubic-bezier(0.16, 1, 0.3, 1); }
+.coverage-item.hit .check { transform: scale(1); }
+@keyframes coverage-hit { from { transform: scale(0.94); opacity: 0.6; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .coverage-item.hit { animation: none; } }
 .coverage-number span { padding-bottom: 6px; color: var(--ink-2); font-family: var(--font-body); font-size: var(--fs-body-sm); font-weight: 400; }
 .coverage-bar { height: 6px; overflow: hidden; background: #e3e1da; border-radius: 999px; }
 .coverage-bar i { display: block; height: 100%; background: var(--sage-strong); }
