@@ -246,7 +246,9 @@ p { color: var(--ink-2); line-height: 1.66; }
 .topbar p { margin-bottom: 0; font-size: var(--fs-lede); color: var(--ink-2); }
 .user { padding: 8px 0 8px 18px; display: flex; flex-direction: column; text-align: right; border-left: 1px solid var(--line); }
 .user strong { margin-top: 3px; font-size: 14px; font-weight: 600; color: var(--ink); }
-.content { padding: 32px clamp(28px, 4vw, 58px) 72px; }
+.content { padding: 32px clamp(28px, 4vw, 58px) 96px; }
+/* 反馈 FAB 安全区：右栏收尾内容不被 fixed 按钮遮挡 */
+.training-progress { padding-bottom: 84px; }
 
 /* ══════════════════════════ PRIMITIVES ═════════════════════════════════ */
 .surface, .surface-dark { border-radius: var(--radius); }
