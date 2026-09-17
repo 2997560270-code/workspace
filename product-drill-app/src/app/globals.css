@@ -274,8 +274,8 @@ p { color: var(--ink-2); line-height: 1.66; }
   font-weight: 500;
   white-space: nowrap;
 }
-.mastery-可独立完成, .mastery-表现稳定 { color: #24583f; border-color: #bdd5c5; background: #e6f0e9; }
-.mastery-在提示下完成 { color: var(--amber); border-color: #e2cfad; background: var(--amber-soft); }
+.mastery-independent, .mastery-stable { color: #24583f; border-color: #bdd5c5; background: #e6f0e9; }
+.mastery-guided { color: var(--amber); border-color: #e2cfad; background: var(--amber-soft); }
 
 .button {
   min-height: 44px;
@@ -477,8 +477,8 @@ p { color: var(--ink-2); line-height: 1.66; }
 .scenario-card { min-height: 280px; padding: 26px; display: flex; flex-direction: column; }
 .scenario-status-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
 .scenario-attempts { color: var(--ink-2); font-family: var(--font-mono); font-size: var(--fs-aux-sm); }
-.scenario-status-已覆盖 { color: #24583f; border-color: #bdd5c5; background: #e6f0e9; }
-.scenario-status-待复练 { color: var(--amber); border-color: #e2cfad; background: var(--amber-soft); }
+.scenario-status-covered { color: #24583f; border-color: #bdd5c5; background: #e6f0e9; }
+.scenario-status-needs_retry { color: var(--amber); border-color: #e2cfad; background: var(--amber-soft); }
 .map-progress { margin: 10px 0 0; color: var(--ink-2); font-size: var(--fs-body-sm); }
 .scenario-card h2 { margin: 44px 0 10px; font-size: var(--fs-title-lg); }
 .scenario-card > p { font-size: var(--fs-body); }

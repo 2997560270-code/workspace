@@ -51,6 +51,12 @@ import {
   type TrainingHistoryRecord
 } from "../lib/training-history";
 import {
+  MASTERY_CLASS,
+  MASTERY_LABEL,
+  SCENARIO_STATUS_CLASS,
+  SCENARIO_STATUS_LABEL
+} from "../lib/ui-labels";
+import {
   DEFAULT_SCENARIO_ID,
   SKILLS,
   TRAINING_SCENARIOS,
@@ -214,7 +220,7 @@ function TodayPanel({
             <span className="section-kicker">你的当前训练重点</span>
             <h2>{latestIssue?.title ?? "先建立一条真实能力证据"}</h2>
           </div>
-          <span className="status-tag">{records.length ? "待复练" : "未诊断"}</span>
+          <span className="status-tag">{records.length ? "有可复练的短板" : "还没开始"}</span>
         </div>
         <div className="focus-grid">
           <div>
@@ -252,7 +258,7 @@ function TodayPanel({
                 <strong>{skill.name}</strong>
                 <p>{SKILLS.find((item) => item.id === skill.id)?.description}</p>
               </div>
-              <span className={`mastery mastery-${skill.state}`} data-testid={`mastery-${skill.id}`}>{skill.state}</span>
+              <span className={`mastery mastery-${MASTERY_CLASS[skill.state]}`} data-testid={`mastery-${skill.id}`}>{MASTERY_LABEL[skill.state]}</span>
             </div>
           ))}
         </div>
@@ -315,7 +321,7 @@ function TrainingMap({
                 <span>{scenario.id.startsWith("custom-") ? "本地场景" : `${scenario.duration} 分钟 · ${scenario.difficulty}`}</span>
               </div>
               <div className="scenario-status-row">
-                <span className={`status-tag scenario-status scenario-status-${status}`} data-testid={`scenario-status-${scenario.id}`}>{status}</span>
+                <span className={`status-tag scenario-status scenario-status-${SCENARIO_STATUS_CLASS[status]}`} data-testid={`scenario-status-${scenario.id}`}>{SCENARIO_STATUS_LABEL[status]}</span>
                 {latest ? (
                   <span className="scenario-attempts">
                     已训练 {attempts} 次 · 最新证据分 {latest.totalScore}
@@ -1067,7 +1073,7 @@ function ReviewPanel({
             >
               <span>{scenario.shortTitle}</span>
               <small>{record.evaluation.issues[0]?.title ?? "主要行为已覆盖"}</small>
-              <i>{record.retry?.improved ? "已改善" : "待复练"}</i>
+              <i>{record.retry?.improved ? "已改善" : record.retry ? "未达标" : "未复练"}</i>
             </button>
           );
         })}
@@ -1083,7 +1089,7 @@ function ReviewPanel({
               <span className="section-kicker">{scenario.industry}</span>
               <h2>{scenario.title}</h2>
             </div>
-            <span className="status-tag">{selected.retry?.improved ? "已改善" : "待复练"}</span>
+            <span className="status-tag">{selected.retry?.improved ? "已改善" : selected.retry ? "未达标" : "未复练"}</span>
           </div>
           {selectedTampered ? (
             <div className="integrity-warning" data-testid="review-tamper-warning" role="alert">
@@ -1276,7 +1282,7 @@ function AbilityPanel({
               <span>{skill.evidenceCount} 条练习证据</span>
               <span>{formalSkill?.evidenceCount ?? 0} 条正式证据</span>
             </div>
-            <span className={`mastery mastery-${skill.state}`} data-testid={`mastery-${skill.id}`}>{skill.state}</span>
+            <span className={`mastery mastery-${MASTERY_CLASS[skill.state]}`} data-testid={`mastery-${skill.id}`}>{MASTERY_LABEL[skill.state]}</span>
           </article>
           );
         })}

@@ -37,7 +37,7 @@ test("updates the training map status after completing a scenario (FB-003)", asy
   // 完成诊断的场景（首次诊断固定为 export-slow）必须不再是「未训练」
   const trainedStatus = page.getByTestId("scenario-status-export-slow");
   await expect(trainedStatus).toBeVisible();
-  await expect(trainedStatus).not.toHaveText("未训练");
+  await expect(trainedStatus).not.toHaveText("还没开始");
   await expect(page.getByTestId("scenario-card-export-slow"))
     .toContainText(/已训练 \d+ 次 · 最新证据分 \d+/);
   await expect(
@@ -46,7 +46,7 @@ test("updates the training map status after completing a scenario (FB-003)", asy
   ).toBeVisible();
 
   // 未参与的场景保持「未训练」，整体进度同步更新
-  await expect(page.getByTestId("scenario-status-dashboard-request")).toHaveText("未训练");
+  await expect(page.getByTestId("scenario-status-dashboard-request")).toHaveText("还没开始");
   await expect(page.getByTestId("map-progress")).toContainText("已覆盖 1 / 12");
 });
 
