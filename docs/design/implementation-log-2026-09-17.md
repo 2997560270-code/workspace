@@ -16,3 +16,7 @@
 | hash | 提交 | 改动 | 验证 | 回退 |
 |---|---|---|---|---|
 | `29e2794` | test: 回归一致性校验改内容锚点，消除行号漂移误红 | `tests/regression-doc-consistency.test.ts`、`docs/product/regression-test-issues-2026-09-06.md` | typecheck ✅；vitest 435/435 ✅（改造前 2 failed） | `git revert 29e2794` |
+| `8526ec9` | docs: 入库 UI/UX 审查与设计契约，CI 覆盖 feat 分支 | `docs/design/*`、`docs/README.md`、`.github/workflows/ci.yml`、`.gitignore` | typecheck ✅；vitest 435/435 ✅ | `git revert 8526ec9` |
+
+批次验证（tag `uiux/base` 前）：`npm run typecheck` ✅ · `npx vitest run` 435/435 ✅ · `npm run eval:golden` 31/31 ✅ · `npm run test:rls:local` ✅ · `npm run e2e` 58/58 ✅。
+批次回退：`git reset --hard uiux/base`（未推送）或 `git revert 21c4f05..uiux/base`（已推送）。
