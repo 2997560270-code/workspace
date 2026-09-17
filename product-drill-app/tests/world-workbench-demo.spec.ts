@@ -52,7 +52,7 @@ async function completeCurrentWorld(page: import("@playwright/test").Page, world
 test("demo world workbench records an action without falling back to the browser-only mode", async ({ page }) => {
   await enterApp(page);
 
-  await page.getByRole("button", { name: "进入世界工作台" }).click();
+  await page.getByTestId("open-world-workbench").click();
   await expect(
     page.getByRole("heading", { level: 2, name: "高权威需求方要求立即增加 AI 摘要" })
   ).toBeVisible();
@@ -82,7 +82,7 @@ test("demo world workbench records an action without falling back to the browser
 
 test("short learner messages keep a content-sized bubble", async ({ page }) => {
   await enterApp(page);
-  await page.getByRole("button", { name: "进入世界工作台" }).click();
+  await page.getByTestId("open-world-workbench").click();
 
   await page
     .getByPlaceholder("提出调查问题或采取行动，Enter 发送，Shift+Enter 换行")
@@ -111,7 +111,7 @@ test("short learner messages keep a content-sized bubble", async ({ page }) => {
 
 test("desktop completes world 1 to 2 to 3 and opens the judgment profile", async ({ page }) => {
   await enterApp(page);
-  await page.getByRole("button", { name: "进入世界工作台" }).click();
+  await page.getByTestId("open-world-workbench").click();
 
   for (let index = 0; index < WORLD_TITLES.length; index += 1) {
     await expect(page.getByRole("heading", { level: 2, name: WORLD_TITLES[index] })).toBeVisible();
@@ -151,7 +151,7 @@ test("desktop completes world 1 to 2 to 3 and opens the judgment profile", async
 
 test("shows the three-world progression track and allows switching worlds (FB-007)", async ({ page }) => {
   await enterApp(page);
-  await page.getByRole("button", { name: "进入世界工作台" }).click();
+  await page.getByTestId("open-world-workbench").click();
 
   // 三个世界的概念说明与进度必须可见
   const track = page.getByTestId("wb-world-track");
@@ -171,7 +171,7 @@ test("shows the three-world progression track and allows switching worlds (FB-00
 
 test("rejects meaningless decision input instead of revealing positive consequences (FB-013)", async ({ page }) => {
   await enterApp(page);
-  await page.getByRole("button", { name: "进入世界工作台" }).click();
+  await page.getByTestId("open-world-workbench").click();
   const input = page.getByPlaceholder("提出调查问题或采取行动，Enter 发送，Shift+Enter 换行");
   // 先取得一条有效调查证据，才能进入决策阶段（FB-013 的闸门）。
   await input.fill("现有摘要的使用情况怎么样？使用率是多少？");
@@ -227,7 +227,7 @@ test("locally completed worlds appear in the decision history as local demo reco
 test("mobile viewport can complete the governed three-world loop", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await enterApp(page);
-  await page.getByRole("button", { name: "进入世界工作台" }).click();
+  await page.getByTestId("open-world-workbench").click();
 
   for (let index = 0; index < WORLD_TITLES.length; index += 1) {
     await expect(page.locator(".wb-header h2")).toHaveCount(1);

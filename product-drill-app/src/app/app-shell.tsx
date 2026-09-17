@@ -878,7 +878,7 @@ function TrainingWorkspace({
           <button className="back-button" onClick={onClose} type="button">← 返回</button>
           <span className="section-kicker">场景简报</span>
           <h2>{scenario.title}</h2>
-          <p>{scenario.context}</p>
+          <p data-testid="briefing-context">{scenario.context}</p>
           {scenario.background?.length ? (
             <div className="background-block" data-testid="scenario-background">
               <span className="background-label">业务背景</span>
@@ -970,7 +970,7 @@ function TrainingWorkspace({
 
         <aside className="training-progress surface">
           <span className="section-kicker">信息覆盖</span>
-          <div className="coverage-number" data-testid="coverage-summary"><strong>{coverage}%</strong><span>不是最终分数</span></div>
+          <div className="coverage-number" data-testid="coverage-summary"><strong>{coverage}%</strong><span data-testid="coverage-unit">不是最终分数</span></div>
           <div className="coverage-bar"><i style={{ width: `${coverage}%` }} /></div>
           <div className="coverage-list">
             {SKILLS.map((skill) => (
@@ -980,7 +980,7 @@ function TrainingWorkspace({
               </div>
             ))}
           </div>
-          <p>覆盖度只表示你是否问到了相关信息，不代表问题质量。</p>
+          <p data-testid="coverage-note">覆盖度只表示你是否问到了相关信息，不代表问题质量。</p>
           <button
             className="button button-secondary"
             data-testid="finish-interview"

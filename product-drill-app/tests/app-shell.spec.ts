@@ -39,7 +39,7 @@ test("keeps the world workbench heading in the mobile viewport", async ({ page }
     document.body.style.minHeight = "2000px";
     window.scrollTo(0, 500);
   });
-  await page.getByRole("button", { name: "进入世界工作台", exact: true }).click();
+  await page.getByTestId("open-world-workbench").click();
 
   await expect(page.getByRole("heading", { level: 1, name: "世界工作台" })).toBeInViewport();
 });

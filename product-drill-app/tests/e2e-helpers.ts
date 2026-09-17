@@ -9,6 +9,23 @@ export const UI_LABELS = {
 
 export type ViewId = "today" | "map" | "review" | "ability";
 
+/** 设计令牌在 e2e 的单一事实来源：批次4 改字体/颜色时只改这里。 */
+export const FONTS = {
+  display: '"Noto Serif SC", "Source Han Serif SC", "Songti SC", STSongti, STSong, SimSun, NSimSun, serif',
+  body: 'Inter, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, -apple-system, "Segoe UI", sans-serif',
+  mono: '"IBM Plex Mono", "JetBrains Mono", "Cascadia Code", "SF Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
+} as const;
+
+export const INK = {
+  claim: "rgb(21, 26, 34)",
+  evidence: "rgb(65, 74, 88)",
+  provenance: "rgb(123, 130, 144)",
+  onDarkClaim: "rgb(245, 242, 234)",
+  onDarkProvenance: "rgb(141, 150, 166)",
+  sage: "rgb(46, 106, 79)",
+  coral: "rgb(176, 67, 47)",
+} as const;
+
 /** 侧栏导航走 data-testid，不依赖拼接可访问名。 */
 export async function gotoView(page: Page, view: ViewId) {
   await page.getByTestId(`nav-${view}`).click();
@@ -30,13 +47,13 @@ export async function enterApp(page: Page) {
 }
 
 export async function reachFeedback(page: Page) {
-  await page.getByRole("button", { name: "开始 3 分钟诊断", exact: true }).click();
-  const input = page.getByRole("textbox", { name: "你的追问", exact: true });
+  await page.getByTestId("start-today-training").click();
+  const input = page.getByTestId("reply-input");
   await input.fill("谁每天使用报表，谁负责最终决策？");
-  await page.getByRole("button", { name: "发送追问", exact: true }).click();
-  await page.getByRole("button", { name: "结束访谈，整理判断", exact: true }).click();
-  await page.getByRole("textbox", { name: "核心问题", exact: true }).fill("真实使用者和失败环节还没有确认");
-  await page.getByRole("textbox", { name: "建议行动", exact: true }).fill("暂不直接重写功能，先还原当前流程并验证影响");
-  await page.getByRole("button", { name: "提交判断并查看反馈", exact: true }).click();
+  await page.getByTestId("send-reply").click();
+  await page.getByTestId("finish-interview").click();
+  await page.getByTestId("judgment-field-coreProblem").fill("真实使用者和失败环节还没有确认");
+  await page.getByTestId("judgment-field-recommendation").fill("暂不直接重写功能，先还原当前流程并验证影响");
+  await page.getByTestId("judgment-submit").click();
   await page.getByRole("heading", { name: "系统为什么做出这个判断" }).waitFor();
 }
