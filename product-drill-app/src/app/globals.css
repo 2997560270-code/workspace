@@ -247,6 +247,8 @@ p { color: var(--ink-2); line-height: 1.66; }
 .user { padding: 8px 0 8px 18px; display: flex; flex-direction: column; text-align: right; border-left: 1px solid var(--line); }
 .user strong { margin-top: 3px; font-size: 14px; font-weight: 600; color: var(--ink); }
 .content { padding: 32px clamp(28px, 4vw, 58px) 96px; }
+/* 页头 tabIndex=-1 只服务于视图切换后的程序化滚动，抑制其默认焦点环（移动端曾表现为一圈黑框） */
+.topbar:focus, .topbar:focus-visible { outline: none; }
 /* 反馈 FAB 安全区：右栏收尾内容不被 fixed 按钮遮挡 */
 .training-progress { padding-bottom: 84px; }
 
