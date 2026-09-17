@@ -521,6 +521,9 @@ export function WorldDecisionHistoryPanel({
     });
   const mergedRecords = [...records, ...localRecords];
 
+  // 新人单一空态：没有任何世界决策时整个面板不渲染，复盘页只保留一个引导空态。
+  if (status === "loaded" && !mergedRecords.length) return null;
+
   return (
     <section className="world-history" aria-labelledby="world-history-title">
       <div className="world-history-heading">
@@ -537,12 +540,6 @@ export function WorldDecisionHistoryPanel({
       ) : null}
       {status === "error" && !mergedRecords.length ? (
         <div className="world-history-status surface" role="alert">世界决策记录加载失败，请刷新重试。</div>
-      ) : null}
-      {status === "loaded" && !mergedRecords.length ? (
-        <div className="world-history-status surface">
-          <h3>还没有已完成的世界决策</h3>
-          <p>完成一个世界工作台挑战后，调查、决策和后果会显示在这里。</p>
-        </div>
       ) : null}
 
       {mergedRecords.length ? (

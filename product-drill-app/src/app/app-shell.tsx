@@ -1262,9 +1262,11 @@ function ReviewPanel({
 function AbilityPanel({
   records,
   onOpenReview,
+  onGoToday,
 }: {
   records: TrainingHistoryRecord[];
   onOpenReview: () => void;
+  onGoToday: () => void;
 }) {
   const formalProfile = buildAbilityProfile(records.filter((record) => record.engine === "openai"), { formalEvidenceOnly: true });
   const practiceProfile = buildAbilityProfile(records);
@@ -1283,14 +1285,22 @@ function AbilityPanel({
             {latestImprovementSkill ? `最近改善：${latestImprovementSkill}。` : "最近改善：完成一次复练后显示。"}
             {formalProfile.completedCount ? " 正式趋势只统计模型完成的训练。" : " 当前状态包含练习反馈，正式趋势仍需模型训练证据。"}
           </p>
-          <button className="button button-light" onClick={onOpenReview} type="button">
-            查看全部训练记录
-          </button>
-        </div>
-        <div className="summary-stats">
-          <div><strong>{practiceProfile.completedCount}</strong><span>专项练习记录</span></div>
-          <div><strong>{formalProfile.completedCount}</strong><span>计入能力记录的次数</span></div>
-          <div><strong>{formalProfile.improvedCount}</strong><span>专项练习改善</span></div>
+          {practiceProfile.completedCount ? (
+            <>
+              <button className="button button-light" onClick={onOpenReview} type="button">
+                查看全部训练记录
+              </button>
+              <div className="summary-stats">
+                <div><strong>{practiceProfile.completedCount}</strong><span>专项练习记录</span></div>
+                <div><strong>{formalProfile.completedCount}</strong><span>计入能力记录的次数</span></div>
+                <div><strong>{formalProfile.improvedCount}</strong><span>专项练习改善</span></div>
+              </div>
+            </>
+          ) : (
+            <button className="button button-light" onClick={onGoToday} type="button">
+              去开始第一次练习
+            </button>
+          )}
         </div>
       </section>
       <section className="surface ability-table">
@@ -1746,11 +1756,11 @@ export function AppShell({
             // #6 新链路：判断证据画像（替换旧 totalScore / 雷达图）
             // 旧 AbilityPanel 保留供旧训练链路使用
             <div className="stack-lg">
-              <TeamWorkspacePanel draft={mentorDraft} onDraftChange={setMentorDraft} onViewRecord={viewTeamRecord} userId={userId} userName={userName} />
               <div className="ability-layout">
                 <JudgmentProfilePanel />
-                <AbilityPanel onOpenReview={() => setView("review")} records={trustedRecords} />
+                <AbilityPanel onGoToday={() => setView("today")} onOpenReview={() => setView("review")} records={trustedRecords} />
               </div>
+              <TeamWorkspacePanel draft={mentorDraft} onDraftChange={setMentorDraft} onViewRecord={viewTeamRecord} userId={userId} userName={userName} />
             </div>
           ) : null}
         </div>
