@@ -21,7 +21,7 @@ export const NAV_ITEMS: NavItem[] = [
 const VIEW_META: Record<ViewId, ViewMeta> = {
   today: {
     title: "今天，练会一个真正的产品判断",
-    description: "用 5—10 分钟完成一个真实业务情境，获得逐句证据反馈。"
+    description: "一次练习约 6 分钟：和业务角色对话，提交你的判断，拿到针对你原话的反馈。"
   },
   map: {
     title: "训练地图",
