@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { FeedbackApiError, submitFeedback } from "../lib/api/feedback-client";
 import { FEEDBACK_CATEGORIES, type FeedbackCategory } from "../lib/api/feedback-schemas";
+import { X } from "@phosphor-icons/react";
 import { useDialogA11y } from "../lib/dialog-a11y";
 
 const CATEGORY_LABELS: Record<FeedbackCategory, string> = {
@@ -91,7 +92,7 @@ export function FeedbackWidget() {
               <h2>帮我们改进产品</h2>
             </div>
             <button className="feedback-fab-close" onClick={close} type="button" aria-label="关闭">
-              ×
+              <X aria-hidden="true" size={16} weight="bold" />
             </button>
           </div>
 

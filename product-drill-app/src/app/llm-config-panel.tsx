@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { fetchLlmConfigs, LlmConfigApiError, saveLlmConfig, testLlmConnection } from "../lib/api/llm-config-client";
 import { LLM_PROVIDER_PRESETS, providerName, type LlmConfigPublic } from "../lib/api/llm-config-schemas";
+import { CaretDown, CaretRight, X } from "@phosphor-icons/react";
 import { useDialogA11y } from "../lib/dialog-a11y";
 
 type Status = "idle" | "loading" | "saving" | "testing" | "error";
@@ -128,7 +129,7 @@ export function LlmConfigPanel({ onClose }: { onClose: () => void }) {
               <h2>模型</h2>
               <p>填入各提供方的 API 密钥即可使用其模型。</p>
             </div>
-            <button className="settings-close" onClick={onClose} type="button" aria-label="关闭">×</button>
+            <button className="settings-close" onClick={onClose} type="button" aria-label="关闭"><X aria-hidden="true" size={16} weight="bold" /></button>
           </div>
 
           {active ? (
@@ -169,7 +170,7 @@ export function LlmConfigPanel({ onClose }: { onClose: () => void }) {
 
             <div className="llm-collapse">
               <button className="llm-collapse-toggle" onClick={() => setShowAdvanced((value) => !value)} type="button">
-                {showAdvanced ? "▾" : "▸"} 自定义设置
+                {showAdvanced ? <CaretDown aria-hidden="true" size={12} weight="bold" /> : <CaretRight aria-hidden="true" size={12} weight="bold" />} 自定义设置
               </button>
               {showAdvanced ? (
                 <div className="llm-advanced">

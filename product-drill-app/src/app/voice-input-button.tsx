@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Microphone } from "@phosphor-icons/react";
 
 type SpeechRecognitionLike = {
   lang: string;
@@ -120,7 +121,7 @@ export function VoiceInputButton({ onTranscript, disabled }: { onTranscript: (te
         title={notice || label}
         type="button"
       >
-        <span aria-hidden="true">{status === "listening" ? "■" : "●"}</span>
+        <Microphone aria-hidden="true" size={14} weight={status === "listening" ? "fill" : "regular"} />
         {status === "unsupported" ? "浏览器不支持" : status === "error" ? "重试语音" : label}
       </button>
       {notice ? (

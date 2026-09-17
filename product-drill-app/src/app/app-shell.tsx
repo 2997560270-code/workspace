@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { ArrowUpRight, Check, GearSix } from "@phosphor-icons/react";
 import { WorldWorkbench } from "./world-workbench";
 import { JudgmentProfilePanel, WorldDecisionHistoryPanel } from "./judgment-profile-panel";
 import {
@@ -101,11 +102,11 @@ function formatCountdown(seconds: number): string {
 }
 
 function ArrowIcon() {
-  return <span aria-hidden="true">↗</span>;
+  return <ArrowUpRight aria-hidden="true" size={13} weight="bold" />;
 }
 
 function CheckMark({ active = true }: { active?: boolean }) {
-  return <span aria-hidden="true" className={active ? "check active" : "check"}>✓</span>;
+  return <span aria-hidden="true" className={active ? "check active" : "check"}><Check size={11} weight="bold" /></span>;
 }
 
 function mergeHistoryRecords(primary: TrainingHistoryRecord[], secondary: TrainingHistoryRecord[]) {
@@ -1624,7 +1625,7 @@ export function AppShell({
             }}
             type="button"
           >
-            ⚙ 模型设置
+            <GearSix aria-hidden="true" size={15} /> 模型设置
           </button>
           <SignOutButton />
         </div>
@@ -1652,7 +1653,7 @@ export function AppShell({
             }}
             type="button"
           >
-            ⚙ 设置
+            <GearSix aria-hidden="true" size={15} /> 设置
           </button>
         </header>
         <div className="content">
