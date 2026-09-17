@@ -87,7 +87,7 @@ body {
 }
 button, input, textarea, select { font: inherit; font-family: var(--font-body); }
 button { cursor: pointer; }
-button:disabled { cursor: not-allowed; opacity: 0.46; }
+button:disabled { cursor: not-allowed; }
 
 /* ── Tier 1: CLAIMS — serif, near-black, present ───────────────────────── */
 h1, h2, h3, h4, p { margin-top: 0; }
@@ -298,6 +298,11 @@ p { color: var(--ink-2); line-height: 1.66; }
 .button-coral { color: var(--coral-strong); border-color: #efaaa0; background: var(--coral-soft); }
 .text-button, .back-button { padding: 0; color: var(--ink); border: 0; background: transparent; font-size: var(--fs-body-sm); font-weight: 650; }
 .text-button:hover, .back-button:hover { color: var(--sage-strong); }
+button:disabled { cursor: not-allowed; }
+.button:disabled { opacity: 1; background: var(--line); border-color: var(--line); color: var(--ink-2); }
+.button-light:disabled { opacity: 1; background: #394252; border-color: #394252; color: #aeb6c4; }
+.text-button:disabled { opacity: 1; color: var(--ink-3); }
+.composer-note, .progress-note { display: block; color: var(--ink-3); font-size: var(--fs-aux-sm); }
 
 /* ══════════════════════════ TODAY ══════════════════════════════════════ */
 .today-layout { display: grid; grid-template-columns: minmax(0, 1fr) 278px; gap: 18px; }

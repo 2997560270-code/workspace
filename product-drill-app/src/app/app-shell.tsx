@@ -547,6 +547,7 @@ function FeedbackPanel({
                 rows={3}
                 value={retryAnswer}
               />
+              <span className="composer-note">写至少 4 个字后可提交</span>
               {retryResult ? (
                 <div className={retryResult.improved ? "retry-result success" : "retry-result"}>
                   <strong>{retryResult.improved ? "已观察到改善" : "还可以更具体"}</strong>
@@ -981,7 +982,7 @@ function TrainingWorkspace({
                 给我一点提示
               </button>
               <button className="button button-primary" data-testid="send-reply" disabled={busy || strictExpired || !reply.trim()} onClick={() => { void sendReply(); }} type="button">发送追问</button>
-              {strictExpired ? <span className="composer-note">本局时间已结束</span> : null}
+              {strictExpired ? <span className="composer-note">本局时间已结束</span> : !reply.trim() ? <span className="composer-note">写下你的问题后即可发送</span> : null}
             </div>
           </div>
         </section>
@@ -999,6 +1000,7 @@ function TrainingWorkspace({
             ))}
           </div>
           <p data-testid="coverage-note">覆盖度只表示你是否问到了相关信息，不代表问题质量。</p>
+          {(!strictExpired && session.messages.filter((message) => message.role === "user").length < 1) ? <span className="progress-note">至少发送一个追问后，即可提交判断</span> : null}
           <button
             className="button button-secondary"
             data-testid="finish-interview"
