@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { enterApp } from "./e2e-helpers";
+import { enterApp, gotoView } from "./e2e-helpers";
 
 async function openResourceHub(page: Parameters<typeof enterApp>[0]) {
   await enterApp(page);
-  await page.getByRole("button", { name: "02 训练地图 按能力选择训练任务", exact: true }).click();
+  await gotoView(page, "map");
   await page.getByRole("button", { name: "打开资源中心", exact: true }).click();
 }
 

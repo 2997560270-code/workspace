@@ -1,17 +1,20 @@
 ﻿import { expect, test } from "@playwright/test";
-import { enterApp } from "./e2e-helpers";
+import { enterApp, gotoView, UI_LABELS } from "./e2e-helpers";
 
 test("navigates between the four direction A modules", async ({ page }) => {
   await enterApp(page);
   await expect(page.getByTestId("weekly-summary")).toContainText("建立你的能力基线");
+  // copy guard：导航按钮仍须向用户暴露 label 与 hint 文案
+  await expect(page.getByTestId("nav-map")).toContainText("训练地图");
+  await expect(page.getByTestId("nav-map")).toContainText("按能力选择训练任务");
   const cases = [
-    ["02 训练地图 按能力选择训练任务", "训练地图"],
-    ["03 复盘与复练 重练具体失误时刻", "复盘与复练"],
-    ["04 我的能力 查看掌握状态和证据", "我的能力"],
-    ["01 今日训练 开始一次针对性练习", "今天，练会一个真正的产品判断"]
+    ["map", "训练地图"],
+    ["review", "复盘与复练"],
+    ["ability", "我的能力"],
+    ["today", UI_LABELS.todayHeading]
   ] as const;
-  for (const [button, heading] of cases) {
-    await page.getByRole("button", { name: button, exact: true }).click();
+  for (const [view, heading] of cases) {
+    await gotoView(page, view);
     await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
   }
 });
@@ -19,7 +22,7 @@ test("navigates between the four direction A modules", async ({ page }) => {
 test("keeps the ability view within the mobile viewport", async ({ page }) => {
   await enterApp(page);
   await page.setViewportSize({ width: 375, height: 844 });
-  await page.getByRole("button", { name: "04 我的能力 查看掌握状态和证据", exact: true }).click();
+  await gotoView(page, "ability");
 
   const widths = await page.evaluate(() => ({
     client: document.documentElement.clientWidth,

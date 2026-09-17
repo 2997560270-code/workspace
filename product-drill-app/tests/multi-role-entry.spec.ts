@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { enterApp } from "./e2e-helpers";
+import { enterApp, gotoView } from "./e2e-helpers";
 
 // FB-008：多角色训练入口必须在训练地图显眼可见且可用（需求文档 4.5，主入口为训练地图）。
 test("multi-role training entry is reachable from the training map (FB-008)", async ({ page }) => {
   await enterApp(page);
-  await page.getByRole("button", { name: "02 训练地图 按能力选择训练任务", exact: true }).click();
+  await gotoView(page, "map");
 
   // 入口卡片紧跟场景列表，位于第一屏（在自定义场景/课程入口之前）
   const entry = page.getByTestId("multi-role-entry");

@@ -1,5 +1,19 @@
 import type { Page } from "@playwright/test";
 
+/** 用户可见文案的单一事实来源：文案改造时只改这里。
+ *  注意：这里只收敛「定位用」的文案；验证用户看到什么的断言仍应写在各 spec 里。 */
+export const UI_LABELS = {
+  todayHeading: "今天，练会一个真正的产品判断",
+  sourcePattern: /产品练习生 · (服务端记录|本地缓存)/,
+} as const;
+
+export type ViewId = "today" | "map" | "review" | "ability";
+
+/** 侧栏导航走 data-testid，不依赖拼接可访问名。 */
+export async function gotoView(page: Page, view: ViewId) {
+  await page.getByTestId(`nav-${view}`).click();
+}
+
 export async function enterApp(page: Page) {
   await page.context().addCookies([{
     name: "product_drill_e2e_user",
@@ -11,8 +25,8 @@ export async function enterApp(page: Page) {
   // In E2E-isolated mode the isolated demo cookie is the login path, so the
   // app enters the dashboard even when Supabase is configured (no real account).
   await page.goto("/");
-  await page.getByRole("heading", { level: 1, name: "今天，练会一个真正的产品判断" }).waitFor();
-  await page.getByText(/产品练习生 · (服务端记录|本地缓存)/).waitFor({ state: "attached" });
+  await page.getByRole("heading", { level: 1, name: UI_LABELS.todayHeading }).waitFor();
+  await page.getByText(UI_LABELS.sourcePattern).waitFor({ state: "attached" });
 }
 
 export async function reachFeedback(page: Page) {

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { enterApp, reachFeedback } from "./e2e-helpers";
+import { enterApp, gotoView, reachFeedback } from "./e2e-helpers";
 
 test("records a successful local retry in review", async ({ page }) => {
   await enterApp(page);
@@ -31,7 +31,7 @@ test("updates the training map status after completing a scenario (FB-003)", asy
   await page.getByRole("button", { name: "完成并返回今日训练", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "复盘与复练" })).toBeVisible();
 
-  await page.getByRole("button", { name: "02 训练地图 按能力选择训练任务", exact: true }).click();
+  await gotoView(page, "map");
   await expect(page.getByRole("heading", { level: 1, name: "训练地图" })).toBeVisible();
 
   // 完成诊断的场景（首次诊断固定为 export-slow）必须不再是「未训练」
