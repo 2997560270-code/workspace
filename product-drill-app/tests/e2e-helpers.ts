@@ -4,7 +4,7 @@ import type { Page } from "@playwright/test";
  *  注意：这里只收敛「定位用」的文案；验证用户看到什么的断言仍应写在各 spec 里。 */
 export const UI_LABELS = {
   todayHeading: "今天，练会一个真正的产品判断",
-  sourcePattern: /产品练习生 · (服务端记录|本地缓存)/,
+  sidebarRole: "产品练习生",
 } as const;
 
 export type ViewId = "today" | "map" | "review" | "ability";
@@ -43,7 +43,7 @@ export async function enterApp(page: Page) {
   // app enters the dashboard even when Supabase is configured (no real account).
   await page.goto("/");
   await page.getByRole("heading", { level: 1, name: UI_LABELS.todayHeading }).waitFor();
-  await page.getByText(UI_LABELS.sourcePattern).waitFor({ state: "attached" });
+  await page.getByText(UI_LABELS.sidebarRole, { exact: true }).waitFor({ state: "attached" });
 }
 
 export async function reachFeedback(page: Page) {

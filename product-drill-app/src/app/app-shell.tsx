@@ -1317,7 +1317,6 @@ export function AppShell({
   const [storageReady, setStorageReady] = useState(false);
   // FB-014：服务端签名校验结果（本地记录可能被篡改，校验只能在服务端完成）。
   const [integrityResults, setIntegrityResults] = useState<Record<string, "valid" | "invalid">>({});
-  const [historyStatus, setHistoryStatus] = useState<"loading" | "server" | "local">("loading");
   const topbarRef = useRef<HTMLElement>(null);
   const meta = getViewMeta(view);
   const storageKey = `${STORAGE_KEY}:${userId}`;
@@ -1375,19 +1374,16 @@ export function AppShell({
 
     if (userSource === "demo" && cachedRecords.length) {
       setHistoryRecords(cachedRecords);
-      setHistoryStatus("local");
     }
 
     fetchRemoteHistory()
       .then((remoteRecords) => {
         if (cancelled) return;
         setHistoryRecords(userSource === "supabase" ? remoteRecords : mergeHistoryRecords(remoteRecords, cachedRecords));
-        setHistoryStatus("server");
       })
       .catch(() => {
         if (cancelled) return;
         setHistoryRecords(userSource === "supabase" ? [] : cachedRecords);
-        setHistoryStatus("local");
       })
       .finally(() => { if (!cancelled) setStorageReady(true); });
 
@@ -1446,7 +1442,7 @@ export function AppShell({
   function addRecord(record: TrainingHistoryRecord) {
     setHistoryRecords((current) => mergeHistoryRecords([record], current));
     if (record.engine === "deterministic") {
-      void syncDeterministicRecord(record).catch(() => setHistoryStatus("local"));
+      void syncDeterministicRecord(record).catch(() => undefined);
     }
   }
 
@@ -1461,7 +1457,7 @@ export function AppShell({
     }
     setHistoryRecords((current) => current.map((record) => record.id === recordId ? nextRecord : record));
     if (nextRecord.engine === "deterministic") {
-      void syncDeterministicRecord(nextRecord).catch(() => setHistoryStatus("local"));
+      void syncDeterministicRecord(nextRecord).catch(() => undefined);
     }
   }
 
@@ -1471,7 +1467,7 @@ export function AppShell({
     const nextRecord = { ...currentRecord, mentorNote };
     setHistoryRecords((current) => current.map((record) => record.id === recordId ? nextRecord : record));
     if (nextRecord.engine === "deterministic") {
-      void syncDeterministicRecord(nextRecord).catch(() => setHistoryStatus("local"));
+      void syncDeterministicRecord(nextRecord).catch(() => undefined);
     }
   }
 
@@ -1537,7 +1533,6 @@ export function AppShell({
     () => historyRecords.filter((record) => integrityResults[record.id] === "valid"),
     [historyRecords, integrityResults]
   );
-  const sourceLabel = historyStatus === "loading" ? "正在同步" : historyStatus === "server" ? "服务端记录" : "本地缓存";
   const nextWorkbenchWorld = useMemo(
     () => getNextIncompleteDemoWorld(completedWorldIds),
     [completedWorldIds]
@@ -1587,7 +1582,7 @@ export function AppShell({
         <div className="sidebar-footer">
           <div className="sidebar-user">
             <strong>{userName}</strong>
-            <span>产品练习生 · {sourceLabel}</span>
+            <span>产品练习生</span>
           </div>
           <div className="sidebar-week">
             <span>本周训练</span>
