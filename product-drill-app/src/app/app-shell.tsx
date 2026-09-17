@@ -201,7 +201,7 @@ function TodayPanel({
       <aside className="weekly surface">
         <div className="section-heading compact">
           <div>
-            <span className="section-kicker">本周节奏</span>
+            
             <h2>{weeklyDone} / {profile.weeklyTarget} 次</h2>
           </div>
         </div>
@@ -217,7 +217,7 @@ function TodayPanel({
       <section className="focus-card surface">
         <div className="section-heading">
           <div>
-            <span className="section-kicker">你的当前训练重点</span>
+            
             <h2>{latestIssue?.title ?? "先建立一条真实能力证据"}</h2>
           </div>
           <span className="status-tag">{records.length ? "有可复练的短板" : "还没开始"}</span>
@@ -256,14 +256,13 @@ function TodayPanel({
       <section className="map-preview surface">
         <div className="section-heading">
           <div>
-            <span className="section-kicker">产品发现能力地图</span>
+            
             <h2>每次练习都会留下能回看的记录</h2>
           </div>
         </div>
         <div className="skill-rows">
-          {profile.skills.map((skill, index) => (
+          {profile.skills.map((skill) => (
             <div className="skill-row" key={skill.id}>
-              <span className="skill-index">0{index + 1}</span>
               <div>
                 <strong>{skill.name}</strong>
                 <p>{SKILLS.find((item) => item.id === skill.id)?.description}</p>
@@ -276,7 +275,7 @@ function TodayPanel({
 
       {/* FB-008：多角色训练入口在默认的“今日训练”页也可见，避免埋在二级“训练地图”里找不到 */}
       <section className="surface multi-role-entry" data-testid="today-multi-role-entry">
-        <div><span className="section-kicker">多视角练习</span><h2>多人角色训练</h2><p>在同一业务问题中切换运营、财务和一线角色，练习处理利益差异。</p></div>
+        <div><h2>多人角色训练</h2><p>在同一业务问题中切换运营、财务和一线角色，练习处理利益差异。</p></div>
         <button className="button button-secondary" onClick={onOpenMultiRole} type="button">开始多人角色训练</button>
       </section>
     </div>
@@ -353,33 +352,33 @@ function TrainingMap({
       </div>
       {/* FB-008：多人角色训练是需求文档 4.5 的正式能力，入口必须紧跟场景列表，不能被埋在页面底部 */}
       <section className="surface multi-role-entry" data-testid="multi-role-entry">
-        <div><span className="section-kicker">多视角练习</span><h2>多人角色训练</h2><p>在同一业务问题中切换运营、财务和一线角色，练习处理利益差异。</p></div>
+        <div><h2>多人角色训练</h2><p>在同一业务问题中切换运营、财务和一线角色，练习处理利益差异。</p></div>
         <button className="button button-secondary" onClick={onOpenMultiRole} type="button">开始多人角色训练</button>
       </section>
       <section className="surface custom-scenario-entry" data-testid="custom-scenario-entry">
         <div>
-          <span className="section-kicker">本地扩展</span>
+          
           <h2>创建自定义场景</h2>
           <p>把你正在面对的真实问题变成一次可复盘的产品发现练习。</p>
         </div>
         <button className="button button-secondary" onClick={onCreateCustomScenario} type="button">创建本地场景</button>
       </section>
       <section className="surface course-entry" data-testid="course-entry">
-        <div><span className="section-kicker">结构化学习</span><h2>课程内容</h2><p>用短知识点和行动练习补足场景训练之外的基础。</p></div>
+        <div><h2>课程内容</h2><p>用短知识点和行动练习补足场景训练之外的基础。</p></div>
         <button className="button button-secondary" onClick={onOpenCourses} type="button">查看课程</button>
       </section>
       <section className="surface resource-hub-entry" data-testid="resource-hub-entry">
-        <div><span className="section-kicker">开放资料</span><h2>社区、行业知识库与标准化考核</h2><p>浏览案例、检索行业资料、预览内容审核流程，并体验标准化考核诊断。</p></div>
+        <div><h2>社区、行业知识库与标准化考核</h2><p>浏览案例、检索行业资料、预览内容审核流程，并体验标准化考核诊断。</p></div>
         <button className="button button-secondary" onClick={() => onOpenResourceHub("community")} type="button">打开资源中心</button>
       </section>
       {/* RT-006/FB-012：标准化考核直达入口，避免被埋在资源中心第 7 个标签里而“找不到” */}
       <section className="surface assessment-entry" data-testid="assessment-entry">
-        <div><span className="section-kicker">标准化测评（试点）</span><h2>固定题序能力测评</h2><p>用固定题序做一次标准化能力诊断，练习者可用同一标准衡量掌握情况。</p></div>
+        <div><h2>固定题序能力测评</h2><p>用固定题序做一次标准化能力诊断，练习者可用同一标准衡量掌握情况。</p></div>
         <button className="button button-secondary" data-testid="assessment-entry-button" onClick={() => onOpenResourceHub("assessment")} type="button">进入标准化考核</button>
       </section>
       <section className="surface experiment-entry" data-testid="product-material-experiment-entry">
         <div>
-          <span className="section-kicker">资料练习</span>
+          
           <h2>产品资料生成练习</h2>
           <p>把一次产品判断整理成可讨论的资料草稿，明确证据边界和下一步验证。</p>
         </div>
@@ -422,7 +421,7 @@ function JudgmentForm({
     <section className="judgment surface" data-testid="judgment-canvas">
       <div className="section-heading">
         <div>
-          <span className="section-kicker">产品判断画布</span>
+          
           <h2>把对话信息转成一个可以验证的判断</h2>
         </div>
         <span className="quiet">把对话里的信息整理成你的判断</span>
@@ -508,7 +507,7 @@ function FeedbackPanel({
       <section className="surface evidence-section">
         <div className="section-heading">
           <div>
-            <span className="section-kicker">逐句证据反馈</span>
+            
             <h2>系统为什么做出这个判断</h2>
           </div>
         </div>
@@ -989,7 +988,7 @@ function TrainingWorkspace({
         </section>
 
         <aside className="training-progress surface">
-          <span className="section-kicker">信息覆盖</span>
+          
           <div className="coverage-number" data-testid="coverage-summary"><strong>{coverage}%</strong><span data-testid="coverage-unit">不是最终分数</span></div>
           <div className="coverage-bar"><i style={{ width: `${coverage}%` }} /></div>
           <div className="coverage-list">
@@ -1065,7 +1064,6 @@ function ReviewPanel({
   if (!records.length) {
     return (
       <section className="empty-state surface">
-        <span className="empty-number">01</span>
         <h2>还没有可以复盘的训练</h2>
         <p>完成第一次练习后，这里会出现你可以重练的具体环节。</p>
         <button className="button button-primary" onClick={() => onStart(DEFAULT_SCENARIO_ID)} type="button">开始首次训练</button>
@@ -1260,7 +1258,7 @@ function AbilityPanel({
     <div className="ability-layout">
       <section className="ability-summary surface-dark">
         <div>
-          <span className="section-kicker light">专项训练证据</span>
+          
           <h2>{practiceProfile.completedCount ? `专项训练已留下 ${practiceProfile.completedCount} 条记录，其中 ${formalProfile.completedCount} 条计入能力记录` : "完成首次专项训练，建立能力基线"}</h2>
           <p>{practiceProfile.completedCount ? practiceProfile.nextTraining : "这里只统计今日训练和训练地图里的专项练习，不包含上面情境对话的判断记录；演示或降级的结果只作为练习反馈。"}</p>
           <p className="ability-summary-note">
@@ -1280,15 +1278,14 @@ function AbilityPanel({
       <section className="surface ability-table">
         <div className="section-heading">
           <div>
-            <span className="section-kicker">五项产品发现能力</span>
+            
             <h2>每个状态都能回到具体训练证据</h2>
           </div>
         </div>
-        {practiceProfile.skills.map((skill, index) => {
+        {practiceProfile.skills.map((skill) => {
           const formalSkill = formalProfile.skills.find((item) => item.id === skill.id);
           return (
           <article data-testid={`ability-skill-${skill.id}`} key={skill.id}>
-            <span className="skill-index">0{index + 1}</span>
             <div>
               <h3>{skill.name}</h3>
               <p>{skill.latestEvidence}</p>
@@ -1575,7 +1572,7 @@ export function AppShell({
           </div>
         </div>
         <nav aria-label="主导航">
-          {NAV_ITEMS.map((item, index) => (
+          {NAV_ITEMS.map((item) => (
             <button
               aria-current={!activeTraining && item.view === view ? "page" : undefined}
               className={!activeTraining && item.view === view ? "active" : ""}
@@ -1595,7 +1592,6 @@ export function AppShell({
               }}
               type="button"
             >
-              <span>0{index + 1}</span>
               <div><strong>{item.label}</strong><small>{item.hint}</small></div>
             </button>
           ))}
