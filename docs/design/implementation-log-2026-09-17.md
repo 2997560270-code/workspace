@@ -75,3 +75,19 @@
 使 9 个失败未阻断提交。此后验证一律以 `grep -E "Tests |passed|failed"` 直读结果并人工核对计数。
 批次验证（tag `uiux/visual` 前）：typecheck ✅ · vitest 435/435 ✅ · golden 31/31 ✅ · rls ✅ · e2e 58/58 ✅。
 批次回退：`git reset --hard uiux/visual` 或 `git revert uiux/p0..uiux/visual`（e9abba2 与 0907465 成对）。
+
+## 批次 5 · 结构改造（tag `uiux/structure`）
+
+| hash | 提交 | 覆盖 | 回退 |
+|---|---|---|---|
+| `8ce7284` | 23+24 模式切换上移 + 一句话解释 | 聊天头；aria-describedby；MODE_HINTS | `git revert 8ce7284` |
+| `0e7026c` | 25 覆盖度 n/5 + 点亮 | 去 0% 百分比；命中 180ms 动效（reduced-motion 关闭） | `git revert 0e7026c` |
+| `352378b` | 26 覆盖度清单 ul/li | 语义化列表 | `git revert 352378b` |
+| `0772a9b` | 27 画布预填（P0-4） | judgment-draft.ts + 6 条单测锁不变量 | `git revert 0772a9b` |
+| `eebff30` | 28 新人态收敛 | 能力页第一步 CTA；团队面板下移；复盘单一空态 | `git revert eebff30` |
+
+deferred：训练地图「分组折叠」暂缓——`scenario-library.spec.ts` 以
+`.scenario-card` 计数 12 与入口顺序 rect 为契约，折叠会破坏；待该契约改为
+testid 语义后再做（另立提交）。
+批次验证（tag `uiux/structure` 前）：typecheck ✅ · vitest 441/441 ✅ · golden 31/31 ✅ · rls ✅ · e2e 58/58 ✅。
+批次回退：`git reset --hard uiux/structure` 或 `git revert uiux/visual..uiux/structure`。
