@@ -168,11 +168,12 @@ function TodayPanel({
           <h2>{recommended.title}</h2>
           <p>{recommended.context}</p>
           <div className="hero-actions">
-            <button className="button button-light" onClick={() => onStart(recommended.id)} type="button">
+            <button className="button button-light" data-testid="start-today-training" onClick={() => onStart(recommended.id)} type="button">
               {records.length ? "开始今日训练" : "开始 3 分钟诊断"} <ArrowIcon />
             </button>
             <button
               className="button button-secondary"
+              data-testid="open-world-workbench"
               onClick={() => workbenchComplete ? onOpenAbility() : onStartWorkbench()}
               type="button"
             >
@@ -226,6 +227,7 @@ function TodayPanel({
           </div>
           <button
             className="button button-secondary"
+            data-testid="start-retry-home"
             disabled={!records.length}
             onClick={onOpenReview}
             type="button"
@@ -250,7 +252,7 @@ function TodayPanel({
                 <strong>{skill.name}</strong>
                 <p>{SKILLS.find((item) => item.id === skill.id)?.description}</p>
               </div>
-              <span className={`mastery mastery-${skill.state}`}>{skill.state}</span>
+              <span className={`mastery mastery-${skill.state}`} data-testid={`mastery-${skill.id}`}>{skill.state}</span>
             </div>
           ))}
         </div>
@@ -326,7 +328,7 @@ function TrainingMap({
                 <span>训练</span>
                 <strong>{skill.name}</strong>
               </div>
-              <button className="text-button" onClick={() => onStart(scenario.id)} type="button">
+              <button className="text-button" data-testid={`scenario-start-${scenario.id}`} onClick={() => onStart(scenario.id)} type="button">
                 {status === "未训练" ? "开始训练" : "复练这个场景"} <ArrowIcon />
               </button>
             </article>
@@ -357,7 +359,7 @@ function TrainingMap({
       {/* RT-006/FB-012：标准化考核直达入口，避免被埋在资源中心第 7 个标签里而“找不到” */}
       <section className="surface assessment-entry" data-testid="assessment-entry">
         <div><span className="section-kicker">阶段 5 标准化考核</span><h2>固定题序诊断试点</h2><p>用固定题序做一次标准化能力诊断，练习者可用同一标准衡量掌握情况。</p></div>
-        <button className="button button-secondary" onClick={() => onOpenResourceHub("assessment")} type="button">进入标准化考核</button>
+        <button className="button button-secondary" data-testid="assessment-entry-button" onClick={() => onOpenResourceHub("assessment")} type="button">进入标准化考核</button>
       </section>
       <section className="surface experiment-entry" data-testid="product-material-experiment-entry">
         <div>
@@ -365,7 +367,7 @@ function TrainingMap({
           <h2>产品资料生成练习</h2>
           <p>把一次产品判断整理成可讨论的资料草稿，明确证据边界和下一步验证。</p>
         </div>
-        <button className="button button-secondary" onClick={onOpenProductExperiment} type="button">开始资料生成实验</button>
+        <button className="button button-secondary" data-testid="product-material-start" onClick={onOpenProductExperiment} type="button">开始资料生成实验</button>
       </section>
     </div>
   );
@@ -401,7 +403,7 @@ function JudgmentForm({
       : "提交判断并查看反馈";
 
   return (
-    <section className="judgment surface">
+    <section className="judgment surface" data-testid="judgment-canvas">
       <div className="section-heading">
         <div>
           <span className="section-kicker">产品判断画布</span>
@@ -414,6 +416,7 @@ function JudgmentForm({
           <label className={field.wide ? "wide" : ""} key={field.key}>
             <span>{field.label}</span>
             <textarea
+              data-testid={`judgment-field-${field.key}`}
               disabled={isSubmitting}
               onChange={(event) => onChange({ ...value, [field.key]: event.target.value })}
               placeholder={field.placeholder}
@@ -436,6 +439,7 @@ function JudgmentForm({
         <button
           aria-busy={isSubmitting}
           className="button button-primary"
+          data-testid="judgment-submit"
           disabled={!completeEnough || isSubmitting}
           onClick={onSubmit}
           type="button"
@@ -513,7 +517,7 @@ function FeedbackPanel({
             <strong>{primaryIssue.nextAction}</strong>
           </div>
           {!retrying ? (
-            <button className="button button-coral" onClick={onStartRetry} type="button">
+            <button className="button button-coral" data-testid="start-retry-feedback" onClick={onStartRetry} type="button">
               开始 2 分钟复练 <ArrowIcon />
             </button>
           ) : (
@@ -533,6 +537,7 @@ function FeedbackPanel({
               ) : null}
               <button
                 className="button button-primary"
+                data-testid="submit-retry"
                 disabled={retryAnswer.trim().length < 4 || Boolean(retryResult?.improved)}
                 onClick={onSubmitRetry}
                 type="button"
@@ -545,7 +550,7 @@ function FeedbackPanel({
       ) : null}
 
       <div className="finish-row">
-        <button className="button button-primary" onClick={onFinish} type="button">
+        <button className="button button-primary" data-testid="finish-and-return" onClick={onFinish} type="button">
           完成并返回今日训练
         </button>
       </div>
@@ -888,7 +893,7 @@ function TrainingWorkspace({
           <div className="briefing-list">
             {scenario.briefing.map((item) => <div key={item}><CheckMark /> {item}</div>)}
           </div>
-          <div className="mode-switch" aria-label="模式选择">
+          <div className="mode-switch" aria-label="模式选择" data-testid="mode-switch">
             {TRAINING_MODE_OPTIONS.map((mode) => (
               <button
                 aria-pressed={session.mode === mode}
@@ -939,6 +944,7 @@ function TrainingWorkspace({
           <div className="composer">
             <textarea
               aria-label="你的追问"
+              data-testid="reply-input"
               disabled={busy || strictExpired}
               onChange={(event) => setReply(event.target.value)}
               onKeyDown={handleKeyDown}
@@ -950,24 +956,25 @@ function TrainingWorkspace({
               <VoiceInputButton disabled={busy || strictExpired} onTranscript={(text) => setReply((current) => current ? `${current} ${text}` : text)} />
               <button
                 className="text-button"
+                data-testid="request-hint"
                 disabled={busy || session.mode !== "练习"}
                 onClick={() => setSession((current) => useTrainingHint(current))}
                 type="button"
               >
                 给我一个轻提示
               </button>
-              <button className="button button-primary" disabled={busy || strictExpired || !reply.trim()} onClick={() => { void sendReply(); }} type="button">{busy ? "等待回应" : strictExpired ? "时间已到" : "发送追问"}</button>
+              <button className="button button-primary" data-testid="send-reply" disabled={busy || strictExpired || !reply.trim()} onClick={() => { void sendReply(); }} type="button">{busy ? "等待回应" : strictExpired ? "时间已到" : "发送追问"}</button>
             </div>
           </div>
         </section>
 
         <aside className="training-progress surface">
           <span className="section-kicker">信息覆盖</span>
-          <div className="coverage-number"><strong>{coverage}%</strong><span>不是最终分数</span></div>
+          <div className="coverage-number" data-testid="coverage-summary"><strong>{coverage}%</strong><span>不是最终分数</span></div>
           <div className="coverage-bar"><i style={{ width: `${coverage}%` }} /></div>
           <div className="coverage-list">
             {SKILLS.map((skill) => (
-              <div key={skill.id}>
+              <div data-testid={`coverage-item-${skill.id}`} key={skill.id}>
                 <CheckMark active={session.coveredSkills.includes(skill.id)} />
                 <span>{skill.name}</span>
               </div>
@@ -976,6 +983,7 @@ function TrainingWorkspace({
           <p>覆盖度只表示你是否问到了相关信息，不代表问题质量。</p>
           <button
             className="button button-secondary"
+            data-testid="finish-interview"
             disabled={busy || (!strictExpired && session.messages.filter((message) => message.role === "user").length < 1)}
             onClick={() => setSession((current) => moveToJudgment(current))}
             type="button"
@@ -1268,7 +1276,7 @@ function AbilityPanel({
               <span>{skill.evidenceCount} 条练习证据</span>
               <span>{formalSkill?.evidenceCount ?? 0} 条正式证据</span>
             </div>
-            <span className={`mastery mastery-${skill.state}`}>{skill.state}</span>
+            <span className={`mastery mastery-${skill.state}`} data-testid={`mastery-${skill.id}`}>{skill.state}</span>
           </article>
           );
         })}
@@ -1555,6 +1563,7 @@ export function AppShell({
             <button
               aria-current={!activeTraining && item.view === view ? "page" : undefined}
               className={!activeTraining && item.view === view ? "active" : ""}
+              data-testid={`nav-${item.view}`}
               key={item.view}
               onClick={() => {
                 setActiveTraining(null);
@@ -1587,6 +1596,7 @@ export function AppShell({
           </div>
           <button
             className="sidebar-setting-button"
+            data-testid="sidebar-settings"
             onClick={() => {
               setLlmConfigOpen(true);
               setCourseOpen(false);
@@ -1614,6 +1624,7 @@ export function AppShell({
           <button
             aria-label="打开设置"
             className="topbar-settings-button"
+            data-testid="open-settings"
             onClick={() => {
               setLlmConfigOpen(true);
               setCourseOpen(false);
