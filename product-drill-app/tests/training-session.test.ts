@@ -53,7 +53,7 @@ describe("direction A training session", () => {
     const updated = useTrainingHint(session);
     expect(updated.hintsUsed).toBe(1);
     expect(updated.messages).toHaveLength(2);
-    expect(updated.messages.at(-1)?.content).toContain("轻提示");
+    expect(updated.messages.at(-1)?.content).toContain("一点提示");
   });
 
   it("moves from interview to a structured product judgment", () => {

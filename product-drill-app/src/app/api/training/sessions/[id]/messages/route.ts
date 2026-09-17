@@ -44,6 +44,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return Response.json({ session: nextSession, fallback: nextSession.engine === "deterministic" });
   } catch (error) {
     captureServerException(error, { area: "training_message", sessionId: id });
-    return apiError("AI 用户暂时无法回应，请稍后重试。", 503);
+    return apiError("AI 角色暂时无法回应，请稍后重试。", 503);
   }
 }

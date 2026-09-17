@@ -891,7 +891,6 @@ function TrainingWorkspace({
       <div className="training-shell">
         <section className="briefing surface">
           <button className="back-button" onClick={onClose} type="button">← 返回</button>
-          <span className="section-kicker">场景简报</span>
           <h2>{scenario.title}</h2>
           <p data-testid="briefing-context">{scenario.context}</p>
           {scenario.background?.length ? (
@@ -939,7 +938,7 @@ function TrainingWorkspace({
           <div className="message-list" data-testid="message-list" ref={messageListRef}>
             {session.messages.map((message) => (
               <article className={`message ${message.role}`} key={message.id}>
-                <span>{message.role === "ai" ? "AI 用户" : "你"}</span>
+                <span>{message.role === "ai" ? "AI 角色" : "你"}</span>
                 <p>{message.content}</p>
               </article>
             ))}
@@ -950,7 +949,7 @@ function TrainingWorkspace({
                   <p>{pendingReply}</p>
                 </article>
                 <div aria-live="polite" className="message-thinking" data-testid="thinking-indicator" role="status">
-                  <span>AI 用户</span>
+                  <span>AI 角色</span>
                   <p>正在思考…</p>
                 </div>
               </>
@@ -963,7 +962,7 @@ function TrainingWorkspace({
               disabled={busy || strictExpired}
               onChange={(event) => setReply(event.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="提出一个具体问题，Enter 发送，Shift + Enter 换行"
+              placeholder={`你想问这位${scenario.role}什么？例如：谁每天在用这个功能？`}
               rows={3}
               value={reply}
             />
@@ -976,9 +975,10 @@ function TrainingWorkspace({
                 onClick={() => setSession((current) => useTrainingHint(current))}
                 type="button"
               >
-                给我一个轻提示
+                给我一点提示
               </button>
-              <button className="button button-primary" data-testid="send-reply" disabled={busy || strictExpired || !reply.trim()} onClick={() => { void sendReply(); }} type="button">{busy ? "等待回应" : strictExpired ? "时间已到" : "发送追问"}</button>
+              <button className="button button-primary" data-testid="send-reply" disabled={busy || strictExpired || !reply.trim()} onClick={() => { void sendReply(); }} type="button">发送追问</button>
+              {strictExpired ? <span className="composer-note">本局时间已结束</span> : null}
             </div>
           </div>
         </section>
@@ -1003,7 +1003,7 @@ function TrainingWorkspace({
             onClick={() => setSession((current) => moveToJudgment(current))}
             type="button"
           >
-            {strictExpired ? "时间到，整理当前判断" : "结束访谈，整理判断"}
+            {strictExpired ? "时间到，提交我的判断" : "结束对话，提交我的判断"}
           </button>
         </aside>
       </div>
