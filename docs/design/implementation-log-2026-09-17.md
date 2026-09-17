@@ -59,3 +59,19 @@
 
 批次验证（tag `uiux/p0` 前）：typecheck ✅ · vitest 435/435 ✅ · golden 31/31 ✅ · rls ✅ · e2e 58/58 ✅。
 批次回退：`git reset --hard uiux/p0` 或 `git revert uiux/copy..uiux/p0`。
+
+## 批次 4 · 视觉基线（tag `uiux/visual`）
+
+| hash | 提交 | 覆盖 | 回退 |
+|---|---|---|---|
+| `efdd019` | 18 字体 token | 标题去衬线、正文去 Inter；FONTS 常量同步 | `git revert efdd019` |
+| `70abbb6` | 19 颜色收敛 | 单一强调 #1F6F54；删 6 条彩虹边条；indigo 身份用法改 sage/中性 | `git revert 70abbb6` |
+| `0515601` | 20 图标库 | @phosphor-icons/react 替换 ⚙●↗▸×✓ | `git revert 0515601` |
+| `e9abba2` | 21 删编号与 eyebrow | ⚠ 曾带红落地：删编号 span 未同步导航 grid 轨道，按钮高 206px 掉出视口致 9 个 e2e 超时 | `git revert e9abba2`（须与 0907465 成对） |
+| `0907465` | 21-fix 配套布局 | 导航改 block 单列、skill-row 两列；e2e 恢复 58/58 | 与 e9abba2 成对 |
+| `d05291e` | 22 圆角单一尺度 | 七种散落圆角收敛为 12/8/999 | `git revert d05291e` |
+
+事故记录：e9abba2 的验证命令用了 `npm run e2e | tail`，管道掩盖了 playwright 退出码，
+使 9 个失败未阻断提交。此后验证一律以 `grep -E "Tests |passed|failed"` 直读结果并人工核对计数。
+批次验证（tag `uiux/visual` 前）：typecheck ✅ · vitest 435/435 ✅ · golden 31/31 ✅ · rls ✅ · e2e 58/58 ✅。
+批次回退：`git reset --hard uiux/visual` 或 `git revert uiux/p0..uiux/visual`（e9abba2 与 0907465 成对）。
