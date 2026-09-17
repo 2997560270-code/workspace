@@ -175,7 +175,7 @@ function TodayPanel({
           <p>{recommended.context}</p>
           <div className="hero-actions">
             <button className="button button-light" data-testid="start-today-training" onClick={() => onStart(recommended.id)} type="button">
-              {records.length ? "开始今日训练" : "开始 3 分钟诊断"} <ArrowIcon />
+              {records.length ? "开始今日练习" : "开始首次练习"} <ArrowIcon />
             </button>
             <button
               className="button button-secondary"
@@ -183,10 +183,10 @@ function TodayPanel({
               onClick={() => workbenchComplete ? onOpenAbility() : onStartWorkbench()}
               type="button"
             >
-              {workbenchComplete ? "查看判断画像" : "进入世界工作台"} <ArrowIcon />
+              {workbenchComplete ? "查看我的判断报告" : "进入情境对话"} <ArrowIcon />
             </button>
             <span title={nextWorldReason}>
-              {workbenchComplete ? "世界闭环已完成" : `下一挑战：${nextWorldTitle}`}
+              {workbenchComplete ? "本情境已完成" : `下一个情境：${nextWorldTitle}`}
             </span>
           </div>
         </div>
@@ -201,9 +201,8 @@ function TodayPanel({
         <div className="section-heading compact">
           <div>
             <span className="section-kicker">本周节奏</span>
-            <h2>{weeklyDone} / {profile.weeklyTarget}</h2>
+            <h2>{weeklyDone} / {profile.weeklyTarget} 次</h2>
           </div>
-          <span className="quiet">次训练</span>
         </div>
         <div className="week-bars" aria-label={`本周已完成 ${weeklyDone} 次训练`}>
           {Array.from({ length: profile.weeklyTarget }, (_, index) => (
@@ -229,17 +228,27 @@ function TodayPanel({
           </div>
           <div>
             <span className="detail-label">下一步动作</span>
-            <p>{latestIssue?.nextAction ?? "先完成一个短场景，不需要准备，也没有标准答案。"}</p>
+            <p>{latestIssue?.nextAction ?? (records.length ? "回到复盘，重练上次的具体失误环节。" : "不需要准备，也没有标准答案，先完成一个短场景。")}</p>
           </div>
-          <button
-            className="button button-secondary"
-            data-testid="start-retry-home"
-            disabled={!records.length}
-            onClick={onOpenReview}
-            type="button"
-          >
-            开始 2 分钟复练
-          </button>
+          {records.length ? (
+            <button
+              className="button button-secondary"
+              data-testid="start-retry-home"
+              onClick={onOpenReview}
+              type="button"
+            >
+              开始 2 分钟复练
+            </button>
+          ) : (
+            <button
+              className="button button-secondary"
+              data-testid="start-retry-home"
+              onClick={() => onStart(recommended.id)}
+              type="button"
+            >
+              去开始第一次练习
+            </button>
+          )}
         </div>
       </section>
 
@@ -247,7 +256,7 @@ function TodayPanel({
         <div className="section-heading">
           <div>
             <span className="section-kicker">产品发现能力地图</span>
-            <h2>不是刷题，而是留下可验证的行为证据</h2>
+            <h2>每次练习都会留下能回看的记录</h2>
           </div>
         </div>
         <div className="skill-rows">
@@ -364,16 +373,16 @@ function TrainingMap({
       </section>
       {/* RT-006/FB-012：标准化考核直达入口，避免被埋在资源中心第 7 个标签里而“找不到” */}
       <section className="surface assessment-entry" data-testid="assessment-entry">
-        <div><span className="section-kicker">阶段 5 标准化考核</span><h2>固定题序诊断试点</h2><p>用固定题序做一次标准化能力诊断，练习者可用同一标准衡量掌握情况。</p></div>
+        <div><span className="section-kicker">标准化测评（试点）</span><h2>固定题序能力测评</h2><p>用固定题序做一次标准化能力诊断，练习者可用同一标准衡量掌握情况。</p></div>
         <button className="button button-secondary" data-testid="assessment-entry-button" onClick={() => onOpenResourceHub("assessment")} type="button">进入标准化考核</button>
       </section>
       <section className="surface experiment-entry" data-testid="product-material-experiment-entry">
         <div>
-          <span className="section-kicker">后续实验</span>
+          <span className="section-kicker">资料练习</span>
           <h2>产品资料生成练习</h2>
           <p>把一次产品判断整理成可讨论的资料草稿，明确证据边界和下一步验证。</p>
         </div>
-        <button className="button button-secondary" data-testid="product-material-start" onClick={onOpenProductExperiment} type="button">开始资料生成实验</button>
+        <button className="button button-secondary" data-testid="product-material-start" onClick={onOpenProductExperiment} type="button">练习整理资料草稿</button>
       </section>
     </div>
   );

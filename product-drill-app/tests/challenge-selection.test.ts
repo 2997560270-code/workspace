@@ -112,6 +112,6 @@ describe("selectNextChallengeForUser", () => {
     const selection = await selectNextChallengeForUser(userId);
     expect(selection.loop_complete).toBe(true);
     expect(selection.is_remediation).toBe(false);
-    expect(selection.reason).toContain("闭环证据");
+    expect(selection.reason).toContain("证据已闭环");
   });
 });

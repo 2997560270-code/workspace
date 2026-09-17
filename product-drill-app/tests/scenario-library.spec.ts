@@ -12,7 +12,7 @@ test("renders twelve focused scenarios in the training map", async ({ page }) =>
 test("generates a bounded product material experiment draft", async ({ page }) => {
   await enterApp(page);
   await gotoView(page, "map");
-  await page.getByRole("button", { name: "开始资料生成实验", exact: true }).click();
+  await page.getByTestId("product-material-start").click();
   await page.getByRole("heading", { name: "把产品判断整理成一页可讨论的资料" }).waitFor();
   await page.getByLabel("产品名称").fill("库存助手");
   await page.getByLabel("目标用户").fill("门店店长");

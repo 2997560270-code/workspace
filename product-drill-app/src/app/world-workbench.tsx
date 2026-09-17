@@ -683,7 +683,7 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete, complet
     setError("");
     setFeedbackStatus("正在核对调查证据…");
     const profileTimer = window.setTimeout(
-      () => setFeedbackStatus("正在更新判断画像…"),
+      () => setFeedbackStatus("正在更新你的判断报告…"),
       4_000
     );
     const selectionTimer = window.setTimeout(
@@ -985,14 +985,14 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete, complet
               <p>{reflectContent}</p>
               {nextChallenge && !loopComplete && (
                 <div className="wb-next-challenge">
-                  <span className="detail-label">下一挑战</span>
+                  <span className="detail-label">下一个情境</span>
                   <strong>{nextChallenge.world_title}</strong>
                   <p>{nextChallenge.reason}</p>
                 </div>
               )}
               {loopComplete && (
                 <div className="wb-next-challenge" role="status">
-                  <span className="detail-label">世界闭环已完成</span>
+                  <span className="detail-label">本情境已完成</span>
                   <strong>三个世界的判断证据已保存</strong>
                   <p>{nextChallenge?.reason}</p>
                 </div>
@@ -1015,12 +1015,12 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete, complet
                 type="button"
               >
                 {loopComplete
-                  ? "完成闭环，查看判断画像"
+                  ? "完成练习，查看我的判断报告"
                   : nextChallenge?.is_remediation
                   ? "进入修正练习"
                   : nextWorld
                     ? "进入下一个世界"
-                    : "完成闭环，查看判断画像"}
+                    : "完成练习，查看我的判断报告"}
               </button>
             </div>
           )}

@@ -102,7 +102,7 @@ export function selectNextChallenge(
       is_transfer_test: false,
       is_remediation: false,
       loop_complete: true,
-      reason: "三个世界均已完成，已形成闭环证据。可在判断画像中查看结果。",
+      reason: "三个情境均已完成，证据已闭环。可在「我的判断报告」中查看结果。",
     };
   }
 
