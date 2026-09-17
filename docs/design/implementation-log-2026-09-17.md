@@ -31,3 +31,19 @@
 
 批次验证（tag `uiux/harness` 前）：typecheck ✅ · vitest 435/435 ✅ · golden 31/31 ✅ · rls ✅ · e2e 58/58 ✅。
 批次回退：`git reset --hard uiux/harness` 或 `git revert uiux/base..uiux/harness`。
+
+## 批次 2 · 文案 C1-C35（tag `uiux/copy`）
+
+| hash | 提交 | 覆盖 | 回退 |
+|---|---|---|---|
+| `4a04001` | C1-C3 运行态披露改白话 | 演示模式在聊天阶段即披露 | `git revert 4a04001` |
+| `99258b3` | C4 侧栏去存储来源 | 含清理 historyStatus 死状态 | `git revert 99258b3` |
+| `529819a` | C5 退出按钮单一意图 | 「退出登录」 | `git revert 529819a` |
+| `9f99491` | C6/C17 状态标签解耦 | 新增 ui-labels.ts；类名 ASCII 化；复练结果改三态 | `git revert 9f99491` |
+| `546d19b` | C7-C12 登录页 | 单一时长口径；提交改「继续」；去 Supabase 术语 | `git revert 546d19b` |
+| `d95357a` | C13-C21 今日训练页 | 世界/挑战/画像 改 情境/练习/判断报告；重点卡按钮与文字一致 | `git revert d95357a` |
+| `b3a7b5c` | C22-C30 工作台 | 去粘连 eyebrow；actor 统一；发送按钮恒名+旁注 | `git revert b3a7b5c` |
+| `f5d181e` | C31-C35 + X4-X7 | 必填说明移按钮旁；Rubric/World/Model 改中文 | `git revert f5d181e` |
+
+批次验证（tag `uiux/copy` 前）：typecheck ✅ · vitest 435/435 ✅ · golden 31/31 ✅ · rls ✅ · e2e 58/58 ✅。
+批次回退：`git reset --hard uiux/copy` 或 `git revert uiux/harness..uiux/copy`。
