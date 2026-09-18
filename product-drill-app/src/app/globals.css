@@ -726,11 +726,11 @@ button:disabled { cursor: not-allowed; }
 .summary-stats strong { display: block; font-family: var(--font-mono); font-size: 1.9rem; font-weight: 600; color: var(--on-dark-title); font-variant-numeric: tabular-nums; }
 .summary-stats span { color: var(--on-dark-aux); }
 .ability-table { padding: 32px; }
-.ability-table > article { min-height: 96px; display: grid; grid-template-columns: 46px minmax(0, 1fr) 190px 110px; align-items: center; gap: 18px; border-bottom: 1px solid var(--line); }
+.ability-table > article { min-height: 96px; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 18px; border-bottom: 1px solid var(--line); }
 .ability-table > article:last-child { border-bottom: 0; }
 .ability-table h3 { margin: 0 0 7px; font-size: var(--fs-title-sm); }
 .ability-table p { margin: 0; font-size: var(--fs-body-sm); }
-.ability-counts { display: flex; gap: 14px; }
+.ability-counts { display: flex; gap: 14px; white-space: nowrap; }
 
 /* ══════════════════════════ LOGIN ══════════════════════════════════════ */
 .login-page { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(420px, 0.9fr); background: var(--bg); }
@@ -1013,8 +1013,10 @@ button:disabled { cursor: not-allowed; }
   .team-divider { grid-column: 1; }
   .judgment-actions, .feedback-summary { align-items: flex-start; flex-direction: column; }
   .evidence-row { grid-template-columns: 1fr; }
-  .ability-table > article { grid-template-columns: 38px minmax(0, 1fr); padding: 20px 0; }
-  .ability-counts, .ability-table .mastery { grid-column: 2; }
+  .ability-table > article { grid-template-columns: minmax(0, 1fr) auto; padding: 20px 0; row-gap: 10px; }
+  .ability-table > article > div:first-child { grid-column: 1; grid-row: 1; }
+  .ability-table .mastery { grid-column: 2; grid-row: 1; justify-self: end; }
+  .ability-counts { grid-column: 1 / -1; grid-row: 2; }
   .summary-stats div { min-width: 0; }
   .login-page { grid-template-columns: 1fr; }
   .login-story { min-height: 560px; }

@@ -21,6 +21,17 @@ test("shows ability evidence after a completed training", async ({ page }) => {
   await expect(page.locator(".ability-table article")).toHaveCount(5);
 });
 
+test("ability names render on a single line at desktop width", async ({ page }) => {
+  await enterApp(page);
+  await gotoView(page, "ability");
+
+  const name = page.locator(".ability-table > article").first().locator("h3");
+  const box = await name.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.height).toBeLessThan(40);
+  expect(box!.width).toBeGreaterThan(200);
+});
+
 test("creates a local team and exposes an invite code", async ({ page }) => {
   await enterApp(page);
   await gotoView(page, "ability");
