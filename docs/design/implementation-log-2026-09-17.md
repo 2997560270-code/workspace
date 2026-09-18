@@ -234,3 +234,36 @@ challenge-selection 单测 `校准世界`→`基线情境`。testid 均未变。
 截图实测（Playwright 1366×768 与 1440×900）：composer 三控件单行、提示语独立成行、
 三列零横向溢出、右栏计数堆叠、简报标题两行平衡断行。
 批次回退：`git reset --hard uiux/copy-2` 或 `git revert uiux/copy-2..uiux/workspace`。
+
+## 批次 11 · 训练工作区改为 ChatGPT 式单列对话布局（tag `uiux/chat`）
+
+用户要求（2026-09-18）：参考 ChatGPT / Codex 的对话页重做训练工作区——单列干净布局、
+场景简报并入 AI 开场消息、覆盖度按需浮动遮罩、消息气泡化、输入框带建议提示。
+确认的设计决定：简报集成进开场消息卡；覆盖度做右下角浮动按钮 + 按需浮层（默认收起）；
+左侧沿用应用既有侧栏（桌面常驻、窄屏收起）；建议追问以 chips 形式置于输入框上方。
+
+结构变化（`TrainingWorkspace` interview 阶段 return 重写）：
+- `.training-shell` 三列 → `.training-chat-shell` 单列容器 + `.training-chat-container`（max-width 780 居中）
+- 顶栏 `.chat-topbar`：返回 / 标题 h2 / 角色 h3 / `.mode-switch` / 严格计时 / 模式提示行
+- 简报 → `<section class="briefing chat-opening">`，h2「场景简报」+ context + 业务背景 + 要点清单
+- 消息保留 `.message ai/user` 结构与内层 `<p>`（契约），视觉加头像圆标（::before）与气泡圆角、入场动画
+- 输入区：`.suggestion-chips`（文案收敛进 `ui-labels.ts` 的 SUGGESTED_QUESTIONS）+ textarea +
+  动作行（语音 / 提示 / 结束对话提交判断 / 发送追问 / 状态注记）
+- 覆盖度右栏 → `.coverage-toggle` 浮动按钮（显示 n / 5）+ `.coverage-float-panel` 按需浮层
+  （head/body/foot 三段，foot 承载 coverage-note 与「至少发送一个追问」注记）
+- 清理旧三列死 CSS（.training-shell/.conversation*/.training-progress* 及两处 media 覆盖）
+
+契约保留与修补：testid 全保留（reply-input/send-reply/request-hint/finish-interview/mode-switch/
+strict-timer/message-list/pending-user-message/thinking-indicator/coverage-summary/coverage-unit/
+coverage-note/coverage-item-*/briefing-context/scenario-background/mode-hint）；按钮文案「发送追问」「语音输入」
+不变；`.mode-switch` 类保留（training-dialog.spec 以类定位）；角色名初版误改 `<p>` 导致
+training-config.spec 的 heading 断言失败，修回 `<h3 class="chat-role">`（e2e 64/64 复绿）。
+
+| hash | 提交 | 覆盖 | 回退 |
+|---|---|---|---|
+| `8df0e62` | 单列对话布局 | app-shell interview return 重写 + globals.css chat 段 + ui-labels SUGGESTED_QUESTIONS | `git revert 8df0e62` |
+
+批次验证（tag `uiux/chat` 前）：typecheck ✅ · vitest 441/441（69 files）✅ · e2e 64/64 ✅。
+截图实测（Playwright 1440×900 / 1366×768）：单列居中、开场简报卡、头像气泡、chips+输入框+四按钮动作行、
+右下覆盖度浮动按钮；1366 下无横向溢出。
+批次回退：`git reset --hard uiux/workspace` 或 `git revert uiux/workspace..uiux/chat`。
