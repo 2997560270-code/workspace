@@ -36,7 +36,7 @@ import { FeedbackWidget } from "./feedback-widget";
 import { SignOutButton } from "./signout-button";
 import { MultiRolePanel } from "./multi-role-panel";
 import { ResourceHubPanel, type HubTab } from "./resource-hub-panel";
-import { LlmConfigPanel } from "./llm-config-panel";
+import { SettingsPanel } from "./settings-panel";
 import {
   evaluateRetry,
   generateEvaluation,
@@ -1374,7 +1374,7 @@ export function AppShell({
   const [multiRoleOpen, setMultiRoleOpen] = useState(false);
   const [resourceHubOpen, setResourceHubOpen] = useState(false);
   const [resourceHubTab, setResourceHubTab] = useState<HubTab>("community");
-  const [llmConfigOpen, setLlmConfigOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [customScenarios, setCustomScenarios] = useState<TrainingScenario[]>([]);
   // #4 世界工作台：null = 未激活，string = 目标 world_id
   const [activeWorkbenchWorldId, setActiveWorkbenchWorldId] = useState<string | null>(null);
@@ -1508,7 +1508,7 @@ export function AppShell({
     setCourseOpen(false);
     setMultiRoleOpen(false);
     setResourceHubOpen(false);
-    setLlmConfigOpen(false);
+    setSettingsOpen(false);
     setView("review");
   }
 
@@ -1641,7 +1641,7 @@ export function AppShell({
                 setCourseOpen(false);
                 setMultiRoleOpen(false);
                 setResourceHubOpen(false);
-                setLlmConfigOpen(false);
+                setSettingsOpen(false);
                 setReviewFocusRecordId("");
                 setView(item.view);
               }}
@@ -1665,7 +1665,7 @@ export function AppShell({
             className="sidebar-setting-button"
             data-testid="sidebar-settings"
             onClick={() => {
-              setLlmConfigOpen(true);
+              setSettingsOpen(true);
               setCourseOpen(false);
               setMultiRoleOpen(false);
               setResourceHubOpen(false);
@@ -1676,7 +1676,7 @@ export function AppShell({
             }}
             type="button"
           >
-            <GearSix aria-hidden="true" size={15} /> 模型设置
+            <GearSix aria-hidden="true" size={15} /> 设置
           </button>
           <SignOutButton />
         </div>
@@ -1695,7 +1695,7 @@ export function AppShell({
               className="topbar-settings-button"
               data-testid="open-settings"
               onClick={() => {
-                setLlmConfigOpen(true);
+                setSettingsOpen(true);
                 setCourseOpen(false);
                 setMultiRoleOpen(false);
                 setResourceHubOpen(false);
@@ -1752,8 +1752,8 @@ export function AppShell({
             <CoursePanel onClose={() => setCourseOpen(false)} userId={userId} />
           ) : productExperimentOpen ? (
             <ProductMaterialExperiment onClose={() => setProductExperimentOpen(false)} />
-          ) : llmConfigOpen ? (
-            <LlmConfigPanel onClose={() => setLlmConfigOpen(false)} />
+          ) : settingsOpen ? (
+            <SettingsPanel onClose={() => setSettingsOpen(false)} userName={userName} userSource={userSource} />
           ) : view === "today" ? (
             <TodayPanel
               onOpenReview={() => setView("review")}
