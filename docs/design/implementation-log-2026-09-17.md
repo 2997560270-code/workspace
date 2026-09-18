@@ -205,3 +205,32 @@ challenge-selection 单测 `校准世界`→`基线情境`。testid 均未变。
 浏览器实测：能力页空态 h2「还没有情境对话的判断证据」+ 四条白话例证；工作台 h1「情境对话」、
 顶栏「情境 1 / 3 · B2C / AI 工具产品 · 基线轮」、进度轨「情境 1/2/3」、聊天角色「对方」。
 批次回退：`git reset --hard uiux/devtools` 或 `git revert uiux/devtools..uiux/copy-2`。
+
+## 批次 10 · 训练工作区 100% 缩放布局重排（tag `uiux/workspace`）
+
+用户验收反馈（2026-09-18，100% 缩放截图）：训练工作区 composer 的「语音输入 / 给我一点提示 /
+发送追问」被压到 CJK 竖排断行、简报列过窄挤出自滚动条、右栏「0 / 5 个信息维度已问到」互挤换行。
+根因：`.training-shell` 三列最小宽之和（300+420+250+gap）超过 100% 缩放下主区可用宽（约 1000–1100px），
+中列 `minmax(420px,1fr)` 的下限使网格溢出，composer 的 space-between 单行把按钮压碎。
+漏测原因：e2e 默认视口 1280×720 命中 ≤1180px 的两列分支，三列桌面布局从未被覆盖。
+
+落地（沿用批次7 调研规则：摘要列 `minmax(0,1fr)` 防溢出、控件 nowrap、行高/间距 token 不变）：
+- 列宽改 `clamp(280px,23vw,360px) minmax(0,1fr) clamp(232px,19vw,280px)`，gap 18px
+- `.composer-actions` 改 `flex-wrap: wrap`；按钮/语音/提示按钮 `white-space: nowrap; flex: 0 0 auto`；
+  主按钮 `margin-left: auto` 靠右；`.composer-note` `flex-basis: 100%` 独立成行
+- 覆盖度计数与单位上下堆叠（`flex-wrap` + 单位 `flex-basis: 100%`），计数保持 tabular-nums
+- 简报列 `scrollbar-width: thin` + 标题 `text-wrap: balance`；会话头状态（练习模式/计时）`margin-left: auto` 右对齐
+- 新增 `tests/training-layout.spec.ts`：`test.use({ viewport: 1366×768 })` 锁单行按钮高度、
+  零横向溢出、计数堆叠三条契约，补上桌面三列分支的覆盖缺口
+
+| hash | 提交 | 覆盖 | 回退 |
+|---|---|---|---|
+| `28070f9` | 布局重排 + 回归 e2e | globals.css 训练工作区段 + 新 spec（e2e 63→64） | `git revert 28070f9` |
+
+契约变化：新增 e2e 用例 1 条（64/64）；testid 未变（复用 `send-reply` / `request-hint` /
+`coverage-summary` / `coverage-unit`）。
+
+批次验证（tag `uiux/workspace` 前）：typecheck ✅ · vitest 441/441（69 files）✅ · e2e 64/64 ✅。
+截图实测（Playwright 1366×768 与 1440×900）：composer 三控件单行、提示语独立成行、
+三列零横向溢出、右栏计数堆叠、简报标题两行平衡断行。
+批次回退：`git reset --hard uiux/copy-2` 或 `git revert uiux/copy-2..uiux/workspace`。
