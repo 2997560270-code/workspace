@@ -246,8 +246,6 @@ p { color: var(--ink-2); line-height: 1.66; }
 .content { padding: 32px clamp(28px, 4vw, 58px) 96px; }
 /* 页头 tabIndex=-1 只服务于视图切换后的程序化滚动，抑制其默认焦点环（移动端曾表现为一圈黑框） */
 .topbar:focus, .topbar:focus-visible { outline: none; }
-/* 反馈 FAB 安全区：右栏收尾内容不被 fixed 按钮遮挡 */
-.training-progress { padding-bottom: 84px; }
 
 /* ══════════════════════════ PRIMITIVES ═════════════════════════════════ */
 .surface, .surface-dark { border-radius: var(--radius); }
@@ -3345,46 +3343,26 @@ button:disabled { cursor: not-allowed; }
   }
 }
 
-/* ── Floating user feedback widget ─────────────────────────────── */
-.feedback-fab {
-  position: fixed;
-  right: 22px;
-  bottom: 22px;
-  z-index: 60;
-  padding: 12px 18px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--navy);
-  color: var(--on-dark-title);
-  font-weight: 650;
-  font-size: var(--fs-body-sm);
-  box-shadow: 0 10px 24px rgba(17, 24, 39, 0.18);
-  cursor: pointer;
-  transition: transform 160ms ease, box-shadow 160ms ease;
-}
-.feedback-fab:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 14px 30px rgba(17, 24, 39, 0.22);
-}
-.feedback-fab-panel {
-  position: fixed;
-  right: 22px;
-  bottom: 78px;
-  z-index: 60;
-  width: min(400px, calc(100vw - 44px));
+/* ── User feedback dialog（入口在页头，不再用 fixed FAB 遮挡正文） ── */
+.topbar-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.feedback-dialog {
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(680px, calc(100vh - 48px));
+  overflow-y: auto;
   padding: 22px;
   box-shadow: 0 24px 60px rgba(17, 24, 39, 0.22);
 }
-.feedback-fab-header {
+.feedback-dialog:focus { outline: none; }
+.feedback-dialog-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 14px;
 }
-.feedback-fab-header h2 { font-size: var(--fs-title-md); margin: 0; }
-.feedback-fab-close { border: 0; background: transparent; color: var(--ink-3); font-size: 22px; line-height: 1; cursor: pointer; }
-.feedback-fab-close:hover { color: var(--ink); }
+.feedback-dialog-header h2 { font-size: var(--fs-title-md); margin: 0; }
+.feedback-dialog-close { border: 0; background: transparent; color: var(--ink-3); font-size: 22px; line-height: 1; cursor: pointer; }
+.feedback-dialog-close:hover { color: var(--ink); }
 .feedback-field { margin-bottom: 12px; }
 .feedback-field .detail-label { display: block; margin-bottom: 6px; }
 .feedback-field select,
@@ -3418,14 +3396,9 @@ button:disabled { cursor: not-allowed; }
 .feedback-page { margin: 10px 0; font-size: var(--fs-aux-sm); color: var(--ink-3); overflow-wrap: anywhere; }
 .feedback-error { margin: 8px 0 0; color: var(--coral-strong); font-size: var(--fs-aux-sm); }
 .feedback-actions { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
-.feedback-fab-success { text-align: center; padding: 8px 0 4px; }
-.feedback-fab-success strong { display: block; font-size: var(--fs-body); margin-bottom: 8px; }
-.feedback-fab-success p { color: var(--ink-2); margin-bottom: 14px; }
-
-@media (max-width: 640px) {
-  .feedback-fab { right: 14px; bottom: 14px; }
-  .feedback-fab-panel { right: 14px; bottom: 68px; width: calc(100vw - 28px); }
-}
+.feedback-dialog-success { text-align: center; padding: 8px 0 4px; }
+.feedback-dialog-success strong { display: block; font-size: var(--fs-body); margin-bottom: 8px; }
+.feedback-dialog-success p { color: var(--ink-2); margin-bottom: 14px; }
 
 /* ── User LLM config panel ─────────────────────────────────────── */
 .sidebar-setting-button {
@@ -3589,8 +3562,10 @@ button:disabled { cursor: not-allowed; }
   white-space: nowrap;
 }
 .topbar-settings-button:hover { border-color: var(--sage-strong); color: var(--sage-strong); }
+/* 窄屏：页头纵向堆叠，标题占满整行，反馈/设置两个按钮排在下一行 */
 @media (max-width: 640px) {
-  .topbar-settings-button { align-self: flex-start; }
+  .topbar { flex-direction: column; align-items: stretch; gap: 16px; }
+  .topbar-actions { justify-content: flex-start; }
 }
 
 .settings-drawer--slim {

@@ -1668,24 +1668,27 @@ export function AppShell({
             <h1>{pageTitle}</h1>
             <p>{pageDescription}</p>
           </div>
-          <button
-            aria-label="打开设置"
-            className="topbar-settings-button"
-            data-testid="open-settings"
-            onClick={() => {
-              setLlmConfigOpen(true);
-              setCourseOpen(false);
-              setMultiRoleOpen(false);
-              setResourceHubOpen(false);
-              setProductExperimentOpen(false);
-              setCustomScenarioBuilderOpen(false);
-              setActiveTraining(null);
-              setActiveWorkbenchWorldId(null);
-            }}
-            type="button"
-          >
-            <GearSix aria-hidden="true" size={15} /> 设置
-          </button>
+          <div className="topbar-actions">
+            <FeedbackWidget />
+            <button
+              aria-label="打开设置"
+              className="topbar-settings-button"
+              data-testid="open-settings"
+              onClick={() => {
+                setLlmConfigOpen(true);
+                setCourseOpen(false);
+                setMultiRoleOpen(false);
+                setResourceHubOpen(false);
+                setProductExperimentOpen(false);
+                setCustomScenarioBuilderOpen(false);
+                setActiveTraining(null);
+                setActiveWorkbenchWorldId(null);
+              }}
+              type="button"
+            >
+              <GearSix aria-hidden="true" size={15} /> 设置
+            </button>
+          </div>
         </header>
         <div className="content">
           {activeWorkbenchWorldId !== null ? (
@@ -1772,7 +1775,6 @@ export function AppShell({
           ) : null}
         </div>
       </section>
-      <FeedbackWidget />
     </main>
   );
 }
