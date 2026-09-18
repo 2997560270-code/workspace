@@ -136,3 +136,28 @@ actor 统一「AI 角色」、覆盖度「0 / 5 个信息维度已问到」+ 解
 
 批次验证（tag `uiux/residual` 前）：typecheck ✅ · vitest 441/441（69 files）✅ · golden 31/31（VALID 30 cases）✅ · rls ✅ · e2e 60/60 ✅。
 批次回退：`git reset --hard uiux/structure` 或 `git revert uiux/structure..uiux/residual`。
+
+## 批次 7 · 调研驱动的细节优化（tag `uiux/polish`）
+
+调研来源（2026-09-18，网络/GitHub）：Linear / Vercel Geist / shadcn / Notion 的 DESIGN.md 汇总
+（soulcore-dev/soul-design-md）、anthropics/skills frontend-design、alexpate/awesome-design-systems、
+Ant Design 字体/动效/空状态规范、ant-design-pro 账户设置 IA、Microsoft WinUI 设置指南、Apple HIG Settings、
+NN/g 表单与响应时限、sparanoid/chinese-copywriting-guidelines、W3C clreq 中文排版需求、
+thedaviddias/Front-End-Checklist、The A11Y Project Checklist。
+落地规则摘要：摘要行 `minmax(0,1fr) auto auto` + 名称列 `min-width:0`；设置页单列 ≤680px、分区 ≤5 项、
+即时生效 + 行内「已保存」；动效四档 100/150/200/300ms 且禁 spring/bounce；CJK 正文行高 1.7–1.8；
+计数 tabular-nums；模态 scale-in 300ms；禁用态保持可读配色（P0-2 优先于 opacity 惯例）。
+
+| hash | 提交 | 覆盖 | 回退 |
+|---|---|---|---|
+| `18fff51` | 能力页行布局修复 | 桌面三列 + 窄屏两行堆叠，修掉 38px 编号列残留导致的竖排断行；e2e 锁单行契约 | `git revert 18fff51` |
+| `2501238` | 批次7-1 设置中心 | 账号/界面/模型三分区单列 680px；减少动画开关即时生效 + 行内反馈；入口统一「设置」 | `git revert 2501238` |
+| `1ec1419` | 移除旧面板 | 删除被取代的 llm-config-panel（与 2501238 成对回退） | `git revert 1ec1419` |
+| `43967fe` | 批次7-2 动效与排版 | --dur-1..4 / --ease-* token；按压 scale(.98)；模态 scale-in；CJK 行高 1.75；计数 tabular-nums | `git revert 43967fe` |
+| `f2ed72d` | 设置中心 e2e 契约 | 分区可见 + 减少动画开关即时生效/持久化两条用例 | `git revert f2ed72d` |
+
+契约变化：设置入口 testid 不变（`open-settings` / `sidebar-settings`），文案「模型设置」→「设置」；
+新增 `reduce-motion-switch` testid 与 `html[data-reduce-motion]` 属性契约。
+
+批次验证（tag `uiux/polish` 前）：typecheck ✅ · vitest 441/441（69 files）✅ · golden 31/31（VALID 30 cases）✅ · rls ✅ · e2e 63/63 ✅。
+批次回退：`git reset --hard uiux/residual` 或 `git revert uiux/residual..uiux/polish`（2501238 与 1ec1419 成对）。
