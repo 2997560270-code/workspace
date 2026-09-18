@@ -267,3 +267,41 @@ training-config.spec 的 heading 断言失败，修回 `<h3 class="chat-role">`�
 截图实测（Playwright 1440×900 / 1366×768）：单列居中、开场简报卡、头像气泡、chips+输入框+四按钮动作行、
 右下覆盖度浮动按钮；1366 下无横向溢出。
 批次回退：`git reset --hard uiux/workspace` 或 `git revert uiux/workspace..uiux/chat`。
+
+## 批次 12 · 训练初始态改为 OpenWebUI 式 hero 布局（tag `uiux/hero`）
+
+用户要求（2026-09-18，附 OpenWebUI 截图）：进入训练后的初始界面要像截图那样——居中头像 +
+标题 + 副标题的 hero、居中大圆角输入卡 + 圆形发送键、输入卡下方「标题 + 副标题」的建议清单。
+确认的设计决定：hero 只承载情境标题 / 角色 / 一句话背景，业务背景与要点收进可折叠 details；
+AI 开场白仍是消息流第一条气泡（学员要回答的正是这句话，且 training-dialog.spec 断言其可见）；
+发送首条追问后无缝切到对话态（简报卡 + 消息流 + 贴底输入卡），hero 与顶栏标题不重复出现。
+
+结构变化（`TrainingWorkspace` interview 阶段）：
+- 新增 `hasUserMessage` 分支：初始态 = `.chat-hero`（头像圆标 / h2 标题 / h3 角色 / `.chat-hero-sub`
+  一句话背景 / `.chat-hero-details` 折叠背景与要点）+ 消息流 + `.composer-static` + `.chat-suggest`
+- 对话态 = 顶栏标题回归 + `.chat-opening` 简报卡 + 消息流 + `.composer-docked`（贴底）
+- 消息流抽成 `messageStream()`、输入卡抽成 `composerCard(includeFinish)`，两态共用，
+  保证 `message-list` / `pending-user-message` / `thinking-indicator` 等 testid 在任一态都存在
+- 输入卡：圆角 16 + 阴影的卡片，动作行 = 语音 / 给我一点提示 /（对话态）结束对话 / 40px 圆形
+  `.send-round`（navy 底、ArrowUp 图标、disabled 转浅灰）；初始态 textarea 2 行、对话态 3 行
+- 建议清单：`SUGGESTED_QUESTIONS` 由 string[] 改为 {question, hint}[]，整行按钮点击即发送
+- 顶栏初始态不再重复标题（`.chat-topbar.is-empty`），返回键 `margin-right: auto` 推开模式切换
+
+契约保留与修补：
+- information-hierarchy.spec 在初始态读 `.briefing h2` / `briefing-context` / `.message p`，
+  因此初始态必须同时有 hero 的 h2、`.chat-hero-sub`（evidence 层：ink-2 / body / 400）与消息流；
+  `.chat-hero-details` 闭合隐藏补 `:not([open]) > :not(summary){display:none}`（批次6 教训）
+- 曾把语音键改 `iconOnly` 圆形图标键，rt007 用例断言错误态按钮正文「重试语音」而失败；
+  该正文同时是 FB-002「失败必须可见」的载体，故回退 iconOnly，保留带文案的语音键
+- 修历史遗留泄漏：顶栏账户块 `.user`（左竖线 + 18px 左内边距）命中 `.message.user`，
+  在气泡左侧留下一条竖线；`.training-chat-shell .message.user` 显式归零 padding/border/text-align
+- 删除批次11 的 `.suggestion-chips/.suggestion-chip` 死样式
+
+| hash | 提交 | 覆盖 | 回退 |
+|---|---|---|---|
+| `21a0463` | 初始态 hero 重设计 | app-shell 两态分支 + globals.css 批次12 段 + ui-labels SUGGESTED_QUESTIONS 结构化 | `git revert 21a0463` |
+
+批次验证（tag `uiux/hero` 前）：typecheck ✅ · vitest 441/441（69 files）✅ · e2e 64/64 ✅。
+截图实测（Playwright 1440×900 / 1366×768，reduced-motion 下取景）：初始态居中 hero + 静态输入卡 +
+建议清单、details 展开后背景与要点成卡、对话态用户气泡 navy 无竖线、1366 零横向溢出。
+批次回退：`git reset --hard uiux/chat` 或 `git revert uiux/chat..uiux/hero`。
