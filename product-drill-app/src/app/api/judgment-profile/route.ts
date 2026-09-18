@@ -19,6 +19,6 @@ export async function GET() {
     return Response.json(profile);
   } catch (error) {
     captureServerException(error, { area: "judgment_profile" });
-    return apiError("无法获取判断画像，请稍后重试。", 503);
+    return apiError("无法获取你的判断报告，请稍后重试。", 503);
   }
 }

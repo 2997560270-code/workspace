@@ -198,15 +198,11 @@ export function LoginForm() {
           <p>AI 扮演真实业务角色。你负责追问、判断和提交方案，再用逐句证据反馈重练具体短板。</p>
         </div>
         <div className="login-proof">
-          <div><strong>3 分钟</strong><span>完成首次能力诊断</span></div>
-          <div><strong>1 个</strong><span>每轮只训练一个主要能力</span></div>
-          <div><strong>可复练</strong><span>证明自己真的已经改善</span></div>
+          <div><strong>约 6 分钟</strong><span>完成首次练习；之后每次只练一个能力，可随时复练对比</span></div>
         </div>
       </section>
       <section className="login-entry">
         <div className="login-panel">
-          <div className="mark">PD</div>
-          <span className="section-kicker">Product discovery gym</span>
           <h2>{mode === "login" ? "登录你的账号" : "创建你的账号"}</h2>
           <p>{mode === "login" ? "使用邮箱和密码登录，继续你的产品判断训练。" : "使用邮箱注册，建立属于你的能力证据档案。"}</p>
 
@@ -235,8 +231,8 @@ export function LoginForm() {
                 {confirmTouched && confirmError ? <p className="form-error" role="alert">{confirmError}</p> : null}
               </label>
             ) : null}
-            <button className="button button-primary" disabled={submitDisabled} type="submit">
-              {busy ? "请稍候…" : mode === "login" ? "登录" : "注册"}
+            <button className="button button-primary" data-testid="auth-submit" disabled={submitDisabled} type="submit">
+              {busy ? "请稍候…" : "继续"}
             </button>
             {submitHint ? <p className="login-hint" data-testid="login-submit-hint" role="status">{submitHint}</p> : null}
             {status ? (
@@ -246,17 +242,19 @@ export function LoginForm() {
 
           {supabase && mode === "login" ? (
             <button className="login-switch" disabled={busy} type="button" onClick={handleMagicLink}>
-              或使用无密码登录链接（邮箱）
+              改用邮箱链接登录（不用密码）
             </button>
           ) : null}
-          <button className="login-switch" type="button" onClick={() => switchMode(mode === "login" ? "register" : "login")}>
-            {mode === "login" ? "还没有账号？注册一个" : "已有账号？去登录"}
-          </button>
+          {mode === "register" ? (
+            <button className="login-switch" type="button" onClick={() => switchMode("login")}>
+              已有账号？去登录
+            </button>
+          ) : null}
 
           <div className="login-note">
             {supabase
-              ? "使用 Supabase 安全存储账号与登录信息。"
-              : "未配置 Supabase：账号数据仅保存在本机，注册即登录，无需邮箱验证。"}
+              ? "账号信息加密保存在云端，跨设备可用。"
+              : "账号只保存在你这台电脑上，注册后直接进入，无需验证邮箱。"}
           </div>
         </div>
       </section>

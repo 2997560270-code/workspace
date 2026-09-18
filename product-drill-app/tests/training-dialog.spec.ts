@@ -3,15 +3,15 @@ import { enterApp } from "./e2e-helpers";
 
 test("runs an evidence-led interview and opens the judgment canvas", async ({ page }) => {
   await enterApp(page);
-  await page.getByRole("button", { name: "开始 3 分钟诊断", exact: true }).click();
+  await page.getByTestId("start-today-training").click();
   await expect(page.getByText("最近好几个客户都在投诉报表导出太慢")).toBeVisible();
   const input = page.getByRole("textbox", { name: "你的追问", exact: true });
   await input.fill("谁每天使用报表，谁负责最终决策？");
   await page.getByRole("button", { name: "发送追问", exact: true }).click();
   await expect(page.locator(".message.ai").last()).toContainText("财务分析师");
   await expect(page.locator(".message.user p").last()).toHaveCSS("text-align", "left");
-  await expect(page.getByText("20%", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "结束访谈，整理判断", exact: true }).click();
+  await expect(page.getByTestId("coverage-summary")).toContainText("1 / 5");
+  await page.getByTestId("finish-interview").click();
   await expect(page.getByRole("heading", { name: "把对话信息转成一个可以验证的判断" })).toBeVisible();
 });
 
@@ -24,7 +24,7 @@ test("shows a voice input fallback without blocking text training", async ({ pag
     Object.defineProperty(w, "webkitSpeechRecognition", { value: undefined, configurable: true });
   });
   await enterApp(page);
-  await page.getByRole("button", { name: "开始 3 分钟诊断", exact: true }).click();
+  await page.getByTestId("start-today-training").click();
   await expect(page.getByRole("button", { name: "语音输入", exact: true })).toBeVisible();
   // FB-002：点击后失败/不支持必须有可见提示（不能只藏在 title 里）
   await page.getByRole("button", { name: "语音输入", exact: true }).click();
@@ -35,7 +35,7 @@ test("shows a voice input fallback without blocking text training", async ({ pag
 
 test("shows the submitted question and thinking state before the AI reply arrives", async ({ page }) => {
   await enterApp(page);
-  await page.getByRole("button", { name: "开始 3 分钟诊断", exact: true }).click();
+  await page.getByTestId("start-today-training").click();
   const input = page.getByRole("textbox", { name: "你的追问", exact: true });
   await expect(input).toBeEnabled();
   const messageList = page.getByTestId("message-list");
@@ -90,16 +90,16 @@ test("shows the submitted question and thinking state before the AI reply arrive
 
 test("strict mode shows a countdown and disables hints", async ({ page }) => {
   await enterApp(page);
-  await page.getByRole("button", { name: "开始 3 分钟诊断", exact: true }).click();
+  await page.getByTestId("start-today-training").click();
   await page.getByRole("button", { name: "严格", exact: true }).click();
   await expect(page.getByTestId("strict-timer")).toContainText("剩余");
-  await expect(page.getByRole("button", { name: "给我一个轻提示", exact: true })).toBeDisabled();
+  await expect(page.getByTestId("request-hint")).toBeDisabled();
   await expect(page.getByRole("textbox", { name: "你的追问", exact: true })).toBeEnabled();
 });
 
 test("mode switch uses 诊断/严格/练习 after the RT-002 rename", async ({ page }) => {
   await enterApp(page);
-  await page.getByRole("button", { name: "开始 3 分钟诊断", exact: true }).click();
+  await page.getByTestId("start-today-training").click();
   const modeSwitch = page.locator(".mode-switch");
   await expect(modeSwitch.getByRole("button", { name: "诊断", exact: true })).toBeVisible();
   await expect(modeSwitch.getByRole("button", { name: "严格", exact: true })).toBeVisible();
@@ -113,7 +113,7 @@ test("mode switch uses 诊断/严格/练习 after the RT-002 rename", async ({ p
 
 test("mode switching never inflates the strict countdown (FB-005)", async ({ page }) => {
   await enterApp(page);
-  await page.getByRole("button", { name: "开始 3 分钟诊断", exact: true }).click();
+  await page.getByTestId("start-today-training").click();
   const timer = page.getByTestId("strict-timer");
   const fullSeconds = 6 * 60; // 首次诊断场景固定 6 分钟
 
@@ -137,12 +137,12 @@ test("mode switching never inflates the strict countdown (FB-005)", async ({ pag
 
 test("shows submission progress while judgment feedback is being generated", async ({ page }) => {
   await enterApp(page);
-  await page.getByRole("button", { name: "开始 3 分钟诊断", exact: true }).click();
+  await page.getByTestId("start-today-training").click();
   const input = page.getByRole("textbox", { name: "你的追问", exact: true });
   await input.fill("谁每天使用报表，谁负责最终决策？");
   await page.getByRole("button", { name: "发送追问", exact: true }).click();
   await expect(page.locator(".message.ai").last()).toBeVisible();
-  await page.getByRole("button", { name: "结束访谈，整理判断", exact: true }).click();
+  await page.getByTestId("finish-interview").click();
   await page.getByRole("textbox", { name: "核心问题", exact: true }).fill("还没有确认真实使用者和失败环节");
   await page.getByRole("textbox", { name: "建议行动", exact: true }).fill("先还原当前流程，再决定优化范围");
 

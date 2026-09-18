@@ -1,15 +1,15 @@
 ﻿import { expect, test } from "@playwright/test";
-import { enterApp, reachFeedback } from "./e2e-helpers";
+import { enterApp, gotoView, reachFeedback } from "./e2e-helpers";
 
 test("completes the direction A diagnosis-feedback-retry loop", async ({ page }) => {
   await enterApp(page);
   await reachFeedback(page);
-  await page.getByRole("button", { name: "开始 2 分钟复练", exact: true }).click();
+  await page.getByTestId("start-retry-feedback").click();
   await page.getByRole("textbox", { name: "只提出一个更好的问题", exact: true }).fill("当前从发起导出到拿到文件的流程是怎么完成的？");
   await page.getByRole("button", { name: "提交复练", exact: true }).click();
   await expect(page.getByText("已观察到改善", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "完成并返回今日训练", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "复盘与复练" })).toBeVisible();
-  await page.getByRole("button", { name: "04 我的能力 查看掌握状态和证据", exact: true }).click();
+  await gotoView(page, "ability");
   await expect(page.getByText("专项练习改善", { exact: true })).toBeVisible();
 });

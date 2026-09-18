@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { enterApp } from "./e2e-helpers";
+import { enterApp, gotoView } from "./e2e-helpers";
 
 /**
  * FB-010：盲评理由要求至少 20 字，但之前只有 placeholder、没有实时提示。
@@ -7,7 +7,7 @@ import { enterApp } from "./e2e-helpers";
  */
 
 async function openResourceTab(page: import("@playwright/test").Page, tab: string) {
-  await page.getByRole("button", { name: "02 训练地图 按能力选择训练任务", exact: true }).click();
+  await gotoView(page, "map");
   await page.getByRole("button", { name: "打开资源中心", exact: true }).click();
   await page.getByRole("tab", { name: tab, exact: true }).click();
 }

@@ -73,13 +73,13 @@ function coachResponse(coveredSkills: SkillId[], mode: TrainingSession["mode"]):
   if (mode !== "练习") return "我已经回答了你的问题。你可以继续追问，也可以在信息足够时整理产品判断。";
   const missing = SKILL_ORDER.find((skill) => !coveredSkills.includes(skill));
   const prompts: Record<SkillId, string> = {
-    role: "轻提示：需求是谁提出的，不一定等于谁每天使用。",
-    workflow: "轻提示：试着让对方带你走一遍现在的完整流程。",
-    impact: "轻提示：还可以确认问题频率、后果和业务影响。",
-    alternative: "轻提示：用户通常已经在用某种方式解决，不妨问问。",
-    metric: "轻提示：什么变化能证明问题真的解决了？"
+    role: "一点提示：需求是谁提出的，不一定等于谁每天使用。",
+    workflow: "一点提示：试着让对方带你走一遍现在的完整流程。",
+    impact: "一点提示：还可以确认问题频率、后果和业务影响。",
+    alternative: "一点提示：用户通常已经在用某种方式解决，不妨问问。",
+    metric: "一点提示：什么变化能证明问题真的解决了？"
   };
-  return missing ? prompts[missing] : "你已经覆盖了主要信息维度，可以结束访谈并整理产品判断。";
+  return missing ? prompts[missing] : "该问的都问到了，可以结束对话提交判断。";
 }
 
 export function createTrainingSession(input: {

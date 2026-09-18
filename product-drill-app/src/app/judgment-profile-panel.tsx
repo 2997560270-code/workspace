@@ -35,7 +35,7 @@ const CONFIDENCE_LABELS: Record<ChallengeDecisionSummary["confidence"], string> 
 
 const EVENT_LABELS: Record<ChallengeDecisionTimeline["events"][number]["event_type"], string> = {
   user_action: "调查动作",
-  world_response: "世界回应",
+  world_response: "对方回应",
   reveal: "后果揭示",
   intervention: "系统干预",
 };
@@ -60,7 +60,7 @@ function formatDateTime(value: string | null): string {
 function getEventDescription(payload: Record<string, unknown>): string {
   if (typeof payload.text === "string" && payload.text.trim()) return payload.text;
   if (typeof payload.content === "string" && payload.content.trim()) return payload.content;
-  return "已记录结构化世界事件";
+  return "已记录结构化情境事件";
 }
 
 export function DecisionTimelinePanel({
@@ -135,9 +135,9 @@ export function DecisionTimelinePanel({
       {status === "loaded" && timeline ? (
         <>
           <dl className="decision-provenance" aria-label="版本追溯">
-            <div><dt>World</dt><dd>{timeline.world_id} · {timeline.world_version}</dd></div>
-            <div><dt>Rubric</dt><dd>{timeline.rubric_version}</dd></div>
-            <div><dt>Model</dt><dd>{timeline.model_version}</dd></div>
+            <div><dt>情境</dt><dd>{timeline.world_id} · {timeline.world_version}</dd></div>
+            <div><dt>评分版本</dt><dd>{timeline.rubric_version}</dd></div>
+            <div><dt>模型</dt><dd>{timeline.model_version}</dd></div>
             <div><dt>完成时间</dt><dd>{formatDateTime(timeline.completed_at)}</dd></div>
           </dl>
 
@@ -229,14 +229,14 @@ function EvidenceCard({
       <div className="ev-card-header">
         <EvidenceTypeBadge type={type} />
         {item.is_transfer && (
-          <span className="ev-tag ev-tag-transfer">迁移世界 {item.transfer_world_id}</span>
+          <span className="ev-tag ev-tag-transfer">新情境 {item.transfer_world_id}</span>
         )}
         {item.is_same_world_correction && (
-          <span className="ev-tag ev-tag-correction">同世界修正机会</span>
+          <span className="ev-tag ev-tag-correction">同情境修正机会</span>
         )}
       </div>
       <div className="ev-card-meta">
-        <span title="世界版本">世界 {item.world_id} · v{item.world_version}</span>
+        <span title="情境版本">情境 {item.world_id} · v{item.world_version}</span>
         <span title="模型版本">模型 {item.model_version}</span>
       </div>
       <div className="ev-card-link">
@@ -295,10 +295,10 @@ function HypothesisCard({
         </div>
       )}
 
-      <div className="jp-rubric provenance">Rubric {item.rubric_version}</div>
+      <div className="jp-rubric provenance">评分版本 {item.rubric_version}</div>
 
       {!hasAnyEvidence && (
-        <p className="jp-no-evidence">尚无证据，完成世界工作台训练后自动更新。</p>
+        <p className="jp-no-evidence">尚无证据，完成情境对话后自动更新。</p>
       )}
 
       {expanded && hasAnyEvidence && (
@@ -323,7 +323,7 @@ function HypothesisCard({
 
           {item.transfer_evidence.length > 0 && (
             <section>
-              <span className="section-kicker">迁移证据（陌生世界独立决策）</span>
+              <span className="section-kicker">迁移证据（在新情境中的独立决策）</span>
               {item.transfer_evidence.map((ev) => (
                 <EvidenceCard item={ev} key={ev.id} onOpenDecision={onOpenDecision} type="transfer" />
               ))}
@@ -332,7 +332,7 @@ function HypothesisCard({
 
           {item.assisted_evidence.length > 0 && (
             <section>
-              <span className="section-kicker">辅助证据（含提示，不计入独立趋势）</span>
+              <span className="section-kicker">辅助证据（含提示，不计入独立表现）</span>
               {item.assisted_evidence.map((ev) => (
                 <EvidenceCard item={ev} key={ev.id} onOpenDecision={onOpenDecision} type="assisted" />
               ))}
@@ -384,7 +384,7 @@ export function JudgmentProfilePanel() {
   if (status === "loading") {
     return (
       <div className="jp-loading surface">
-        <p>正在加载判断证据画像…</p>
+        <p>正在加载判断证据…</p>
       </div>
     );
   }
@@ -392,7 +392,7 @@ export function JudgmentProfilePanel() {
   if (status === "error") {
     return (
       <div className="jp-error surface">
-        <p>无法加载画像，请刷新重试。</p>
+        <p>无法加载判断证据，请刷新重试。</p>
       </div>
     );
   }
@@ -401,17 +401,17 @@ export function JudgmentProfilePanel() {
     return (
       <section className="jp-empty surface">
         <span className="empty-number">01</span>
-        <h2>还没有世界判断证据</h2>
+        <h2>还没有情境对话的判断证据</h2>
         <p>
-          这里仅统计世界工作台中的结构化调查与决策，不包含专项训练记录。
-          完成一次世界调查与决策后，系统会自动构建你的判断证据画像。
-          画像里每一条结论都可以追溯到具体的决策事件，不是模糊总分。
+          这里只统计情境对话里的调查与决策，不包含专项训练记录。
+          完成一次情境对话后，会自动整理出你的判断习惯；
+          每条结论都能点回当时的决策现场，不是模糊总分。
         </p>
         <ul className="jp-empty-facts">
-          <li>支持证据 — 独立决策中仍缺少关键调查维度</li>
-          <li>反证 — 独立决策中覆盖了三个调查维度</li>
-          <li>迁移证据 — 在陌生世界中无提示独立复现</li>
-          <li>辅助证据 — 使用了提示，记录但不计入独立趋势</li>
+          <li>支持证据 — 例如「独立决策时漏掉了关键调查维度」</li>
+          <li>反证 — 例如「某次独立决策查全了三个调查维度」</li>
+          <li>迁移证据 — 换了新情境，不用提示也能做对</li>
+          <li>辅助证据 — 用了提示：留档参考，不计入独立表现</li>
         </ul>
       </section>
     );
@@ -429,21 +429,21 @@ export function JudgmentProfilePanel() {
 
       <section className="jp-summary surface-dark">
         <div>
-          <span className="section-kicker light">世界判断证据</span>
-          <h2>世界工作台的每条结论都可追溯到具体决策</h2>
+          <span className="section-kicker light">情境对话的判断证据</span>
+          <h2>每条结论都能点回当时的具体决策</h2>
           <p>
-            本区域只统计世界工作台中的结构化调查与决策，不包含下方的专项训练记录。
-            置信度反映相同条件下行为的一致性，证据不足时不会显示伪精确结论。
+            这里只统计情境对话里的调查与决策，不包含下方专项训练记录。
+            置信度表示相同情况下你的做法是否稳定；证据不够时不会硬给结论。
           </p>
         </div>
         <div className="jp-summary-stats">
           <div>
             <strong>{items.length}</strong>
-            <span>世界判断习惯</span>
+            <span>判断习惯</span>
           </div>
           <div>
             <strong>{items.reduce((n, i) => n + i.independent_evidence_count, 0)}</strong>
-            <span>世界独立证据</span>
+            <span>独立证据</span>
           </div>
           <div>
             <strong>{items.reduce((n, i) => n + i.transfer_evidence.length, 0)}</strong>
@@ -513,7 +513,7 @@ export function WorldDecisionHistoryPanel({
         status: "completed",
         started_at: "",
         completed_at: null,
-        chosen_action: "在离线演示模式下完成了该世界的调查与决策。",
+        chosen_action: "在离线演示模式下完成了该情境的调查与决策。",
         confidence: "medium",
         consequences_revealed: true,
         source: "local_demo",
@@ -521,28 +521,25 @@ export function WorldDecisionHistoryPanel({
     });
   const mergedRecords = [...records, ...localRecords];
 
+  // 新人单一空态：没有任何世界决策时整个面板不渲染，复盘页只保留一个引导空态。
+  if (status === "loaded" && !mergedRecords.length) return null;
+
   return (
     <section className="world-history" aria-labelledby="world-history-title">
       <div className="world-history-heading">
         <div>
-          <span className="section-kicker">世界工作台</span>
-          <h2 id="world-history-title">世界决策记录</h2>
+          <span className="section-kicker">情境对话</span>
+          <h2 id="world-history-title">情境决策记录</h2>
         </div>
         <p>选择一条记录，查看调查、决策、后果和版本来源。</p>
       </div>
 
-      {status === "loading" ? <div className="world-history-status surface">正在加载世界决策记录…</div> : null}
+      {status === "loading" ? <div className="world-history-status surface">正在加载情境决策记录…</div> : null}
       {status === "error" && mergedRecords.length ? (
         <div className="world-history-status surface" role="alert">服务端记录加载失败，以下为本地演示模式下的完成记录。</div>
       ) : null}
       {status === "error" && !mergedRecords.length ? (
-        <div className="world-history-status surface" role="alert">世界决策记录加载失败，请刷新重试。</div>
-      ) : null}
-      {status === "loaded" && !mergedRecords.length ? (
-        <div className="world-history-status surface">
-          <h3>还没有已完成的世界决策</h3>
-          <p>完成一个世界工作台挑战后，调查、决策和后果会显示在这里。</p>
-        </div>
+        <div className="world-history-status surface" role="alert">情境决策记录加载失败，请刷新重试。</div>
       ) : null}
 
       {mergedRecords.length ? (
@@ -568,7 +565,7 @@ export function WorldDecisionHistoryPanel({
                 <small>{record.chosen_action}</small>
               </span>
               <span className="world-history-meta">
-                <small>World {record.world_version}</small>
+                <small>情境 {record.world_version}</small>
                 {record.source === "local_demo" ? (
                   <small className="world-history-local" data-testid="world-history-local">本地演示记录</small>
                 ) : (
@@ -584,7 +581,7 @@ export function WorldDecisionHistoryPanel({
       {selectedLocalId ? (
         <div className="world-history-status surface" data-testid="world-history-local-note" role="note">
           <h3>这是一条本地演示记录</h3>
-          <p>该世界在离线演示模式下完成，详细时间线未同步到服务端；连接服务端后完成的决策才会生成完整记录。</p>
+          <p>该情境在离线演示模式下完成，详细时间线未同步到服务端；连接服务端后完成的决策才会生成完整记录。</p>
           <button className="button button-secondary" onClick={() => setSelectedLocalId(null)} type="button">关闭</button>
         </div>
       ) : null}

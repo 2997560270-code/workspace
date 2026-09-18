@@ -5,6 +5,7 @@
 > 关联文档：`user-trial-feedback-2026-09-02.md`（FB-001–014）、`regression-test-issues-2026-09-04.md`（RT-001–006）、`fix-changelog-2026-09-05.md`（修复方变更声明）
 > 测试环境：Web 端 `localhost:3000`，已连接服务端。截图1中语音报错为 705667b 新文案，可确认反馈人本轮已运行含修复的构建
 > 代码定位说明：「代码定位」基于当前 `product-drill-app/src` 静态阅读，用于解释根因，运行时行为仍需复测确认
+> 行号说明：文中所有 `xxx.tsx:NNN` 行号均为 2026-09-06 代码快照，仅具历史定位价值；`regression-doc-consistency.test.ts` 已改为按内容锚点（testid / 函数名 / 字面量）核对，不再依赖行号
 
 ## 1. 文档目的
 

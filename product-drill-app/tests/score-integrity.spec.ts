@@ -14,7 +14,7 @@ async function loginAs(page: Page, userId: string) {
   }]);
   await page.goto("/");
   await page.getByRole("heading", { level: 1, name: "今天，练会一个真正的产品判断" }).waitFor();
-  await page.getByText(/产品练习生 · (服务端记录|本地缓存)/).waitFor({ state: "attached" });
+  await page.getByText("产品练习生", { exact: true }).waitFor({ state: "attached" });
 }
 
 test("server-signed scores pass integrity checks and tampered scores are marked untrusted (FB-014)", async ({ page }) => {

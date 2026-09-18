@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { ArrowUp, ArrowUpRight, CaretRight, Check, ChatTeardropText, GearSix, Lightning } from "@phosphor-icons/react";
 import { WorldWorkbench } from "./world-workbench";
 import { JudgmentProfilePanel, WorldDecisionHistoryPanel } from "./judgment-profile-panel";
 import {
@@ -35,7 +36,7 @@ import { FeedbackWidget } from "./feedback-widget";
 import { SignOutButton } from "./signout-button";
 import { MultiRolePanel } from "./multi-role-panel";
 import { ResourceHubPanel, type HubTab } from "./resource-hub-panel";
-import { LlmConfigPanel } from "./llm-config-panel";
+import { SettingsPanel } from "./settings-panel";
 import {
   evaluateRetry,
   generateEvaluation,
@@ -50,6 +51,15 @@ import {
   type RetryResult,
   type TrainingHistoryRecord
 } from "../lib/training-history";
+import {
+  MASTERY_CLASS,
+  MASTERY_LABEL,
+  MODE_HINTS,
+  SCENARIO_STATUS_CLASS,
+  SCENARIO_STATUS_LABEL,
+  SUGGESTED_QUESTIONS
+} from "../lib/ui-labels";
+import { draftJudgmentFromTranscript, mergeJudgmentDraft, type JudgmentFieldKey } from "../lib/judgment-draft";
 import {
   DEFAULT_SCENARIO_ID,
   SKILLS,
@@ -95,11 +105,11 @@ function formatCountdown(seconds: number): string {
 }
 
 function ArrowIcon() {
-  return <span aria-hidden="true">↗</span>;
+  return <ArrowUpRight aria-hidden="true" size={13} weight="bold" />;
 }
 
 function CheckMark({ active = true }: { active?: boolean }) {
-  return <span aria-hidden="true" className={active ? "check active" : "check"}>✓</span>;
+  return <span aria-hidden="true" className={active ? "check active" : "check"}><Check size={11} weight="bold" /></span>;
 }
 
 function mergeHistoryRecords(primary: TrainingHistoryRecord[], secondary: TrainingHistoryRecord[]) {
@@ -118,8 +128,8 @@ function RuntimeNotice({
   const text = status === "connecting"
     ? "正在连接训练服务…"
     : status === "online"
-      ? "已连接服务端；评分会记录模型、场景与 Rubric 版本。"
-      : "当前使用离线演示引擎；结果不会计入正式能力趋势。";
+      ? "训练记录已开启，评分会保存你的原始回答。"
+      : "演示模式：回复为示例剧本，本次不计入你的能力记录。配置模型后开始真实训练。";
   return (
     <div aria-live="polite" className={`runtime-notice runtime-${status}`}>
       <span>{text}</span>
@@ -168,18 +178,19 @@ function TodayPanel({
           <h2>{recommended.title}</h2>
           <p>{recommended.context}</p>
           <div className="hero-actions">
-            <button className="button button-light" onClick={() => onStart(recommended.id)} type="button">
-              {records.length ? "开始今日训练" : "开始 3 分钟诊断"} <ArrowIcon />
+            <button className="button button-light" data-testid="start-today-training" onClick={() => onStart(recommended.id)} type="button">
+              {records.length ? "开始今日练习" : "开始首次练习"} <ArrowIcon />
             </button>
             <button
               className="button button-secondary"
+              data-testid="open-world-workbench"
               onClick={() => workbenchComplete ? onOpenAbility() : onStartWorkbench()}
               type="button"
             >
-              {workbenchComplete ? "查看判断画像" : "进入世界工作台"} <ArrowIcon />
+              {workbenchComplete ? "查看我的判断报告" : "进入情境对话"} <ArrowIcon />
             </button>
             <span title={nextWorldReason}>
-              {workbenchComplete ? "世界闭环已完成" : `下一挑战：${nextWorldTitle}`}
+              {workbenchComplete ? "本情境已完成" : `下一个情境：${nextWorldTitle}`}
             </span>
           </div>
         </div>
@@ -193,14 +204,20 @@ function TodayPanel({
       <aside className="weekly surface">
         <div className="section-heading compact">
           <div>
-            <span className="section-kicker">本周节奏</span>
-            <h2>{weeklyDone} / {profile.weeklyTarget}</h2>
+            
+            <h2>{weeklyDone} / {profile.weeklyTarget} 次</h2>
           </div>
-          <span className="quiet">次训练</span>
         </div>
-        <div className="week-bars" aria-label={`本周已完成 ${weeklyDone} 次训练`}>
+        <div
+          aria-label={`本周已完成 ${weeklyDone} / ${profile.weeklyTarget} 次训练`}
+          aria-valuemax={profile.weeklyTarget}
+          aria-valuemin={0}
+          aria-valuenow={weeklyDone}
+          className="week-bars"
+          role="progressbar"
+        >
           {Array.from({ length: profile.weeklyTarget }, (_, index) => (
-            <span className={index < weeklyDone ? "done" : ""} key={index} />
+            <span aria-hidden="true" className={index < weeklyDone ? "done" : ""} key={index} />
           ))}
         </div>
         <p data-testid="weekly-summary">{weeklyDone ? `本周平均证据分 ${weeklySummary.averageScore}，改善 ${weeklySummary.improvedCount} 次。` : "完成第一轮训练，建立你的能力基线。"}</p>
@@ -210,10 +227,10 @@ function TodayPanel({
       <section className="focus-card surface">
         <div className="section-heading">
           <div>
-            <span className="section-kicker">你的当前训练重点</span>
+            
             <h2>{latestIssue?.title ?? "先建立一条真实能力证据"}</h2>
           </div>
-          <span className="status-tag">{records.length ? "待复练" : "未诊断"}</span>
+          <span className="status-tag">{records.length ? "有可复练的短板" : "还没开始"}</span>
         </div>
         <div className="focus-grid">
           <div>
@@ -222,35 +239,45 @@ function TodayPanel({
           </div>
           <div>
             <span className="detail-label">下一步动作</span>
-            <p>{latestIssue?.nextAction ?? "先完成一个短场景，不需要准备，也没有标准答案。"}</p>
+            <p>{latestIssue?.nextAction ?? (records.length ? "回到复盘，重练上次的具体失误环节。" : "不需要准备，也没有标准答案，先完成一个短场景。")}</p>
           </div>
-          <button
-            className="button button-secondary"
-            disabled={!records.length}
-            onClick={onOpenReview}
-            type="button"
-          >
-            开始 2 分钟复练
-          </button>
+          {records.length ? (
+            <button
+              className="button button-secondary"
+              data-testid="start-retry-home"
+              onClick={onOpenReview}
+              type="button"
+            >
+              开始 2 分钟复练
+            </button>
+          ) : (
+            <button
+              className="button button-secondary"
+              data-testid="start-retry-home"
+              onClick={() => onStart(recommended.id)}
+              type="button"
+            >
+              去开始第一次练习
+            </button>
+          )}
         </div>
       </section>
 
       <section className="map-preview surface">
         <div className="section-heading">
           <div>
-            <span className="section-kicker">产品发现能力地图</span>
-            <h2>不是刷题，而是留下可验证的行为证据</h2>
+            
+            <h2>每次练习都会留下能回看的记录</h2>
           </div>
         </div>
         <div className="skill-rows">
-          {profile.skills.map((skill, index) => (
+          {profile.skills.map((skill) => (
             <div className="skill-row" key={skill.id}>
-              <span className="skill-index">0{index + 1}</span>
               <div>
                 <strong>{skill.name}</strong>
                 <p>{SKILLS.find((item) => item.id === skill.id)?.description}</p>
               </div>
-              <span className={`mastery mastery-${skill.state}`}>{skill.state}</span>
+              <span className={`mastery mastery-${MASTERY_CLASS[skill.state]}`} data-testid={`mastery-${skill.id}`}>{MASTERY_LABEL[skill.state]}</span>
             </div>
           ))}
         </div>
@@ -258,7 +285,7 @@ function TodayPanel({
 
       {/* FB-008：多角色训练入口在默认的“今日训练”页也可见，避免埋在二级“训练地图”里找不到 */}
       <section className="surface multi-role-entry" data-testid="today-multi-role-entry">
-        <div><span className="section-kicker">多视角练习</span><h2>多人角色训练</h2><p>在同一业务问题中切换运营、财务和一线角色，练习处理利益差异。</p></div>
+        <div><h2>多人角色训练</h2><p>在同一业务问题中切换运营、财务和一线角色，练习处理利益差异。</p></div>
         <button className="button button-secondary" onClick={onOpenMultiRole} type="button">开始多人角色训练</button>
       </section>
     </div>
@@ -286,9 +313,14 @@ function TrainingMap({
 }) {
   // FB-003：地图状态直接从训练记录推导，完成训练后即时刷新。
   const allScenarios = [...TRAINING_SCENARIOS, ...customScenarios];
-  const coveredCount = allScenarios.filter(
-    (scenario) => getScenarioTrainingStatus(scenario.id, records).status !== "未训练"
-  ).length;
+  const isCovered = (scenario: TrainingScenario) =>
+    getScenarioTrainingStatus(scenario.id, records).status !== "未训练";
+  const coveredCount = allScenarios.filter(isCovered).length;
+  // D5：12 张同构卡片平铺会造成选择瘫痪，按五个核心能力分组，组头直接给出「几个场景 · 已练几个」
+  const skillGroups = SKILLS.map((skill) => ({
+    skill,
+    scenarios: allScenarios.filter((scenario) => scenario.skillId === skill.id),
+  })).filter((group) => group.scenarios.length > 0);
 
   return (
     <div className="stack-lg">
@@ -302,70 +334,85 @@ function TrainingMap({
           已覆盖 <strong>{coveredCount} / {allScenarios.length}</strong> 个场景；完成后状态会即时更新。
         </p>
       </section>
-      <div className="scenario-grid">
-        {allScenarios.map((scenario) => {
-          const skill = getSkill(scenario.skillId);
-          const { status, attempts, latest } = getScenarioTrainingStatus(scenario.id, records);
+      <div className="scenario-groups">
+        {skillGroups.map((group) => {
+          const doneCount = group.scenarios.filter(isCovered).length;
           return (
-            <article className="scenario-card surface" data-testid={`scenario-card-${scenario.id}`} key={scenario.id}>
-              <div className="scenario-topline">
-                <span>{scenario.industry}</span>
-                <span>{scenario.id.startsWith("custom-") ? "本地场景" : `${scenario.duration} 分钟 · ${scenario.difficulty}`}</span>
+            <details className="scenario-group" data-testid={`scenario-group-${group.skill.id}`} key={group.skill.id} open>
+              <summary data-testid={`scenario-group-summary-${group.skill.id}`}>
+                <h2>{group.skill.name}</h2>
+                <span className="scenario-group-meta">
+                  {group.scenarios.length} 个场景 · {doneCount ? `已练 ${doneCount}` : "还没练过"}
+                </span>
+                <CaretRight aria-hidden="true" className="scenario-group-caret" size={13} weight="bold" />
+              </summary>
+              <p className="scenario-group-desc">{group.skill.description}</p>
+              <div className="scenario-grid">
+                {group.scenarios.map((scenario) => {
+                  const { status, attempts, latest } = getScenarioTrainingStatus(scenario.id, records);
+                  return (
+                    <article className="scenario-card surface" data-testid={`scenario-card-${scenario.id}`} key={scenario.id}>
+                      <div className="scenario-topline">
+                        <span>{scenario.industry}</span>
+                        <span>{scenario.id.startsWith("custom-") ? "本地场景" : `${scenario.duration} 分钟 · ${scenario.difficulty}`}</span>
+                      </div>
+                      {/* D8：状态行始终占位以对齐标题，但标签只在真有状态时渲染 */}
+                      <div className="scenario-status-row">
+                        {status === "未训练" ? null : (
+                          <span className={`status-tag scenario-status scenario-status-${SCENARIO_STATUS_CLASS[status]}`} data-testid={`scenario-status-${scenario.id}`}>{SCENARIO_STATUS_LABEL[status]}</span>
+                        )}
+                        {latest ? (
+                          <span className="scenario-attempts">
+                            已训练 {attempts} 次 · 最新证据分 {latest.totalScore}
+                          </span>
+                        ) : null}
+                      </div>
+                      <h2>{scenario.shortTitle}</h2>
+                      <p>{scenario.title}</p>
+                      <button className="text-button" data-testid={`scenario-start-${scenario.id}`} onClick={() => onStart(scenario.id)} type="button">
+                        {status === "未训练" ? "开始训练" : "复练这个场景"} <ArrowIcon />
+                      </button>
+                    </article>
+                  );
+                })}
               </div>
-              <div className="scenario-status-row">
-                <span className={`status-tag scenario-status scenario-status-${status}`} data-testid={`scenario-status-${scenario.id}`}>{status}</span>
-                {latest ? (
-                  <span className="scenario-attempts">
-                    已训练 {attempts} 次 · 最新证据分 {latest.totalScore}
-                  </span>
-                ) : null}
-              </div>
-              <h2>{scenario.shortTitle}</h2>
-              <p>{scenario.title}</p>
-              <div className="scenario-skill">
-                <span>训练</span>
-                <strong>{skill.name}</strong>
-              </div>
-              <button className="text-button" onClick={() => onStart(scenario.id)} type="button">
-                {status === "未训练" ? "开始训练" : "复练这个场景"} <ArrowIcon />
-              </button>
-            </article>
+            </details>
           );
         })}
       </div>
       {/* FB-008：多人角色训练是需求文档 4.5 的正式能力，入口必须紧跟场景列表，不能被埋在页面底部 */}
       <section className="surface multi-role-entry" data-testid="multi-role-entry">
-        <div><span className="section-kicker">多视角练习</span><h2>多人角色训练</h2><p>在同一业务问题中切换运营、财务和一线角色，练习处理利益差异。</p></div>
+        <div><h2>多人角色训练</h2><p>在同一业务问题中切换运营、财务和一线角色，练习处理利益差异。</p></div>
         <button className="button button-secondary" onClick={onOpenMultiRole} type="button">开始多人角色训练</button>
       </section>
       <section className="surface custom-scenario-entry" data-testid="custom-scenario-entry">
         <div>
-          <span className="section-kicker">本地扩展</span>
+          
           <h2>创建自定义场景</h2>
           <p>把你正在面对的真实问题变成一次可复盘的产品发现练习。</p>
         </div>
         <button className="button button-secondary" onClick={onCreateCustomScenario} type="button">创建本地场景</button>
       </section>
       <section className="surface course-entry" data-testid="course-entry">
-        <div><span className="section-kicker">结构化学习</span><h2>课程内容</h2><p>用短知识点和行动练习补足场景训练之外的基础。</p></div>
+        <div><h2>课程内容</h2><p>用短知识点和行动练习补足场景训练之外的基础。</p></div>
         <button className="button button-secondary" onClick={onOpenCourses} type="button">查看课程</button>
       </section>
       <section className="surface resource-hub-entry" data-testid="resource-hub-entry">
-        <div><span className="section-kicker">开放资料</span><h2>社区、行业知识库与标准化考核</h2><p>浏览案例、检索行业资料、预览内容审核流程，并体验标准化考核诊断。</p></div>
+        <div><h2>社区、行业知识库与标准化考核</h2><p>浏览案例、检索行业资料、预览内容审核流程，并体验标准化考核诊断。</p></div>
         <button className="button button-secondary" onClick={() => onOpenResourceHub("community")} type="button">打开资源中心</button>
       </section>
       {/* RT-006/FB-012：标准化考核直达入口，避免被埋在资源中心第 7 个标签里而“找不到” */}
       <section className="surface assessment-entry" data-testid="assessment-entry">
-        <div><span className="section-kicker">阶段 5 标准化考核</span><h2>固定题序诊断试点</h2><p>用固定题序做一次标准化能力诊断，练习者可用同一标准衡量掌握情况。</p></div>
-        <button className="button button-secondary" onClick={() => onOpenResourceHub("assessment")} type="button">进入标准化考核</button>
+        <div><h2>固定题序能力测评</h2><p>用固定题序做一次标准化能力诊断，练习者可用同一标准衡量掌握情况。</p></div>
+        <button className="button button-secondary" data-testid="assessment-entry-button" onClick={() => onOpenResourceHub("assessment")} type="button">进入标准化考核</button>
       </section>
       <section className="surface experiment-entry" data-testid="product-material-experiment-entry">
         <div>
-          <span className="section-kicker">后续实验</span>
+          
           <h2>产品资料生成练习</h2>
           <p>把一次产品判断整理成可讨论的资料草稿，明确证据边界和下一步验证。</p>
         </div>
-        <button className="button button-secondary" onClick={onOpenProductExperiment} type="button">开始资料生成实验</button>
+        <button className="button button-secondary" data-testid="product-material-start" onClick={onOpenProductExperiment} type="button">练习整理资料草稿</button>
       </section>
     </div>
   );
@@ -374,11 +421,13 @@ function TrainingMap({
 function JudgmentForm({
   value,
   onChange,
+  onFieldTouched,
   onSubmit,
   submissionStage,
 }: {
   value: ProductJudgment;
   onChange: (next: ProductJudgment) => void;
+  onFieldTouched?: (key: keyof ProductJudgment) => void;
   onSubmit: () => void;
   submissionStage: "idle" | "submitting" | "evaluating";
 }) {
@@ -401,21 +450,25 @@ function JudgmentForm({
       : "提交判断并查看反馈";
 
   return (
-    <section className="judgment surface">
+    <section className="judgment surface" data-testid="judgment-canvas">
       <div className="section-heading">
         <div>
-          <span className="section-kicker">产品判断画布</span>
+          
           <h2>把对话信息转成一个可以验证的判断</h2>
         </div>
-        <span className="quiet">至少填写核心问题与建议行动</span>
+        <span className="quiet">把对话里的信息整理成你的判断</span>
       </div>
       <div className="judgment-grid">
         {fields.map((field) => (
           <label className={field.wide ? "wide" : ""} key={field.key}>
             <span>{field.label}</span>
             <textarea
+              data-testid={`judgment-field-${field.key}`}
               disabled={isSubmitting}
-              onChange={(event) => onChange({ ...value, [field.key]: event.target.value })}
+              onChange={(event) => {
+                onFieldTouched?.(field.key);
+                onChange({ ...value, [field.key]: event.target.value });
+              }}
               placeholder={field.placeholder}
               rows={field.wide ? 3 : 2}
               value={value[field.key]}
@@ -424,18 +477,22 @@ function JudgmentForm({
         ))}
       </div>
       <div className="judgment-actions">
-        {isSubmitting ? (
-          <p aria-live="polite" data-testid="judgment-submit-status" role="status">
-            {submissionStage === "submitting"
-              ? "正在保存你的判断，请稍候…"
-              : "判断已保存，正在生成证据反馈…"}
-          </p>
-        ) : (
-          <p>“信息不足，暂不做决定”也是合理判断，只要说明还缺少什么证据。</p>
-        )}
+        <div>
+          {isSubmitting ? (
+            <p aria-live="polite" data-testid="judgment-submit-status" role="status">
+              {submissionStage === "submitting"
+                ? "正在保存你的判断，请稍候…"
+                : "判断已保存，正在生成证据反馈…"}
+            </p>
+          ) : (
+            <p>“信息不足，暂不做决定”也是合理判断，只要说明还缺少什么证据。</p>
+          )}
+          <span className="judgment-require">提交前需填写：核心问题、建议行动</span>
+        </div>
         <button
           aria-busy={isSubmitting}
           className="button button-primary"
+          data-testid="judgment-submit"
           disabled={!completeEnough || isSubmitting}
           onClick={onSubmit}
           type="button"
@@ -474,7 +531,7 @@ function FeedbackPanel({
         <div>
           <span className="section-kicker light">本次训练结果</span>
           <h2>{evaluation.summary}</h2>
-          <p>评分置信度：{evaluation.confidence}。数字只作为辅助，下面的行为证据更重要。</p>
+          <p>系统把握度：{evaluation.confidence}；判断依据见下方行为证据。</p>
         </div>
         <div className="score-orbit">
           <strong>{evaluation.totalScore}</strong>
@@ -485,7 +542,7 @@ function FeedbackPanel({
       <section className="surface evidence-section">
         <div className="section-heading">
           <div>
-            <span className="section-kicker">逐句证据反馈</span>
+            
             <h2>系统为什么做出这个判断</h2>
           </div>
         </div>
@@ -513,7 +570,7 @@ function FeedbackPanel({
             <strong>{primaryIssue.nextAction}</strong>
           </div>
           {!retrying ? (
-            <button className="button button-coral" onClick={onStartRetry} type="button">
+            <button className="button button-coral" data-testid="start-retry-feedback" onClick={onStartRetry} type="button">
               开始 2 分钟复练 <ArrowIcon />
             </button>
           ) : (
@@ -525,6 +582,7 @@ function FeedbackPanel({
                 rows={3}
                 value={retryAnswer}
               />
+              <span className="composer-note">写至少 4 个字后可提交</span>
               {retryResult ? (
                 <div className={retryResult.improved ? "retry-result success" : "retry-result"}>
                   <strong>{retryResult.improved ? "已观察到改善" : "还可以更具体"}</strong>
@@ -533,6 +591,7 @@ function FeedbackPanel({
               ) : null}
               <button
                 className="button button-primary"
+                data-testid="submit-retry"
                 disabled={retryAnswer.trim().length < 4 || Boolean(retryResult?.improved)}
                 onClick={onSubmitRetry}
                 type="button"
@@ -545,7 +604,7 @@ function FeedbackPanel({
       ) : null}
 
       <div className="finish-row">
-        <button className="button button-primary" onClick={onFinish} type="button">
+        <button className="button button-primary" data-testid="finish-and-return" onClick={onFinish} type="button">
           完成并返回今日训练
         </button>
       </div>
@@ -572,6 +631,13 @@ function TrainingWorkspace({
   const [reply, setReply] = useState("");
   const [pendingReply, setPendingReply] = useState<string | null>(null);
   const [judgment, setJudgment] = useState<ProductJudgment>(EMPTY_JUDGMENT);
+  const touchedFieldsRef = useRef<Set<JudgmentFieldKey>>(new Set());
+
+  useEffect(() => {
+    if (session.stage !== "judgment") return;
+    const draft = draftJudgmentFromTranscript(session.messages, session.coveredSkills);
+    setJudgment((current) => mergeJudgmentDraft(current, draft, touchedFieldsRef.current));
+  }, [session.stage, session.messages, session.coveredSkills]);
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [record, setRecord] = useState<TrainingHistoryRecord | null>(null);
   const [retryAnswer, setRetryAnswer] = useState("");
@@ -585,6 +651,7 @@ function TrainingWorkspace({
     return Date.now() + (scenarioDefinition?.duration ?? getScenario(scenarioId).duration) * 60 * 1000;
   });
   const [clockMs, setClockMs] = useState(() => Date.now());
+  const [showCoveragePanel, setShowCoveragePanel] = useState(false);
   // 设置严格模式截止时间时必须同步刷新 clockMs：
   // 非严格模式下时钟不会走动，若沿用旧的 clockMs 计算，
   // 每次切换模式都会把停摆的时间差叠加进剩余时间（计时漂移）。
@@ -621,7 +688,7 @@ function TrainingWorkspace({
       setSession(createTrainingSession({ scenarioId, scenario: scenarioDefinition, mode: initialMode }));
       applyStrictDeadline(initialMode === "严格" ? Date.now() + scenarioDefinition.duration * 60 * 1000 : null);
       setRuntimeStatus("fallback");
-      setActionError("这是本地自定义场景，反馈由本地练习引擎生成，不计入正式能力趋势。");
+      setActionError("这是本地自定义场景，反馈由本地练习引擎生成，不计入你的能力记录。");
       setBusy(false);
       return () => { cancelled = true; };
     }
@@ -657,12 +724,13 @@ function TrainingWorkspace({
     setPendingReply(null);
     setJudgmentSubmissionStage("idle");
     setJudgment(EMPTY_JUDGMENT);
+    touchedFieldsRef.current.clear();
     applyStrictDeadline(null);
     if (scenarioDefinition) {
       setSession(createTrainingSession({ scenarioId, scenario: scenarioDefinition, mode }));
       applyStrictDeadline(mode === "严格" ? Date.now() + scenarioDefinition.duration * 60 * 1000 : null);
       setRuntimeStatus("fallback");
-      setActionError("这是本地自定义场景，反馈由本地练习引擎生成，不计入正式能力趋势。");
+      setActionError("这是本地自定义场景，反馈由本地练习引擎生成，不计入你的能力记录。");
       setBusy(false);
       return;
     }
@@ -679,23 +747,23 @@ function TrainingWorkspace({
         ? Date.now() + getScenario(scenarioId).duration * 60 * 1000
         : null);
       setRuntimeStatus("fallback");
-      setActionError("模式已在本地切换，当前结果不会计入正式能力趋势。");
+      setActionError("模式已在本地切换，当前结果不会计入你的能力记录。");
     } finally {
       setBusy(false);
     }
   }
 
-  async function sendReply() {
-    const content = reply.trim();
+  async function sendReply(contentOverride?: string) {
+    const content = (contentOverride ?? reply).trim();
     if (!content || busy || strictExpired) return;
-    setReply("");
+    if (!contentOverride) setReply("");
     setPendingReply(content);
     setBusy(true);
     setActionError("");
     if (scenarioDefinition) {
       setSession((current) => sendTrainingMessage(current, content));
       setRuntimeStatus("fallback");
-      setActionError("这是本地自定义场景，反馈由本地练习引擎生成，不计入正式能力趋势。");
+      setActionError("这是本地自定义场景，反馈由本地练习引擎生成，不计入你的能力记录。");
       setPendingReply(null);
       setBusy(false);
       return;
@@ -707,7 +775,7 @@ function TrainingWorkspace({
     } catch {
       setSession((current) => sendTrainingMessage(current, content));
       setRuntimeStatus("fallback");
-      setActionError("本次追问由离线演示引擎回应，不会写入正式能力证据。");
+      setActionError("这条回复来自演示剧本，不计入你的能力记录。");
     } finally {
       setPendingReply(null);
       setBusy(false);
@@ -734,7 +802,7 @@ function TrainingWorkspace({
       setEvaluation(nextEvaluation);
       setRecord(nextRecord);
       setRuntimeStatus("fallback");
-      setActionError("自定义场景已完成本地评估，不会进入正式能力趋势。");
+      setActionError("自定义场景已完成本地评估，不会计入你的能力记录。");
       onRecord(nextRecord);
       setJudgmentSubmissionStage("idle");
       setBusy(false);
@@ -758,7 +826,7 @@ function TrainingWorkspace({
       setEvaluation(nextEvaluation);
       setRecord(nextRecord);
       setRuntimeStatus("fallback");
-      setActionError("服务端评估不可用，已生成本地练习反馈；该结果不会进入正式能力趋势。");
+      setActionError("服务端评估不可用，已生成本地练习反馈；该结果不会计入你的能力记录。");
       onRecord(nextRecord);
     } finally {
       setJudgmentSubmissionStage("idle");
@@ -799,7 +867,7 @@ function TrainingWorkspace({
       const nextRecord = addRetryToHistory(record, retry);
       setRecord(nextRecord);
       setRuntimeStatus("fallback");
-      setActionError("自定义场景复练由本地规则评估，不会进入正式能力趋势。");
+      setActionError("自定义场景复练由本地规则评估，不会计入你的能力记录。");
       onRetry(record.id, retry);
       setBusy(false);
       return;
@@ -833,6 +901,86 @@ function TrainingWorkspace({
 
   const notice = <RuntimeNotice error={actionError} status={runtimeStatus} />;
 
+  const hasUserMessage = session.messages.some((message) => message.role === "user") || pendingReply !== null;
+
+  function composerCard(includeFinish: boolean) {
+    return (
+      <div className={`composer${includeFinish ? " composer-docked" : " composer-static"}`}>
+        <textarea
+          aria-label="你的追问"
+          data-testid="reply-input"
+          disabled={busy || strictExpired}
+          onChange={(event) => setReply(event.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={`你想问这位${scenario.role}什么？例如：谁每天在用这个功能？`}
+          rows={includeFinish ? 3 : 2}
+          value={reply}
+        />
+        <div className="composer-actions">
+          <VoiceInputButton disabled={busy || strictExpired} onTranscript={(text) => setReply((current) => current ? `${current} ${text}` : text)} />
+          <button
+            className="text-button"
+            data-testid="request-hint"
+            disabled={busy || session.mode !== "练习"}
+            onClick={() => setSession((current) => useTrainingHint(current))}
+            type="button"
+          >
+            给我一点提示
+          </button>
+          {includeFinish ? (
+            <button
+              className="button button-secondary"
+              data-testid="finish-interview"
+              disabled={busy || (!strictExpired && session.messages.filter((message) => message.role === "user").length < 1)}
+              onClick={() => setSession((current) => moveToJudgment(current))}
+              type="button"
+            >
+              {strictExpired ? "时间到，提交我的判断" : "结束对话，提交我的判断"}
+            </button>
+          ) : null}
+          <button
+            aria-label="发送追问"
+            className="send-round"
+            data-testid="send-reply"
+            disabled={busy || strictExpired || !reply.trim()}
+            onClick={() => { void sendReply(); }}
+            type="button"
+          >
+            <ArrowUp aria-hidden="true" size={16} weight="bold" />
+          </button>
+          {strictExpired ? <span className="composer-note">本局时间已结束</span> : !reply.trim() ? <span className="composer-note">写下你的问题后即可发送</span> : null}
+        </div>
+      </div>
+    );
+  }
+
+  // 初始态与对话态共用同一条消息流：AI 的开场白必须在两种状态下都可见
+  // （学员要回答的正是这句话）。
+  function messageStream() {
+    return (
+      <div className="message-list" data-testid="message-list" ref={messageListRef}>
+        {session.messages.map((message) => (
+          <article className={`message ${message.role}`} key={message.id}>
+            <span>{message.role === "ai" ? "AI 角色" : "你"}</span>
+            <p>{message.content}</p>
+          </article>
+        ))}
+        {pendingReply ? (
+          <>
+            <article className="message user message-pending" data-testid="pending-user-message">
+              <span>你</span>
+              <p>{pendingReply}</p>
+            </article>
+            <div aria-live="polite" className="message-thinking" data-testid="thinking-indicator" role="status">
+              <span>AI 角色</span>
+              <p>正在思考…</p>
+            </div>
+          </>
+        ) : null}
+      </div>
+    );
+  }
+
   if (evaluation) {
     return (
       <>
@@ -857,6 +1005,7 @@ function TrainingWorkspace({
         {notice}
         <JudgmentForm
           onChange={setJudgment}
+          onFieldTouched={(key) => touchedFieldsRef.current.add(key)}
           onSubmit={() => { void submitCurrentJudgment(); }}
           submissionStage={judgmentSubmissionStage}
           value={judgment}
@@ -868,120 +1017,143 @@ function TrainingWorkspace({
   return (
     <>
       {notice}
-      <div className="training-shell">
-        <section className="briefing surface">
-          <button className="back-button" onClick={onClose} type="button">← 返回</button>
-          <span className="section-kicker">场景简报</span>
-          <h2>{scenario.title}</h2>
-          <p>{scenario.context}</p>
-          {scenario.background?.length ? (
-            <div className="background-block" data-testid="scenario-background">
-              <span className="background-label">业务背景</span>
-              <ul className="background-list">
-                {scenario.background.map((item) => <li key={item}>{item}</li>)}
-              </ul>
-              {scenario.backgroundSource ? (
-                <p className="background-source">背景原型：{scenario.backgroundSource}</p>
-              ) : null}
-            </div>
-          ) : null}
-          <div className="briefing-list">
-            {scenario.briefing.map((item) => <div key={item}><CheckMark /> {item}</div>)}
-          </div>
-          <div className="mode-switch" aria-label="模式选择">
-            {TRAINING_MODE_OPTIONS.map((mode) => (
-              <button
-                aria-pressed={session.mode === mode}
-                className={session.mode === mode ? "active" : ""}
-                disabled={busy}
-                key={mode}
-                onClick={() => { void resetMode(mode); }}
-                type="button"
-              >
-                {mode}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="conversation surface">
-          <div className="conversation-head">
-            <div>
-              <span className="section-kicker">AI 角色</span>
-              <h2>{scenario.role}</h2>
+      <div className="training-chat-shell">
+        <main className={`training-chat-container${hasUserMessage ? "" : " is-empty"}`}>
+          <div className={`chat-topbar${hasUserMessage ? "" : " is-empty"}`}>
+            <button className="back-button" onClick={onClose} type="button">← 返回</button>
+            {hasUserMessage ? (
+              <div className="chat-topbar-titles">
+                <h2 className="chat-title">{scenario.title}</h2>
+                <h3 className="chat-role">AI 角色：{scenario.role}</h3>
+              </div>
+            ) : null}
+            <div className="mode-switch" aria-label="模式选择" data-testid="mode-switch">
+              {TRAINING_MODE_OPTIONS.map((mode) => (
+                <button
+                  aria-pressed={session.mode === mode}
+                  className={session.mode === mode ? "active" : ""}
+                  disabled={busy}
+                  key={mode}
+                  onClick={() => { void resetMode(mode); }}
+                  type="button"
+                >
+                  {mode}
+                </button>
+              ))}
             </div>
             {session.mode === "严格" ? (
               <span className={`strict-timer${strictExpired ? " expired" : ""}`} data-testid="strict-timer">
                 {strictDeadline === null ? "准备计时…" : strictExpired ? "时间到" : `剩余 ${formatCountdown(strictRemaining ?? 0)}`}
               </span>
             ) : <span className="quiet">{busy ? "处理中…" : `${session.mode}模式`}</span>}
+            <p className="mode-hint" data-testid="mode-hint" id="mode-hint">{MODE_HINTS[session.mode]}</p>
           </div>
-          <div className="message-list" data-testid="message-list" ref={messageListRef}>
-            {session.messages.map((message) => (
-              <article className={`message ${message.role}`} key={message.id}>
-                <span>{message.role === "ai" ? "AI 用户" : "你"}</span>
-                <p>{message.content}</p>
-              </article>
-            ))}
-            {pendingReply ? (
-              <>
-                <article className="message user message-pending" data-testid="pending-user-message">
-                  <span>你</span>
-                  <p>{pendingReply}</p>
-                </article>
-                <div aria-live="polite" className="message-thinking" data-testid="thinking-indicator" role="status">
-                  <span>AI 用户</span>
-                  <p>正在思考…</p>
-                </div>
-              </>
-            ) : null}
-          </div>
-          <div className="composer">
-            <textarea
-              aria-label="你的追问"
-              disabled={busy || strictExpired}
-              onChange={(event) => setReply(event.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="提出一个具体问题，Enter 发送，Shift + Enter 换行"
-              rows={3}
-              value={reply}
-            />
-            <div className="composer-actions">
-              <VoiceInputButton disabled={busy || strictExpired} onTranscript={(text) => setReply((current) => current ? `${current} ${text}` : text)} />
-              <button
-                className="text-button"
-                disabled={busy || session.mode !== "练习"}
-                onClick={() => setSession((current) => useTrainingHint(current))}
-                type="button"
-              >
-                给我一个轻提示
-              </button>
-              <button className="button button-primary" disabled={busy || strictExpired || !reply.trim()} onClick={() => { void sendReply(); }} type="button">{busy ? "等待回应" : strictExpired ? "时间已到" : "发送追问"}</button>
-            </div>
-          </div>
-        </section>
 
-        <aside className="training-progress surface">
-          <span className="section-kicker">信息覆盖</span>
-          <div className="coverage-number"><strong>{coverage}%</strong><span>不是最终分数</span></div>
-          <div className="coverage-bar"><i style={{ width: `${coverage}%` }} /></div>
-          <div className="coverage-list">
-            {SKILLS.map((skill) => (
-              <div key={skill.id}>
-                <CheckMark active={session.coveredSkills.includes(skill.id)} />
-                <span>{skill.name}</span>
+          {hasUserMessage ? (
+            <>
+              <section className="briefing chat-opening">
+                <h2>场景简报</h2>
+                <p data-testid="briefing-context">{scenario.context}</p>
+                {scenario.background?.length ? (
+                  <div className="background-block" data-testid="scenario-background">
+                    <span className="background-label">业务背景</span>
+                    <ul className="background-list">
+                      {scenario.background.map((item) => <li key={item}>{item}</li>)}
+                    </ul>
+                    {scenario.backgroundSource ? (
+                      <p className="background-source">背景原型：{scenario.backgroundSource}</p>
+                    ) : null}
+                  </div>
+                ) : null}
+                <div className="briefing-list">
+                  {scenario.briefing.map((item) => <div key={item}><CheckMark /> {item}</div>)}
+                </div>
+              </section>
+
+              {messageStream()}
+
+              {composerCard(true)}
+            </>
+          ) : (
+            <>
+              <section className="briefing chat-hero">
+                <div className="chat-hero-avatar"><ChatTeardropText aria-hidden="true" size={24} weight="fill" /></div>
+                <h2>{scenario.title}</h2>
+                <h3 className="chat-hero-role">AI 角色：{scenario.role}</h3>
+                <p className="chat-hero-sub" data-testid="briefing-context">{scenario.context}</p>
+                <details className="chat-hero-details">
+                  <summary><CaretRight aria-hidden="true" className="chat-hero-caret" size={12} weight="bold" />任务背景与要点</summary>
+                  <div className="chat-hero-details-body">
+                    {scenario.background?.length ? (
+                      <div className="background-block" data-testid="scenario-background">
+                        <span className="background-label">业务背景</span>
+                        <ul className="background-list">
+                          {scenario.background.map((item) => <li key={item}>{item}</li>)}
+                        </ul>
+                        {scenario.backgroundSource ? (
+                          <p className="background-source">背景原型：{scenario.backgroundSource}</p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    <div className="briefing-list">
+                      {scenario.briefing.map((item) => <div key={item}><CheckMark /> {item}</div>)}
+                    </div>
+                  </div>
+                </details>
+              </section>
+
+              {messageStream()}
+
+              {composerCard(false)}
+
+              <div className="chat-suggest">
+                <p className="chat-suggest-head"><Lightning aria-hidden="true" size={12} weight="fill" /> 建议</p>
+                {SUGGESTED_QUESTIONS.map((item) => (
+                  <button
+                    disabled={busy || strictExpired}
+                    key={item.question}
+                    onClick={() => { void sendReply(item.question); }}
+                    type="button"
+                  >
+                    <strong>{item.question}</strong>
+                    <small>{item.hint}</small>
+                  </button>
+                ))}
               </div>
-            ))}
+            </>
+          )}
+        </main>
+
+        <button
+          aria-expanded={showCoveragePanel}
+          className="coverage-toggle"
+          onClick={() => setShowCoveragePanel((current) => !current)}
+          type="button"
+        >
+          覆盖度 <strong data-testid="coverage-summary">{session.coveredSkills.length} / {SKILLS.length}</strong>
+        </button>
+
+        <aside aria-label="信息维度覆盖" className={`coverage-float-panel${showCoveragePanel ? " open" : ""}`}>
+          <div className="coverage-panel-head">
+            <h3>信息维度覆盖</h3>
+            <button aria-label="关闭覆盖度面板" className="coverage-panel-close" onClick={() => setShowCoveragePanel(false)} type="button">×</button>
           </div>
-          <p>覆盖度只表示你是否问到了相关信息，不代表问题质量。</p>
-          <button
-            className="button button-secondary"
-            disabled={busy || (!strictExpired && session.messages.filter((message) => message.role === "user").length < 1)}
-            onClick={() => setSession((current) => moveToJudgment(current))}
-            type="button"
-          >
-            {strictExpired ? "时间到，整理当前判断" : "结束访谈，整理判断"}
-          </button>
+          <div className="coverage-panel-body">
+            <div className="coverage-number"><strong>{session.coveredSkills.length} / {SKILLS.length}</strong><span data-testid="coverage-unit">个信息维度已问到</span></div>
+            <div className="coverage-bar"><i style={{ width: `${coverage}%` }} /></div>
+            <ul className="coverage-list">
+              {SKILLS.map((skill) => (
+                <li className={session.coveredSkills.includes(skill.id) ? "coverage-item hit" : "coverage-item"} data-testid={`coverage-item-${skill.id}`} key={skill.id}>
+                  <CheckMark active={session.coveredSkills.includes(skill.id)} />
+                  <span>{skill.name}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="coverage-panel-foot">
+            <p data-testid="coverage-note">覆盖度只表示你是否问到了相关信息，不代表问题质量。</p>
+            {(!strictExpired && session.messages.filter((message) => message.role === "user").length < 1) ? <span className="progress-note">至少发送一个追问后，即可提交判断</span> : null}
+          </div>
         </aside>
       </div>
     </>
@@ -1036,9 +1208,8 @@ function ReviewPanel({
   if (!records.length) {
     return (
       <section className="empty-state surface">
-        <span className="empty-number">01</span>
         <h2>还没有可以复盘的训练</h2>
-        <p>先完成一次能力诊断，系统会把具体失误时刻带到这里。</p>
+        <p>完成第一次练习后，这里会出现你可以重练的具体环节。</p>
         <button className="button button-primary" onClick={() => onStart(DEFAULT_SCENARIO_ID)} type="button">开始首次训练</button>
       </section>
     );
@@ -1059,7 +1230,7 @@ function ReviewPanel({
             >
               <span>{scenario.shortTitle}</span>
               <small>{record.evaluation.issues[0]?.title ?? "主要行为已覆盖"}</small>
-              <i>{record.retry?.improved ? "已改善" : "待复练"}</i>
+              <i>{record.retry?.improved ? "已改善" : record.retry ? "未达标" : "未复练"}</i>
             </button>
           );
         })}
@@ -1075,18 +1246,18 @@ function ReviewPanel({
               <span className="section-kicker">{scenario.industry}</span>
               <h2>{scenario.title}</h2>
             </div>
-            <span className="status-tag">{selected.retry?.improved ? "已改善" : "待复练"}</span>
+            <span className="status-tag">{selected.retry?.improved ? "已改善" : selected.retry ? "未达标" : "未复练"}</span>
           </div>
           {selectedTampered ? (
             <div className="integrity-warning" data-testid="review-tamper-warning" role="alert">
               <strong>完整性校验失败</strong>
-              <p>这条记录与本地签名不一致（评分可能被人为修改），分数已标记为不可信，且不再计入能力证据与统计。</p>
+              <p>这条记录的分数与服务器签名对不上，可能被人改过；已标记为不可信，也不计入你的能力统计。</p>
             </div>
           ) : selectedVerified ? (
-            <p className="integrity-badge" data-testid="review-integrity-badge">评分由服务端计算并签名，完整性校验通过。</p>
+            <p className="integrity-badge" data-testid="review-integrity-badge">分数由服务器计算并签名，校验通过。</p>
           ) : null}
           <div className="review-metrics">
-            <div><span>行为证据分</span><strong>{selectedTampered ? "不可信" : selected.totalScore}</strong></div>
+            <div><span>本次得分（附证据）</span><strong>{selectedTampered ? "不可信" : selected.totalScore}</strong></div>
             <div><span>诊断模式</span><strong>{selected.mode}</strong></div>
             <div><span>复练结果</span><strong>{selected.retry?.improved ? "改善" : selected.retry ? "未达标" : "未复练"}</strong></div>
           </div>
@@ -1129,7 +1300,7 @@ function ReviewPanel({
           {teamNotes.length ? (
             <div className="team-notes review-team-notes" data-testid="review-team-notes">
               <span className="section-kicker">团队负责人 / 导师点评</span>
-              <p>以下点评由团队成员以他们自己的账号留下，不改变模型评分。</p>
+              <p>点评由团队负责人或导师以他们自己的账号留下，不改变模型评分。</p>
               {teamNotes.map((note) => (
                 <blockquote data-testid={`review-team-note-${note.id}`} key={note.id}>
                   <strong>{note.author}</strong>
@@ -1142,7 +1313,7 @@ function ReviewPanel({
           <div className="mentor-note-panel">
             <div>
               <span className="section-kicker">本账号备注</span>
-              <p>这里只以当前账号保存个人备注，不改变模型评分；负责人/导师对成员的点评请在团队面板以他们自己的账号留下。</p>
+              <p>备注只保存在当前账号，不改变模型评分。</p>
             </div>
             {selected.mentorNote ? (
               <blockquote data-testid="mentor-note">
@@ -1217,9 +1388,11 @@ function ReviewPanel({
 function AbilityPanel({
   records,
   onOpenReview,
+  onGoToday,
 }: {
   records: TrainingHistoryRecord[];
   onOpenReview: () => void;
+  onGoToday: () => void;
 }) {
   const formalProfile = buildAbilityProfile(records.filter((record) => record.engine === "openai"), { formalEvidenceOnly: true });
   const practiceProfile = buildAbilityProfile(records);
@@ -1231,35 +1404,42 @@ function AbilityPanel({
     <div className="ability-layout">
       <section className="ability-summary surface-dark">
         <div>
-          <span className="section-kicker light">专项训练证据</span>
-          <h2>{practiceProfile.completedCount ? `专项训练已留下 ${practiceProfile.completedCount} 条记录，其中 ${formalProfile.completedCount} 条进入正式能力趋势` : "完成首次专项训练，建立能力基线"}</h2>
-          <p>{practiceProfile.completedCount ? practiceProfile.nextTraining : "这里仅统计今日训练和训练地图中的专项练习，不包含上方的世界工作台判断证据。离线或降级结果只作为练习反馈。"}</p>
+          
+          <h2>{practiceProfile.completedCount ? `专项训练已留下 ${practiceProfile.completedCount} 条记录，其中 ${formalProfile.completedCount} 条计入能力记录` : "完成首次专项训练，建立能力基线"}</h2>
+          <p>{practiceProfile.completedCount ? practiceProfile.nextTraining : "这里只统计今日训练和训练地图里的专项练习，不包含上面情境对话的判断记录；演示或降级的结果只作为练习反馈。"}</p>
           <p className="ability-summary-note">
             {latestImprovementSkill ? `最近改善：${latestImprovementSkill}。` : "最近改善：完成一次复练后显示。"}
             {formalProfile.completedCount ? " 正式趋势只统计模型完成的训练。" : " 当前状态包含练习反馈，正式趋势仍需模型训练证据。"}
           </p>
-          <button className="button button-light" onClick={onOpenReview} type="button">
-            查看全部训练记录
-          </button>
-        </div>
-        <div className="summary-stats">
-          <div><strong>{practiceProfile.completedCount}</strong><span>专项练习记录</span></div>
-          <div><strong>{formalProfile.completedCount}</strong><span>进入正式趋势</span></div>
-          <div><strong>{formalProfile.improvedCount}</strong><span>专项练习改善</span></div>
+          {practiceProfile.completedCount ? (
+            <>
+              <button className="button button-light" onClick={onOpenReview} type="button">
+                查看全部训练记录
+              </button>
+              <div className="summary-stats">
+                <div><strong>{practiceProfile.completedCount}</strong><span>专项练习记录</span></div>
+                <div><strong>{formalProfile.completedCount}</strong><span>计入能力记录的次数</span></div>
+                <div><strong>{formalProfile.improvedCount}</strong><span>专项练习改善</span></div>
+              </div>
+            </>
+          ) : (
+            <button className="button button-light" onClick={onGoToday} type="button">
+              去开始第一次练习
+            </button>
+          )}
         </div>
       </section>
       <section className="surface ability-table">
         <div className="section-heading">
           <div>
-            <span className="section-kicker">五项产品发现能力</span>
+            
             <h2>每个状态都能回到具体训练证据</h2>
           </div>
         </div>
-        {practiceProfile.skills.map((skill, index) => {
+        {practiceProfile.skills.map((skill) => {
           const formalSkill = formalProfile.skills.find((item) => item.id === skill.id);
           return (
           <article data-testid={`ability-skill-${skill.id}`} key={skill.id}>
-            <span className="skill-index">0{index + 1}</span>
             <div>
               <h3>{skill.name}</h3>
               <p>{skill.latestEvidence}</p>
@@ -1268,7 +1448,7 @@ function AbilityPanel({
               <span>{skill.evidenceCount} 条练习证据</span>
               <span>{formalSkill?.evidenceCount ?? 0} 条正式证据</span>
             </div>
-            <span className={`mastery mastery-${skill.state}`}>{skill.state}</span>
+            <span className={`mastery mastery-${MASTERY_CLASS[skill.state]}`} data-testid={`mastery-${skill.id}`}>{MASTERY_LABEL[skill.state]}</span>
           </article>
           );
         })}
@@ -1293,7 +1473,7 @@ export function AppShell({
   const [multiRoleOpen, setMultiRoleOpen] = useState(false);
   const [resourceHubOpen, setResourceHubOpen] = useState(false);
   const [resourceHubTab, setResourceHubTab] = useState<HubTab>("community");
-  const [llmConfigOpen, setLlmConfigOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [customScenarios, setCustomScenarios] = useState<TrainingScenario[]>([]);
   // #4 世界工作台：null = 未激活，string = 目标 world_id
   const [activeWorkbenchWorldId, setActiveWorkbenchWorldId] = useState<string | null>(null);
@@ -1309,7 +1489,6 @@ export function AppShell({
   const [storageReady, setStorageReady] = useState(false);
   // FB-014：服务端签名校验结果（本地记录可能被篡改，校验只能在服务端完成）。
   const [integrityResults, setIntegrityResults] = useState<Record<string, "valid" | "invalid">>({});
-  const [historyStatus, setHistoryStatus] = useState<"loading" | "server" | "local">("loading");
   const topbarRef = useRef<HTMLElement>(null);
   const meta = getViewMeta(view);
   const storageKey = `${STORAGE_KEY}:${userId}`;
@@ -1367,19 +1546,16 @@ export function AppShell({
 
     if (userSource === "demo" && cachedRecords.length) {
       setHistoryRecords(cachedRecords);
-      setHistoryStatus("local");
     }
 
     fetchRemoteHistory()
       .then((remoteRecords) => {
         if (cancelled) return;
         setHistoryRecords(userSource === "supabase" ? remoteRecords : mergeHistoryRecords(remoteRecords, cachedRecords));
-        setHistoryStatus("server");
       })
       .catch(() => {
         if (cancelled) return;
         setHistoryRecords(userSource === "supabase" ? [] : cachedRecords);
-        setHistoryStatus("local");
       })
       .finally(() => { if (!cancelled) setStorageReady(true); });
 
@@ -1431,14 +1607,14 @@ export function AppShell({
     setCourseOpen(false);
     setMultiRoleOpen(false);
     setResourceHubOpen(false);
-    setLlmConfigOpen(false);
+    setSettingsOpen(false);
     setView("review");
   }
 
   function addRecord(record: TrainingHistoryRecord) {
     setHistoryRecords((current) => mergeHistoryRecords([record], current));
     if (record.engine === "deterministic") {
-      void syncDeterministicRecord(record).catch(() => setHistoryStatus("local"));
+      void syncDeterministicRecord(record).catch(() => undefined);
     }
   }
 
@@ -1453,7 +1629,7 @@ export function AppShell({
     }
     setHistoryRecords((current) => current.map((record) => record.id === recordId ? nextRecord : record));
     if (nextRecord.engine === "deterministic") {
-      void syncDeterministicRecord(nextRecord).catch(() => setHistoryStatus("local"));
+      void syncDeterministicRecord(nextRecord).catch(() => undefined);
     }
   }
 
@@ -1463,7 +1639,7 @@ export function AppShell({
     const nextRecord = { ...currentRecord, mentorNote };
     setHistoryRecords((current) => current.map((record) => record.id === recordId ? nextRecord : record));
     if (nextRecord.engine === "deterministic") {
-      void syncDeterministicRecord(nextRecord).catch(() => setHistoryStatus("local"));
+      void syncDeterministicRecord(nextRecord).catch(() => undefined);
     }
   }
 
@@ -1492,7 +1668,7 @@ export function AppShell({
 
   const activeCustomScenario = activeTraining ? customScenarios.find((scenario) => scenario.id === activeTraining.scenarioId) : undefined;
   const pageTitle = activeWorkbenchWorldId
-    ? "世界工作台"
+    ? "情境对话"
     : activeTraining
     ? (activeCustomScenario ?? getScenario(activeTraining.scenarioId)).shortTitle
     : resourceHubOpen
@@ -1505,7 +1681,7 @@ export function AppShell({
     ? "产品资料生成实验"
     : meta.title;
   const pageDescription = activeWorkbenchWorldId
-    ? "调查、承诺、揭示后果，围绕世界规则工作。"
+    ? "先调查、再判断、最后看后果，在模拟业务情境里完整走一遍。"
     : activeTraining
     ? "一次只训练一个主要能力，先理解问题，再做判断。"
     : resourceHubOpen
@@ -1524,19 +1700,18 @@ export function AppShell({
     [teamViewRecords, historyRecords]
   );
   // FB-014：只有服务端签名且校验通过的记录才作为正式能力证据；
-  // 被篡改的记录（invalid）与本地降级/无签名记录（undefined）都不计入正式能力趋势。
+  // 被篡改的记录（invalid）与本地降级/无签名记录（undefined）都不计入你的能力记录。
   const trustedRecords = useMemo(
     () => historyRecords.filter((record) => integrityResults[record.id] === "valid"),
     [historyRecords, integrityResults]
   );
-  const sourceLabel = historyStatus === "loading" ? "正在同步" : historyStatus === "server" ? "服务端记录" : "本地缓存";
   const nextWorkbenchWorld = useMemo(
     () => getNextIncompleteDemoWorld(completedWorldIds),
     [completedWorldIds]
   );
   const displayedNextChallenge = nextChallengeSelection ?? {
     world_title: nextWorkbenchWorld.title,
-    reason: "按本地世界进度继续挑战。",
+    reason: "按本地情境进度继续挑战。",
     world_id: nextWorkbenchWorld.world_id,
   };
 
@@ -1551,10 +1726,11 @@ export function AppShell({
           </div>
         </div>
         <nav aria-label="主导航">
-          {NAV_ITEMS.map((item, index) => (
+          {NAV_ITEMS.map((item) => (
             <button
               aria-current={!activeTraining && item.view === view ? "page" : undefined}
               className={!activeTraining && item.view === view ? "active" : ""}
+              data-testid={`nav-${item.view}`}
               key={item.view}
               onClick={() => {
                 setActiveTraining(null);
@@ -1564,13 +1740,12 @@ export function AppShell({
                 setCourseOpen(false);
                 setMultiRoleOpen(false);
                 setResourceHubOpen(false);
-                setLlmConfigOpen(false);
+                setSettingsOpen(false);
                 setReviewFocusRecordId("");
                 setView(item.view);
               }}
               type="button"
             >
-              <span>0{index + 1}</span>
               <div><strong>{item.label}</strong><small>{item.hint}</small></div>
             </button>
           ))}
@@ -1578,7 +1753,7 @@ export function AppShell({
         <div className="sidebar-footer">
           <div className="sidebar-user">
             <strong>{userName}</strong>
-            <span>产品练习生 · {sourceLabel}</span>
+            <span>产品练习生</span>
           </div>
           <div className="sidebar-week">
             <span>本周训练</span>
@@ -1587,8 +1762,9 @@ export function AppShell({
           </div>
           <button
             className="sidebar-setting-button"
+            data-testid="sidebar-settings"
             onClick={() => {
-              setLlmConfigOpen(true);
+              setSettingsOpen(true);
               setCourseOpen(false);
               setMultiRoleOpen(false);
               setResourceHubOpen(false);
@@ -1599,7 +1775,7 @@ export function AppShell({
             }}
             type="button"
           >
-            ⚙ 模型设置
+            <GearSix aria-hidden="true" size={15} /> 设置
           </button>
           <SignOutButton />
         </div>
@@ -1611,23 +1787,27 @@ export function AppShell({
             <h1>{pageTitle}</h1>
             <p>{pageDescription}</p>
           </div>
-          <button
-            aria-label="打开设置"
-            className="topbar-settings-button"
-            onClick={() => {
-              setLlmConfigOpen(true);
-              setCourseOpen(false);
-              setMultiRoleOpen(false);
-              setResourceHubOpen(false);
-              setProductExperimentOpen(false);
-              setCustomScenarioBuilderOpen(false);
-              setActiveTraining(null);
-              setActiveWorkbenchWorldId(null);
-            }}
-            type="button"
-          >
-            ⚙ 设置
-          </button>
+          <div className="topbar-actions">
+            <FeedbackWidget />
+            <button
+              aria-label="打开设置"
+              className="topbar-settings-button"
+              data-testid="open-settings"
+              onClick={() => {
+                setSettingsOpen(true);
+                setCourseOpen(false);
+                setMultiRoleOpen(false);
+                setResourceHubOpen(false);
+                setProductExperimentOpen(false);
+                setCustomScenarioBuilderOpen(false);
+                setActiveTraining(null);
+                setActiveWorkbenchWorldId(null);
+              }}
+              type="button"
+            >
+              <GearSix aria-hidden="true" size={15} /> 设置
+            </button>
+          </div>
         </header>
         <div className="content">
           {activeWorkbenchWorldId !== null ? (
@@ -1671,8 +1851,8 @@ export function AppShell({
             <CoursePanel onClose={() => setCourseOpen(false)} userId={userId} />
           ) : productExperimentOpen ? (
             <ProductMaterialExperiment onClose={() => setProductExperimentOpen(false)} />
-          ) : llmConfigOpen ? (
-            <LlmConfigPanel onClose={() => setLlmConfigOpen(false)} />
+          ) : settingsOpen ? (
+            <SettingsPanel onClose={() => setSettingsOpen(false)} userName={userName} userSource={userSource} />
           ) : view === "today" ? (
             <TodayPanel
               onOpenReview={() => setView("review")}
@@ -1705,16 +1885,15 @@ export function AppShell({
             // #6 新链路：判断证据画像（替换旧 totalScore / 雷达图）
             // 旧 AbilityPanel 保留供旧训练链路使用
             <div className="stack-lg">
-              <TeamWorkspacePanel draft={mentorDraft} onDraftChange={setMentorDraft} onViewRecord={viewTeamRecord} userId={userId} userName={userName} />
               <div className="ability-layout">
                 <JudgmentProfilePanel />
-                <AbilityPanel onOpenReview={() => setView("review")} records={trustedRecords} />
+                <AbilityPanel onGoToday={() => setView("today")} onOpenReview={() => setView("review")} records={trustedRecords} />
               </div>
+              <TeamWorkspacePanel draft={mentorDraft} onDraftChange={setMentorDraft} onViewRecord={viewTeamRecord} userId={userId} userName={userName} />
             </div>
           ) : null}
         </div>
       </section>
-      <FeedbackWidget />
     </main>
   );
 }

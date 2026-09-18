@@ -21,7 +21,7 @@ test("shows why the register button is disabled (FB-001)", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tab", { name: "注册" }).click();
 
-  const register = page.getByRole("button", { name: "注册", exact: true });
+  const register = page.getByTestId("auth-submit");
   const hint = page.getByTestId("login-submit-hint");
 
   // 空表单：按钮置灰，但必须给出可见原因

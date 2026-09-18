@@ -65,7 +65,7 @@ const readProbe = (page: Page) => page.evaluate(() => (window as unknown as { __
 /** 进入训练对话，让语音输入按钮出现在「你的追问」输入框旁 */
 async function openComposer(page: Page) {
   await enterApp(page);
-  await page.getByRole("button", { name: "开始 3 分钟诊断", exact: true }).click();
+  await page.getByTestId("start-today-training").click();
   await page.getByRole("button", { name: "语音输入", exact: true }).waitFor();
 }
 

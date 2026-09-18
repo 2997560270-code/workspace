@@ -11,6 +11,6 @@ export async function GET() {
     return Response.json({ selection });
   } catch (error) {
     captureServerException(error, { area: "next_challenge_selection" });
-    return apiError("无法选择下一挑战，请稍后重试。", 503);
+    return apiError("暂时无法选择下一个情境，请稍后重试。", 503);
   }
 }

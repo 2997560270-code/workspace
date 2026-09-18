@@ -71,7 +71,7 @@ export type JudgmentProfile = {
 
 // ── 置信度标签映射 ────────────────────────────────────────────────
 const CONFIDENCE_LABELS: Record<HypothesisConfidence, string> = {
-  high:         "高置信度（多世界独立证据一致）",
+  high:         "高置信度（多个情境的独立证据一致）",
   medium:       "中置信度（有证据，仍需验证）",
   low:          "低置信度（证据有限）",
   insufficient: "证据不足",

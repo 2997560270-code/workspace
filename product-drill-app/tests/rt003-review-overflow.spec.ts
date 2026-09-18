@@ -16,10 +16,10 @@ const LONG_UNBREAKABLE = "https://example.com/very/long/path/segment/without/any
 async function submitWithLongText(page: Page, viewportWidth: number) {
   await page.setViewportSize({ width: viewportWidth, height: 900 });
   await enterApp(page);
-  await page.getByRole("button", { name: "开始 3 分钟诊断", exact: true }).click();
+  await page.getByTestId("start-today-training").click();
   await page.getByRole("textbox", { name: "你的追问", exact: true }).fill("谁每天使用报表，谁负责最终决策？");
   await page.getByRole("button", { name: "发送追问", exact: true }).click();
-  await page.getByRole("button", { name: "结束访谈，整理判断", exact: true }).click();
+  await page.getByTestId("finish-interview").click();
   await page.getByRole("textbox", { name: "核心问题", exact: true }).fill(LONG_UNBREAKABLE);
   await page.getByRole("textbox", { name: "建议行动", exact: true }).fill(LONG_UNBREAKABLE);
   await page.getByRole("button", { name: "提交判断并查看反馈", exact: true }).click();

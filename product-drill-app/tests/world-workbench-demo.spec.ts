@@ -52,7 +52,7 @@ async function completeCurrentWorld(page: import("@playwright/test").Page, world
 test("demo world workbench records an action without falling back to the browser-only mode", async ({ page }) => {
   await enterApp(page);
 
-  await page.getByRole("button", { name: "进入世界工作台" }).click();
+  await page.getByTestId("open-world-workbench").click();
   await expect(
     page.getByRole("heading", { level: 2, name: "高权威需求方要求立即增加 AI 摘要" })
   ).toBeVisible();
@@ -82,7 +82,7 @@ test("demo world workbench records an action without falling back to the browser
 
 test("short learner messages keep a content-sized bubble", async ({ page }) => {
   await enterApp(page);
-  await page.getByRole("button", { name: "进入世界工作台" }).click();
+  await page.getByTestId("open-world-workbench").click();
 
   await page
     .getByPlaceholder("提出调查问题或采取行动，Enter 发送，Shift+Enter 换行")
@@ -111,7 +111,7 @@ test("short learner messages keep a content-sized bubble", async ({ page }) => {
 
 test("desktop completes world 1 to 2 to 3 and opens the judgment profile", async ({ page }) => {
   await enterApp(page);
-  await page.getByRole("button", { name: "进入世界工作台" }).click();
+  await page.getByTestId("open-world-workbench").click();
 
   for (let index = 0; index < WORLD_TITLES.length; index += 1) {
     await expect(page.getByRole("heading", { level: 2, name: WORLD_TITLES[index] })).toBeVisible();
@@ -129,12 +129,12 @@ test("desktop completes world 1 to 2 to 3 and opens the judgment profile", async
 
   await expect(page.getByRole("heading", { level: 1, name: "我的能力" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 3, name: "premature_solution_commitment" })).toBeVisible();
-  await expect(page.getByText("Rubric 0.3.0", { exact: true })).toBeVisible();
-  await expect(page.getByText("尚无证据，完成世界工作台训练后自动更新。", { exact: true })).toBeVisible();
+  await expect(page.getByText("评分版本 0.3.0", { exact: true })).toBeVisible();
+  await expect(page.getByText("尚无证据，完成情境对话后自动更新。", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /查看证据/ })).toHaveCount(0);
 
   await page.getByRole("button", { name: /复盘与复练/ }).click();
-  await expect(page.getByRole("heading", { level: 2, name: "世界决策记录" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "情境决策记录" })).toBeVisible();
   for (const title of WORLD_TITLES) {
     await expect(page.getByText(title, { exact: true })).toBeVisible();
   }
@@ -142,36 +142,36 @@ test("desktop completes world 1 to 2 to 3 and opens the judgment profile", async
   await page.getByRole("button", { name: new RegExp(WORLD_TITLES[0]) }).first().click();
   const timeline = page.getByLabel("决策与后果时间线");
   await expect(timeline).toBeVisible();
-  await expect(timeline.getByText("World", { exact: true })).toBeVisible();
-  await expect(timeline.getByText("Rubric", { exact: true })).toBeVisible();
-  await expect(timeline.getByText("Model", { exact: true })).toBeVisible();
+  await expect(timeline.getByText("情境", { exact: true })).toBeVisible();
+  await expect(timeline.getByText("评分版本", { exact: true })).toBeVisible();
+  await expect(timeline.getByText("模型", { exact: true })).toBeVisible();
   await expect(timeline.getByText("提交决策", { exact: true })).toBeVisible();
   await expect(timeline.getByText("后果已揭示", { exact: true })).toBeVisible();
 });
 
 test("shows the three-world progression track and allows switching worlds (FB-007)", async ({ page }) => {
   await enterApp(page);
-  await page.getByRole("button", { name: "进入世界工作台" }).click();
+  await page.getByTestId("open-world-workbench").click();
 
   // 三个世界的概念说明与进度必须可见
   const track = page.getByTestId("wb-world-track");
   await expect(track).toBeVisible();
-  await expect(track).toContainText("世界 1、2、3 依次验证同一个底层判断习惯");
-  await expect(track.getByText("世界 1", { exact: true })).toBeVisible();
-  await expect(track.getByText("世界 2", { exact: true })).toBeVisible();
-  await expect(track.getByText("世界 3", { exact: true })).toBeVisible();
+  await expect(track).toContainText("情境 1、2、3 依次验证同一个判断习惯");
+  await expect(track.getByText("情境 1", { exact: true })).toBeVisible();
+  await expect(track.getByText("情境 2", { exact: true })).toBeVisible();
+  await expect(track.getByText("情境 3", { exact: true })).toBeVisible();
 
-  // 当前为世界 1：进行中；其余未开始；点击世界 2 可切换并展示对应标题
+  // 当前为情境 1：进行中；其余未开始；点击情境 2 可切换并展示对应标题
   await expect(track.getByText("进行中")).toHaveCount(1);
   await expect(track.getByText("未开始")).toHaveCount(2);
-  await track.getByRole("button", { name: /世界 2/ }).click();
+  await track.getByRole("button", { name: /情境 2/ }).click();
   await expect(page.getByRole("heading", { level: 2, name: WORLD_TITLES[1] })).toBeVisible();
   await expect(page.getByTestId("wb-world-track").getByText("进行中")).toHaveCount(1);
 });
 
 test("rejects meaningless decision input instead of revealing positive consequences (FB-013)", async ({ page }) => {
   await enterApp(page);
-  await page.getByRole("button", { name: "进入世界工作台" }).click();
+  await page.getByTestId("open-world-workbench").click();
   const input = page.getByPlaceholder("提出调查问题或采取行动，Enter 发送，Shift+Enter 换行");
   // 先取得一条有效调查证据，才能进入决策阶段（FB-013 的闸门）。
   await input.fill("现有摘要的使用情况怎么样？使用率是多少？");
@@ -215,7 +215,7 @@ test("locally completed worlds appear in the decision history as local demo reco
   await page.getByRole("heading", { level: 1, name: "今天，练会一个真正的产品判断" }).waitFor();
 
   await page.getByRole("button", { name: /复盘与复练/ }).click();
-  await expect(page.getByRole("heading", { level: 2, name: "世界决策记录" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "情境决策记录" })).toBeVisible();
   await expect(page.getByText("高权威需求方要求立即增加 AI 摘要", { exact: true })).toBeVisible();
   await expect(page.getByTestId("world-history-local")).toContainText("本地演示记录");
 
@@ -227,7 +227,7 @@ test("locally completed worlds appear in the decision history as local demo reco
 test("mobile viewport can complete the governed three-world loop", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await enterApp(page);
-  await page.getByRole("button", { name: "进入世界工作台" }).click();
+  await page.getByTestId("open-world-workbench").click();
 
   for (let index = 0; index < WORLD_TITLES.length; index += 1) {
     await expect(page.locator(".wb-header h2")).toHaveCount(1);

@@ -132,7 +132,7 @@ function buildCounterfactualContent(
   return (
     `反事实路径：在"${worldTrigger}"中，如果在做出"${decision.chosen_action}"之前先：\n\n` +
     exploredPath +
-    `\n\n你可能获得的信息会是……（以下基于已知世界规则的推演）\n` +
+    `\n\n你可能获得的信息会是……（以下基于已知情境规则的推演）\n` +
     `这条路径与你实际选择的路径不同，` +
     `不意味着哪种判断更正确，而是帮助你看到信息缺口如何影响决策方向。`
   );
@@ -145,7 +145,7 @@ function buildRevealConsequenceContent(
   return (
     `后果回放：在"${worldTrigger}"情境中，` +
     `你选择了"${decision.chosen_action}"，预期结果为"${decision.expected_outcome}"。\n\n` +
-    `实际世界响应已解锁。请对照你的预期，` +
+    `实际响应已解锁。请对照你的预期，` +
     `观察哪些因果关系你已预见，哪些超出了你当时的信息边界。`
   );
 }
