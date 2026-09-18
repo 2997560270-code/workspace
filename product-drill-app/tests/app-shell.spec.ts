@@ -41,5 +41,5 @@ test("keeps the world workbench heading in the mobile viewport", async ({ page }
   });
   await page.getByTestId("open-world-workbench").click();
 
-  await expect(page.getByRole("heading", { level: 1, name: "世界工作台" })).toBeInViewport();
+  await expect(page.getByRole("heading", { level: 1, name: "情境对话" })).toBeInViewport();
 });

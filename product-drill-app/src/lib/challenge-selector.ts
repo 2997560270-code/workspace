@@ -82,7 +82,7 @@ export function selectNextChallenge(
       is_transfer_test: false,
       is_remediation: false,
       loop_complete: false,
-      reason: "尚未完成任何世界，从校准世界（calibration）开始建立行为基线。",
+      reason: "还没有完成任何情境，先从基线情境开始，建立你的行为基线。",
     };
   }
 
@@ -125,7 +125,7 @@ export function selectNextChallenge(
       loop_complete: false,
       reason:
         `假设置信度为 "${hypothesis.confidence}"，未达到迁移测试门槛。` +
-        `返回 ${remediationTarget.world_id} 进行修正练习（同世界理解反馈，不产生迁移证据）。`,
+        `返回 ${remediationTarget.world_id} 进行修正练习（同一情境内的理解反馈，不产生迁移证据）。`,
     };
   }
 
@@ -145,8 +145,8 @@ export function selectNextChallenge(
         is_remediation: false,
         loop_complete: false,
         reason:
-          `已完成前置世界，假设置信度为 "${hypothesis.confidence}"，` +
-          `满足迁移测试条件，进入陌生领域世界 ${world.world_id}。`,
+          `已完成前置情境，假设置信度为 "${hypothesis.confidence}"，` +
+          `满足迁移测试条件，进入新领域情境 ${world.world_id}。`,
       };
     }
 
@@ -156,7 +156,7 @@ export function selectNextChallenge(
       is_transfer_test: false,
       is_remediation: false,
       loop_complete: false,
-      reason: `已完成 ${completedSet.size} 个世界，下一个按顺序进入 ${world.transfer_role} 世界 ${world.world_id}。`,
+      reason: `已完成 ${completedSet.size} 个情境，按顺序进入下一个情境 ${world.world_id}。`,
     };
   }
 
@@ -168,6 +168,6 @@ export function selectNextChallenge(
     is_transfer_test: false,
     is_remediation: false,
     loop_complete: false,
-    reason: "暂时没有可进入的新世界。",
+    reason: "暂时没有可进入的新情境。",
   };
 }

@@ -68,6 +68,12 @@ import {
 
 // ── 类型 ──────────────────────────────────────────────────────────
 
+const TRANSFER_ROLE_LABELS: Record<WorldSeed["transfer_role"], string> = {
+  calibration: "基线轮",
+  intervention: "修正轮",
+  transfer_test: "迁移轮",
+};
+
 type Message = {
   id: string;
   role: "user" | "world";
@@ -201,7 +207,7 @@ function DecisionForm({
     <div className="wb-decision-form surface">
       <span className="section-kicker">决策承诺（后果揭示前必须完成）</span>
       <p className="wb-form-notice">
-        在这里写下你的判断和行动方案。提交后才会揭示世界的实际后果，不可撤回。
+        在这里写下你的判断和行动方案。提交后才会揭示情境的实际后果，不可撤回。
       </p>
 
       {field("你的判断（问题是什么）", "judgment", "例如：真正的问题是数据编码不一致，而不是缺少展示工具", 3)}
@@ -547,7 +553,7 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete, complet
   function enterCommitPhase() {
     // FB-013：无有效调查证据时不得进入决策承诺阶段，避免任意输入得到正面后果。
     if (eligibleEvidenceEventIds.length === 0) {
-      setError("你还没有获得任何有效调查证据，无法提交决策。请先围绕当前流程、用户、使用现状、风险或替代方案向世界提问，确认至少一条世界事实（提示可帮助你标记证据）。");
+      setError("你还没有获得任何有效调查证据，无法提交决策。请先围绕当前流程、用户、使用现状、风险或替代方案提问，确认至少一条可引用的事实（提示可帮助你标记证据）。");
       return;
     }
     setState((prev) => prev ? commitToDecisionPhase(prev) : prev);
@@ -585,7 +591,7 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete, complet
       }
       setMessages((prev) => [
         ...prev,
-        worldMessage("✅ 决策已提交。点击「揭示后果」查看世界的实际反应。"),
+        worldMessage("✅ 决策已提交。点击「揭示后果」查看对方的实际反应。"),
       ]);
     } catch (err) {
       // FB-013：服务端明确拒绝（4xx 校验失败）是真实错误，不能当作演示模式静默生成本地决策，
@@ -621,7 +627,7 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete, complet
     if (!state?.run_id || !state.decision_event_id || busy) return;
     // FB-013：无有效证据不得揭示后果，防止「无效输入 → 正面后果」失真。
     if (eligibleEvidenceEventIds.length === 0) {
-      setError("你还没有获得任何有效调查证据，无法揭示后果。请先回到调查阶段，围绕当前流程、用户、使用现状、风险或替代方案确认至少一条世界事实后再提交决策。");
+      setError("你还没有获得任何有效调查证据，无法揭示后果。请先回到调查阶段，围绕当前流程、用户、使用现状、风险或替代方案确认至少一条可引用的事实后再提交决策。");
       return;
     }
     setBusy(true);
@@ -784,7 +790,7 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete, complet
   if (!world || !state) {
     return (
       <div className="wb-loading surface">
-        <p>加载世界中…</p>
+        <p>加载情境中…</p>
       </div>
     );
   }
@@ -801,7 +807,7 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete, complet
         <div className="wb-header-left">
           <button className="back-button" onClick={onClose} type="button">← 返回</button>
           <div>
-            <span className="section-kicker">世界 {worldNumber} / {DEMO_WORLDS.length} · {world.domain} · {world.transfer_role}</span>
+            <span className="section-kicker">情境 {worldNumber} / {DEMO_WORLDS.length} · {world.domain} · {TRANSFER_ROLE_LABELS[world.transfer_role]}</span>
             <h2>{world.title}</h2>
           </div>
         </div>
@@ -809,9 +815,9 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete, complet
       </header>
 
       {/* FB-007：三个世界的概念与推进进度必须可见、可切换 */}
-      <nav aria-label="三个世界的推进进度" className="wb-world-track" data-testid="wb-world-track">
+      <nav aria-label="三个情境的推进进度" className="wb-world-track" data-testid="wb-world-track">
         <p className="wb-world-track-intro">
-          世界 1、2、3 依次验证同一个底层判断习惯：先调查、再承诺。按顺序完成，也可以随时回到任一世界重练。
+          情境 1、2、3 依次验证同一个判断习惯：先调查、再承诺。按顺序完成，也可以随时回到任一情境重练。
         </p>
         <ol>
           {DEMO_WORLDS.map((item, index) => {
@@ -828,7 +834,7 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete, complet
                   title={item.title}
                   type="button"
                 >
-                  <strong>世界 {index + 1}</strong>
+                  <strong>情境 {index + 1}</strong>
                   <span className="wb-world-step-title">{item.title}</span>
                   <span className="wb-world-status" data-testid={`wb-world-status-${item.world_id}`}>{status}</span>
                 </button>
@@ -855,7 +861,7 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete, complet
             {messages.map((m) => (
               <article className={`wb-message wb-message-${m.role}`} key={m.id}>
                 <span className="wb-message-role">
-                  {m.role === "world" ? "世界" : "你"}
+                  {m.role === "world" ? "对方" : "你"}
                 </span>
                 <p>{m.content}</p>
               </article>
@@ -993,7 +999,7 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete, complet
               {loopComplete && (
                 <div className="wb-next-challenge" role="status">
                   <span className="detail-label">本情境已完成</span>
-                  <strong>三个世界的判断证据已保存</strong>
+                  <strong>三个情境的判断证据已保存</strong>
                   <p>{nextChallenge?.reason}</p>
                 </div>
               )}
@@ -1019,7 +1025,7 @@ export function WorldWorkbench({ initialWorldId, onClose, onRunComplete, complet
                   : nextChallenge?.is_remediation
                   ? "进入修正练习"
                   : nextWorld
-                    ? "进入下一个世界"
+                    ? "进入下一个情境"
                     : "完成练习，查看我的判断报告"}
               </button>
             </div>

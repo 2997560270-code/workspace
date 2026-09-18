@@ -1569,7 +1569,7 @@ export function AppShell({
 
   const activeCustomScenario = activeTraining ? customScenarios.find((scenario) => scenario.id === activeTraining.scenarioId) : undefined;
   const pageTitle = activeWorkbenchWorldId
-    ? "世界工作台"
+    ? "情境对话"
     : activeTraining
     ? (activeCustomScenario ?? getScenario(activeTraining.scenarioId)).shortTitle
     : resourceHubOpen
@@ -1582,7 +1582,7 @@ export function AppShell({
     ? "产品资料生成实验"
     : meta.title;
   const pageDescription = activeWorkbenchWorldId
-    ? "调查、承诺、揭示后果，围绕世界规则工作。"
+    ? "先调查、再判断、最后看后果，在模拟业务情境里完整走一遍。"
     : activeTraining
     ? "一次只训练一个主要能力，先理解问题，再做判断。"
     : resourceHubOpen
@@ -1612,7 +1612,7 @@ export function AppShell({
   );
   const displayedNextChallenge = nextChallengeSelection ?? {
     world_title: nextWorkbenchWorld.title,
-    reason: "按本地世界进度继续挑战。",
+    reason: "按本地情境进度继续挑战。",
     world_id: nextWorkbenchWorld.world_id,
   };
 

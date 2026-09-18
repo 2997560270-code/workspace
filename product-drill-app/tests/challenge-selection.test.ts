@@ -50,7 +50,7 @@ describe("selectNextChallengeForUser", () => {
     expect(selection.world_id).toBe("world-1-ai-summary");
     expect(selection.loop_complete).toBe(false);
     expect(selection.transfer_role).toBe("calibration");
-    expect(selection.reason).toContain("校准世界");
+    expect(selection.reason).toContain("基线情境");
   });
 
   it("chooses the intervention world after calibration even with insufficient evidence", async () => {

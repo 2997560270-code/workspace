@@ -5,8 +5,8 @@ test("describes hypothesis support and counter evidence consistently", async ({ 
   await enterApp(page);
   await gotoView(page, "ability");
 
-  await expect(page.getByText("支持证据 — 独立决策中仍缺少关键调查维度", { exact: true })).toBeVisible();
-  await expect(page.getByText("反证 — 独立决策中覆盖了三个调查维度", { exact: true })).toBeVisible();
+  await expect(page.getByText("支持证据 — 例如「独立决策时漏掉了关键调查维度」", { exact: true })).toBeVisible();
+  await expect(page.getByText("反证 — 例如「某次独立决策查全了三个调查维度」", { exact: true })).toBeVisible();
 });
 
 test("shows ability evidence after a completed training", async ({ page }) => {

@@ -134,7 +134,7 @@ test("desktop completes world 1 to 2 to 3 and opens the judgment profile", async
   await expect(page.getByRole("button", { name: /查看证据/ })).toHaveCount(0);
 
   await page.getByRole("button", { name: /复盘与复练/ }).click();
-  await expect(page.getByRole("heading", { level: 2, name: "世界决策记录" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "情境决策记录" })).toBeVisible();
   for (const title of WORLD_TITLES) {
     await expect(page.getByText(title, { exact: true })).toBeVisible();
   }
@@ -156,15 +156,15 @@ test("shows the three-world progression track and allows switching worlds (FB-00
   // 三个世界的概念说明与进度必须可见
   const track = page.getByTestId("wb-world-track");
   await expect(track).toBeVisible();
-  await expect(track).toContainText("世界 1、2、3 依次验证同一个底层判断习惯");
-  await expect(track.getByText("世界 1", { exact: true })).toBeVisible();
-  await expect(track.getByText("世界 2", { exact: true })).toBeVisible();
-  await expect(track.getByText("世界 3", { exact: true })).toBeVisible();
+  await expect(track).toContainText("情境 1、2、3 依次验证同一个判断习惯");
+  await expect(track.getByText("情境 1", { exact: true })).toBeVisible();
+  await expect(track.getByText("情境 2", { exact: true })).toBeVisible();
+  await expect(track.getByText("情境 3", { exact: true })).toBeVisible();
 
-  // 当前为世界 1：进行中；其余未开始；点击世界 2 可切换并展示对应标题
+  // 当前为情境 1：进行中；其余未开始；点击情境 2 可切换并展示对应标题
   await expect(track.getByText("进行中")).toHaveCount(1);
   await expect(track.getByText("未开始")).toHaveCount(2);
-  await track.getByRole("button", { name: /世界 2/ }).click();
+  await track.getByRole("button", { name: /情境 2/ }).click();
   await expect(page.getByRole("heading", { level: 2, name: WORLD_TITLES[1] })).toBeVisible();
   await expect(page.getByTestId("wb-world-track").getByText("进行中")).toHaveCount(1);
 });
@@ -215,7 +215,7 @@ test("locally completed worlds appear in the decision history as local demo reco
   await page.getByRole("heading", { level: 1, name: "今天，练会一个真正的产品判断" }).waitFor();
 
   await page.getByRole("button", { name: /复盘与复练/ }).click();
-  await expect(page.getByRole("heading", { level: 2, name: "世界决策记录" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "情境决策记录" })).toBeVisible();
   await expect(page.getByText("高权威需求方要求立即增加 AI 摘要", { exact: true })).toBeVisible();
   await expect(page.getByTestId("world-history-local")).toContainText("本地演示记录");
 
