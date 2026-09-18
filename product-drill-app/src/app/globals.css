@@ -350,6 +350,9 @@ button:disabled { cursor: not-allowed; }
 .scenario-group[open] .scenario-group-caret { transform: rotate(90deg); }
 .scenario-group-meta { margin-left: auto; color: var(--ink-3); font-family: var(--font-mono); font-size: var(--fs-aux-sm); font-variant-numeric: tabular-nums; }
 .scenario-group-desc { margin: 8px 0 18px; color: var(--ink-2); font-size: var(--fs-body-sm); }
+/* 收起态必须显式声明：.scenario-grid 的 display:grid 会盖掉 UA 对未 open details 的隐藏 */
+.scenario-group:not([open]) > .scenario-group-desc,
+.scenario-group:not([open]) > .scenario-grid { display: none; }
 .scenario-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .custom-scenario-entry { padding: 26px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .custom-scenario-entry h2 { margin: 8px 0; font-size: var(--fs-title); }
@@ -487,6 +490,7 @@ button:disabled { cursor: not-allowed; }
 .material-block p { margin: 8px 0 0; font-size: var(--fs-body-sm); line-height: 1.65; }
 .material-block ul { margin: 8px 0 0; padding-left: 20px; color: var(--ink-2); font-size: var(--fs-body-sm); line-height: 1.7; }
 .scenario-card { min-height: 240px; padding: 26px; display: flex; flex-direction: column; }
+.scenario-topline { display: flex; justify-content: space-between; gap: 12px; }
 .scenario-status-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; min-height: 26px; flex-wrap: wrap; }
 .scenario-attempts { color: var(--ink-2); font-family: var(--font-mono); font-size: var(--fs-aux-sm); }
 .scenario-status-covered { color: #24583f; border-color: #bdd5c5; background: #e6f0e9; }
