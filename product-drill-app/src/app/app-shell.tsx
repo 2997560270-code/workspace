@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { ArrowUpRight, Check, GearSix } from "@phosphor-icons/react";
+import { ArrowUpRight, CaretRight, Check, GearSix } from "@phosphor-icons/react";
 import { WorldWorkbench } from "./world-workbench";
 import { JudgmentProfilePanel, WorldDecisionHistoryPanel } from "./judgment-profile-panel";
 import {
@@ -312,9 +312,14 @@ function TrainingMap({
 }) {
   // FB-003：地图状态直接从训练记录推导，完成训练后即时刷新。
   const allScenarios = [...TRAINING_SCENARIOS, ...customScenarios];
-  const coveredCount = allScenarios.filter(
-    (scenario) => getScenarioTrainingStatus(scenario.id, records).status !== "未训练"
-  ).length;
+  const isCovered = (scenario: TrainingScenario) =>
+    getScenarioTrainingStatus(scenario.id, records).status !== "未训练";
+  const coveredCount = allScenarios.filter(isCovered).length;
+  // D5：12 张同构卡片平铺会造成选择瘫痪，按五个核心能力分组，组头直接给出「几个场景 · 已练几个」
+  const skillGroups = SKILLS.map((skill) => ({
+    skill,
+    scenarios: allScenarios.filter((scenario) => scenario.skillId === skill.id),
+  })).filter((group) => group.scenarios.length > 0);
 
   return (
     <div className="stack-lg">
@@ -328,34 +333,49 @@ function TrainingMap({
           已覆盖 <strong>{coveredCount} / {allScenarios.length}</strong> 个场景；完成后状态会即时更新。
         </p>
       </section>
-      <div className="scenario-grid">
-        {allScenarios.map((scenario) => {
-          const skill = getSkill(scenario.skillId);
-          const { status, attempts, latest } = getScenarioTrainingStatus(scenario.id, records);
+      <div className="scenario-groups">
+        {skillGroups.map((group) => {
+          const doneCount = group.scenarios.filter(isCovered).length;
           return (
-            <article className="scenario-card surface" data-testid={`scenario-card-${scenario.id}`} key={scenario.id}>
-              <div className="scenario-topline">
-                <span>{scenario.industry}</span>
-                <span>{scenario.id.startsWith("custom-") ? "本地场景" : `${scenario.duration} 分钟 · ${scenario.difficulty}`}</span>
+            <details className="scenario-group" data-testid={`scenario-group-${group.skill.id}`} key={group.skill.id} open>
+              <summary data-testid={`scenario-group-summary-${group.skill.id}`}>
+                <h2>{group.skill.name}</h2>
+                <span className="scenario-group-meta">
+                  {group.scenarios.length} 个场景 · {doneCount ? `已练 ${doneCount}` : "还没练过"}
+                </span>
+                <CaretRight aria-hidden="true" className="scenario-group-caret" size={13} weight="bold" />
+              </summary>
+              <p className="scenario-group-desc">{group.skill.description}</p>
+              <div className="scenario-grid">
+                {group.scenarios.map((scenario) => {
+                  const { status, attempts, latest } = getScenarioTrainingStatus(scenario.id, records);
+                  return (
+                    <article className="scenario-card surface" data-testid={`scenario-card-${scenario.id}`} key={scenario.id}>
+                      <div className="scenario-topline">
+                        <span>{scenario.industry}</span>
+                        <span>{scenario.id.startsWith("custom-") ? "本地场景" : `${scenario.duration} 分钟 · ${scenario.difficulty}`}</span>
+                      </div>
+                      {/* D8：状态行始终占位以对齐标题，但标签只在真有状态时渲染 */}
+                      <div className="scenario-status-row">
+                        {status === "未训练" ? null : (
+                          <span className={`status-tag scenario-status scenario-status-${SCENARIO_STATUS_CLASS[status]}`} data-testid={`scenario-status-${scenario.id}`}>{SCENARIO_STATUS_LABEL[status]}</span>
+                        )}
+                        {latest ? (
+                          <span className="scenario-attempts">
+                            已训练 {attempts} 次 · 最新证据分 {latest.totalScore}
+                          </span>
+                        ) : null}
+                      </div>
+                      <h2>{scenario.shortTitle}</h2>
+                      <p>{scenario.title}</p>
+                      <button className="text-button" data-testid={`scenario-start-${scenario.id}`} onClick={() => onStart(scenario.id)} type="button">
+                        {status === "未训练" ? "开始训练" : "复练这个场景"} <ArrowIcon />
+                      </button>
+                    </article>
+                  );
+                })}
               </div>
-              <div className="scenario-status-row">
-                <span className={`status-tag scenario-status scenario-status-${SCENARIO_STATUS_CLASS[status]}`} data-testid={`scenario-status-${scenario.id}`}>{SCENARIO_STATUS_LABEL[status]}</span>
-                {latest ? (
-                  <span className="scenario-attempts">
-                    已训练 {attempts} 次 · 最新证据分 {latest.totalScore}
-                  </span>
-                ) : null}
-              </div>
-              <h2>{scenario.shortTitle}</h2>
-              <p>{scenario.title}</p>
-              <div className="scenario-skill">
-                <span>训练</span>
-                <strong>{skill.name}</strong>
-              </div>
-              <button className="text-button" data-testid={`scenario-start-${scenario.id}`} onClick={() => onStart(scenario.id)} type="button">
-                {status === "未训练" ? "开始训练" : "复练这个场景"} <ArrowIcon />
-              </button>
-            </article>
+            </details>
           );
         })}
       </div>

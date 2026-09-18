@@ -45,8 +45,8 @@ test("updates the training map status after completing a scenario (FB-003)", asy
       .getByRole("button", { name: "复练这个场景" })
   ).toBeVisible();
 
-  // 未参与的场景保持「未训练」，整体进度同步更新
-  await expect(page.getByTestId("scenario-status-dashboard-request")).toHaveText("还没开始");
+  // 未参与的场景不再有状态标签（D8：标签只在真有状态时出现），整体进度同步更新
+  await expect(page.getByTestId("scenario-status-dashboard-request")).toHaveCount(0);
   await expect(page.getByTestId("map-progress")).toContainText("已覆盖 1 / 12");
 });
 

@@ -120,7 +120,6 @@ p { color: var(--ink-2); line-height: 1.66; }
 .user span,
 .hero-proof span,
 .message > span,
-.scenario-skill span,
 .review-list button i,
 .login-proof span,
 .skill-label,
@@ -339,6 +338,18 @@ button:disabled { cursor: not-allowed; }
 .map-intro { padding: 34px; display: grid; grid-template-columns: 1fr 1fr; gap: 44px; }
 .map-intro h2 { margin-bottom: 0; font-size: var(--fs-title-lg); }
 .map-intro p { margin: 0; align-self: end; font-size: var(--fs-lede); }
+/* D5/D8：场景按能力分组，组头可折叠；分隔线只落在组之间，不再逐卡描边 */
+.scenario-groups { display: grid; gap: 30px; }
+.scenario-group { padding-top: 20px; border-top: 1px solid var(--line); }
+.scenario-group summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; }
+.scenario-group summary::-webkit-details-marker { display: none; }
+.scenario-group summary:focus-visible { outline: 2px solid var(--sage-strong); outline-offset: 4px; border-radius: var(--radius-sm); }
+.scenario-group summary h2 { margin: 0; font-size: var(--fs-title); }
+.scenario-group summary:hover h2 { color: var(--sage-strong); }
+.scenario-group-caret { flex-shrink: 0; color: var(--ink-3); transition: transform 160ms ease; }
+.scenario-group[open] .scenario-group-caret { transform: rotate(90deg); }
+.scenario-group-meta { margin-left: auto; color: var(--ink-3); font-family: var(--font-mono); font-size: var(--fs-aux-sm); font-variant-numeric: tabular-nums; }
+.scenario-group-desc { margin: 8px 0 18px; color: var(--ink-2); font-size: var(--fs-body-sm); }
 .scenario-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .custom-scenario-entry { padding: 26px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .custom-scenario-entry h2 { margin: 8px 0; font-size: var(--fs-title); }
@@ -475,17 +486,15 @@ button:disabled { cursor: not-allowed; }
 .material-block > span { color: var(--ink-2); font-family: var(--font-mono); font-size: var(--fs-aux-sm); font-weight: 600; }
 .material-block p { margin: 8px 0 0; font-size: var(--fs-body-sm); line-height: 1.65; }
 .material-block ul { margin: 8px 0 0; padding-left: 20px; color: var(--ink-2); font-size: var(--fs-body-sm); line-height: 1.7; }
-.scenario-card { min-height: 280px; padding: 26px; display: flex; flex-direction: column; }
-.scenario-status-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.scenario-card { min-height: 240px; padding: 26px; display: flex; flex-direction: column; }
+.scenario-status-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; min-height: 26px; flex-wrap: wrap; }
 .scenario-attempts { color: var(--ink-2); font-family: var(--font-mono); font-size: var(--fs-aux-sm); }
 .scenario-status-covered { color: #24583f; border-color: #bdd5c5; background: #e6f0e9; }
 .scenario-status-needs_retry { color: var(--amber); border-color: #e2cfad; background: var(--amber-soft); }
 .map-progress { margin: 10px 0 0; color: var(--ink-2); font-size: var(--fs-body-sm); }
-.scenario-card h2 { margin: 44px 0 10px; font-size: var(--fs-title-lg); }
+.scenario-card h2 { margin: 26px 0 10px; font-size: var(--fs-title-lg); }
 .scenario-card > p { font-size: var(--fs-body); }
-.scenario-skill { margin-top: auto; padding-top: 20px; display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid var(--line); }
-.scenario-skill strong { font-family: var(--font-display); font-size: var(--fs-title-sm); font-weight: 600; color: var(--ink); }
-.scenario-card .text-button { margin-top: 20px; text-align: left; }
+.scenario-card .text-button { margin-top: auto; padding-top: 22px; text-align: left; }
 
 /* ══════════════════════════ TRAINING WORKSPACE ═════════════════════════ */
 .training-shell { display: grid; grid-template-columns: clamp(300px, 22vw, 440px) minmax(420px, 1fr) 250px; gap: 16px; align-items: stretch; }

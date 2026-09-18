@@ -4,9 +4,43 @@ import { enterApp, gotoView } from "./e2e-helpers";
 test("renders twelve focused scenarios in the training map", async ({ page }) => {
   await enterApp(page);
   await gotoView(page, "map");
-  await expect(page.locator(".scenario-card")).toHaveCount(12);
+  // 契约走 testid 而非类名：12 张卡 = 五个能力分组内卡片之和
+  await expect(page.locator("[data-testid^='scenario-card-']")).toHaveCount(12);
   await expect(page.getByText("数据大屏需求", { exact: true })).toBeVisible();
   await expect(page.getByText("老板要求加 AI", { exact: true })).toBeVisible();
+});
+
+// D5：12 张同构卡片平铺会造成选择瘫痪，地图按五个核心能力分组，组头可折叠。
+test("groups scenarios by skill and keeps collapse reversible", async ({ page }) => {
+  await enterApp(page);
+  await gotoView(page, "map");
+
+  for (const skill of ["role", "workflow", "impact", "alternative", "metric"]) {
+    await expect(page.getByTestId(`scenario-group-${skill}`)).toBeVisible();
+  }
+
+  const group = page.getByTestId("scenario-group-role");
+  const summary = page.getByTestId("scenario-group-summary-role");
+  await expect(group.locator(".scenario-card")).toHaveCount(2);
+  await expect(summary).toContainText("2 个场景");
+  await expect(summary).toContainText("还没练过");
+
+  await summary.click();
+  await expect(group.locator(".scenario-card").first()).toBeHidden();
+  // 折叠只影响可见性，卡片仍在 DOM 中，总数契约不变
+  await expect(page.locator("[data-testid^='scenario-card-']")).toHaveCount(12);
+
+  await summary.click();
+  await expect(group.locator(".scenario-card").first()).toBeVisible();
+});
+
+// D8：每张卡都挂「还没开始」等于没有信息，状态标签只在真有状态时出现。
+test("shows a status tag only when the scenario has real state", async ({ page }) => {
+  await enterApp(page);
+  await gotoView(page, "map");
+  await expect(page.getByTestId("scenario-status-dashboard-request")).toHaveCount(0);
+  await expect(page.getByTestId("scenario-card-dashboard-request")).not.toContainText("还没开始");
+  await expect(page.getByTestId("scenario-card-dashboard-request").getByRole("button", { name: "开始训练" })).toBeVisible();
 });
 
 test("generates a bounded product material experiment draft", async ({ page }) => {
