@@ -319,16 +319,13 @@ button:disabled { cursor: not-allowed; }
 .hero-proof span { color: var(--on-dark-aux); }
 .hero-proof strong { display: block; margin-top: 10px; font-family: var(--font-display); font-size: var(--fs-title); font-weight: 600; color: var(--on-dark-title); }
 .hero-proof p { margin: 12px 0 0; font-size: var(--fs-body-sm); color: var(--on-dark-body); }
-.weekly { min-height: 340px; padding: 28px; }
+.weekly { padding: 28px; display: flex; flex-direction: column; }
 .weekly .section-heading h2 { font-family: var(--font-mono); font-weight: 600; font-variant-numeric: tabular-nums; }
-.week-bars { height: 120px; margin: 34px 0 24px; display: flex; align-items: flex-end; gap: 8px; }
-.week-bars span { flex: 1; height: 24%; background: #e4e1da; border-radius: 4px 4px 0 0; }
-.week-bars span:nth-child(2) { height: 42%; }
-.week-bars span:nth-child(3) { height: 60%; }
-.week-bars span:nth-child(4) { height: 78%; }
-.week-bars span:nth-child(5) { height: 100%; }
+/* 本周进度：等高分段条，只表达「已完成 n / target」，不用柱高伪造增长趋势 */
+.week-bars { margin: 24px 0 20px; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+.week-bars span { height: 8px; background: #e4e1da; border-radius: 999px; }
 .week-bars span.done { background: var(--sage-strong); }
-.weekly > p { font-size: var(--fs-body-sm); }
+.weekly > p { margin-top: auto; font-size: var(--fs-body-sm); }
 .weekly-focus { display: block; margin-top: 10px; color: var(--ink-2); font-size: var(--fs-aux-sm); }
 .focus-card, .map-preview { grid-column: 1 / -1; padding: 30px; }
 .focus-grid { margin-top: 28px; display: grid; grid-template-columns: 1fr 1fr auto; align-items: end; gap: 32px; }
@@ -730,16 +727,15 @@ button:disabled { cursor: not-allowed; }
 .login-story .brand { width: fit-content; padding: 0; border: 0; }
 .login-story .brand strong { color: var(--on-dark-title); }
 .login-story .brand span { color: var(--on-dark-aux); }
-/* The opening claim — biggest serif moment in the product */
-.login-story h1 { max-width: 780px; margin: 70px 0 26px; font-size: clamp(2.6rem, 1.7rem + 4vw, 4.9rem); font-weight: 600; line-height: 1.04; letter-spacing: -0.02em; color: var(--on-dark-title); }
+/* 登录 hero：18 字主张在 390–1920 全宽度下都必须落在两行内（gpt-taste 两行铁律） */
+.login-story h1 { max-width: 780px; margin: clamp(36px, 5vw, 64px) 0 24px; font-size: clamp(1.9rem, 1.3rem + 2.2vw, 3rem); font-weight: 600; line-height: 1.2; letter-spacing: -0.02em; color: var(--on-dark-title); }
 .login-story > div > p { max-width: 660px; color: var(--on-dark-body); font-size: var(--fs-lede); line-height: 1.7; }
-.login-proof { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.login-proof { display: grid; gap: 12px; }
 .login-proof div { padding-top: 18px; border-top: 1px solid #374151; }
 .login-proof strong { display: block; font-family: var(--font-display); font-size: var(--fs-title); font-weight: 600; color: var(--on-dark-title); }
 .login-proof span { color: var(--on-dark-aux); }
 .login-entry { padding: clamp(48px, 7vw, 100px); display: grid; place-items: center; }
 .login-panel { width: min(440px, 100%); }
-.login-panel .mark { margin-bottom: 36px; }
 .login-panel h2 { font-size: var(--fs-title-lg); }
 .login-panel > p { margin-bottom: 30px; font-size: var(--fs-body); }
 .login-panel .button { width: 100%; }

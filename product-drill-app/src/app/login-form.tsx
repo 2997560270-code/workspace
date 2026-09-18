@@ -203,8 +203,6 @@ export function LoginForm() {
       </section>
       <section className="login-entry">
         <div className="login-panel">
-          <div className="mark">PD</div>
-          <span className="section-kicker">Product discovery gym</span>
           <h2>{mode === "login" ? "登录你的账号" : "创建你的账号"}</h2>
           <p>{mode === "login" ? "使用邮箱和密码登录，继续你的产品判断训练。" : "使用邮箱注册，建立属于你的能力证据档案。"}</p>
 

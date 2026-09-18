@@ -207,9 +207,16 @@ function TodayPanel({
             <h2>{weeklyDone} / {profile.weeklyTarget} 次</h2>
           </div>
         </div>
-        <div className="week-bars" aria-label={`本周已完成 ${weeklyDone} 次训练`}>
+        <div
+          aria-label={`本周已完成 ${weeklyDone} / ${profile.weeklyTarget} 次训练`}
+          aria-valuemax={profile.weeklyTarget}
+          aria-valuemin={0}
+          aria-valuenow={weeklyDone}
+          className="week-bars"
+          role="progressbar"
+        >
           {Array.from({ length: profile.weeklyTarget }, (_, index) => (
-            <span className={index < weeklyDone ? "done" : ""} key={index} />
+            <span aria-hidden="true" className={index < weeklyDone ? "done" : ""} key={index} />
           ))}
         </div>
         <p data-testid="weekly-summary">{weeklyDone ? `本周平均证据分 ${weeklySummary.averageScore}，改善 ${weeklySummary.improvedCount} 次。` : "完成第一轮训练，建立你的能力基线。"}</p>
