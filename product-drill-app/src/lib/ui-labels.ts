@@ -41,10 +41,10 @@ export const MODE_HINTS: Record<TrainingSession["mode"], string> = {
   "练习": "练习：可用提示，结果只作练习反馈。",
 };
 
-/** 对话输入框上方的建议追问（对应五个信息维度中的高频起点）。 */
-export const SUGGESTED_QUESTIONS: readonly string[] = [
-  "谁每天在用这个功能？",
-  "现在流程哪一步最耗时？",
-  "有没有现成的替代方案？",
-  "这件事的成功指标怎么定？",
+/** 初始态输入卡下方的建议追问（标题 + 对应信息维度说明）。 */
+export const SUGGESTED_QUESTIONS: readonly { question: string; hint: string }[] = [
+  { question: "谁每天在用这个功能？", hint: "用户与角色识别" },
+  { question: "现在流程哪一步最耗时？", hint: "场景与当前流程" },
+  { question: "有没有现成的替代方案？", hint: "现有替代方案" },
+  { question: "这件事的成功指标怎么定？", hint: "成功指标" },
 ];

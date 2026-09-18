@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { ArrowUpRight, CaretRight, Check, GearSix } from "@phosphor-icons/react";
+import { ArrowUp, ArrowUpRight, CaretRight, Check, ChatTeardropText, GearSix, Lightning } from "@phosphor-icons/react";
 import { WorldWorkbench } from "./world-workbench";
 import { JudgmentProfilePanel, WorldDecisionHistoryPanel } from "./judgment-profile-panel";
 import {
@@ -753,10 +753,10 @@ function TrainingWorkspace({
     }
   }
 
-  async function sendReply() {
-    const content = reply.trim();
+  async function sendReply(contentOverride?: string) {
+    const content = (contentOverride ?? reply).trim();
     if (!content || busy || strictExpired) return;
-    setReply("");
+    if (!contentOverride) setReply("");
     setPendingReply(content);
     setBusy(true);
     setActionError("");
@@ -901,6 +901,86 @@ function TrainingWorkspace({
 
   const notice = <RuntimeNotice error={actionError} status={runtimeStatus} />;
 
+  const hasUserMessage = session.messages.some((message) => message.role === "user") || pendingReply !== null;
+
+  function composerCard(includeFinish: boolean) {
+    return (
+      <div className={`composer${includeFinish ? " composer-docked" : " composer-static"}`}>
+        <textarea
+          aria-label="你的追问"
+          data-testid="reply-input"
+          disabled={busy || strictExpired}
+          onChange={(event) => setReply(event.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={`你想问这位${scenario.role}什么？例如：谁每天在用这个功能？`}
+          rows={includeFinish ? 3 : 2}
+          value={reply}
+        />
+        <div className="composer-actions">
+          <VoiceInputButton disabled={busy || strictExpired} onTranscript={(text) => setReply((current) => current ? `${current} ${text}` : text)} />
+          <button
+            className="text-button"
+            data-testid="request-hint"
+            disabled={busy || session.mode !== "练习"}
+            onClick={() => setSession((current) => useTrainingHint(current))}
+            type="button"
+          >
+            给我一点提示
+          </button>
+          {includeFinish ? (
+            <button
+              className="button button-secondary"
+              data-testid="finish-interview"
+              disabled={busy || (!strictExpired && session.messages.filter((message) => message.role === "user").length < 1)}
+              onClick={() => setSession((current) => moveToJudgment(current))}
+              type="button"
+            >
+              {strictExpired ? "时间到，提交我的判断" : "结束对话，提交我的判断"}
+            </button>
+          ) : null}
+          <button
+            aria-label="发送追问"
+            className="send-round"
+            data-testid="send-reply"
+            disabled={busy || strictExpired || !reply.trim()}
+            onClick={() => { void sendReply(); }}
+            type="button"
+          >
+            <ArrowUp aria-hidden="true" size={16} weight="bold" />
+          </button>
+          {strictExpired ? <span className="composer-note">本局时间已结束</span> : !reply.trim() ? <span className="composer-note">写下你的问题后即可发送</span> : null}
+        </div>
+      </div>
+    );
+  }
+
+  // 初始态与对话态共用同一条消息流：AI 的开场白必须在两种状态下都可见
+  // （学员要回答的正是这句话）。
+  function messageStream() {
+    return (
+      <div className="message-list" data-testid="message-list" ref={messageListRef}>
+        {session.messages.map((message) => (
+          <article className={`message ${message.role}`} key={message.id}>
+            <span>{message.role === "ai" ? "AI 角色" : "你"}</span>
+            <p>{message.content}</p>
+          </article>
+        ))}
+        {pendingReply ? (
+          <>
+            <article className="message user message-pending" data-testid="pending-user-message">
+              <span>你</span>
+              <p>{pendingReply}</p>
+            </article>
+            <div aria-live="polite" className="message-thinking" data-testid="thinking-indicator" role="status">
+              <span>AI 角色</span>
+              <p>正在思考…</p>
+            </div>
+          </>
+        ) : null}
+      </div>
+    );
+  }
+
   if (evaluation) {
     return (
       <>
@@ -938,13 +1018,15 @@ function TrainingWorkspace({
     <>
       {notice}
       <div className="training-chat-shell">
-        <main className="training-chat-container">
-          <div className="chat-topbar">
+        <main className={`training-chat-container${hasUserMessage ? "" : " is-empty"}`}>
+          <div className={`chat-topbar${hasUserMessage ? "" : " is-empty"}`}>
             <button className="back-button" onClick={onClose} type="button">← 返回</button>
-            <div className="chat-topbar-titles">
-              <h2 className="chat-title">{scenario.title}</h2>
-              <h3 className="chat-role">AI 角色：{scenario.role}</h3>
-            </div>
+            {hasUserMessage ? (
+              <div className="chat-topbar-titles">
+                <h2 className="chat-title">{scenario.title}</h2>
+                <h3 className="chat-role">AI 角色：{scenario.role}</h3>
+              </div>
+            ) : null}
             <div className="mode-switch" aria-label="模式选择" data-testid="mode-switch">
               {TRAINING_MODE_OPTIONS.map((mode) => (
                 <button
@@ -967,94 +1049,79 @@ function TrainingWorkspace({
             <p className="mode-hint" data-testid="mode-hint" id="mode-hint">{MODE_HINTS[session.mode]}</p>
           </div>
 
-          <section className="briefing chat-opening">
-            <h2>场景简报</h2>
-            <p data-testid="briefing-context">{scenario.context}</p>
-            {scenario.background?.length ? (
-              <div className="background-block" data-testid="scenario-background">
-                <span className="background-label">业务背景</span>
-                <ul className="background-list">
-                  {scenario.background.map((item) => <li key={item}>{item}</li>)}
-                </ul>
-                {scenario.backgroundSource ? (
-                  <p className="background-source">背景原型：{scenario.backgroundSource}</p>
+          {hasUserMessage ? (
+            <>
+              <section className="briefing chat-opening">
+                <h2>场景简报</h2>
+                <p data-testid="briefing-context">{scenario.context}</p>
+                {scenario.background?.length ? (
+                  <div className="background-block" data-testid="scenario-background">
+                    <span className="background-label">业务背景</span>
+                    <ul className="background-list">
+                      {scenario.background.map((item) => <li key={item}>{item}</li>)}
+                    </ul>
+                    {scenario.backgroundSource ? (
+                      <p className="background-source">背景原型：{scenario.backgroundSource}</p>
+                    ) : null}
+                  </div>
                 ) : null}
-              </div>
-            ) : null}
-            <div className="briefing-list">
-              {scenario.briefing.map((item) => <div key={item}><CheckMark /> {item}</div>)}
-            </div>
-          </section>
-
-          <div className="message-list" data-testid="message-list" ref={messageListRef}>
-            {session.messages.map((message) => (
-              <article className={`message ${message.role}`} key={message.id}>
-                <span>{message.role === "ai" ? "AI 角色" : "你"}</span>
-                <p>{message.content}</p>
-              </article>
-            ))}
-            {pendingReply ? (
-              <>
-                <article className="message user message-pending" data-testid="pending-user-message">
-                  <span>你</span>
-                  <p>{pendingReply}</p>
-                </article>
-                <div aria-live="polite" className="message-thinking" data-testid="thinking-indicator" role="status">
-                  <span>AI 角色</span>
-                  <p>正在思考…</p>
+                <div className="briefing-list">
+                  {scenario.briefing.map((item) => <div key={item}><CheckMark /> {item}</div>)}
                 </div>
-              </>
-            ) : null}
-          </div>
+              </section>
 
-          <div className="composer">
-            <div className="suggestion-chips">
-              {SUGGESTED_QUESTIONS.map((question) => (
-                <button
-                  className="suggestion-chip"
-                  disabled={busy || strictExpired}
-                  key={question}
-                  onClick={() => setReply(question)}
-                  type="button"
-                >
-                  {question}
-                </button>
-              ))}
-            </div>
-            <textarea
-              aria-label="你的追问"
-              data-testid="reply-input"
-              disabled={busy || strictExpired}
-              onChange={(event) => setReply(event.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={`你想问这位${scenario.role}什么？例如：谁每天在用这个功能？`}
-              rows={3}
-              value={reply}
-            />
-            <div className="composer-actions">
-              <VoiceInputButton disabled={busy || strictExpired} onTranscript={(text) => setReply((current) => current ? `${current} ${text}` : text)} />
-              <button
-                className="text-button"
-                data-testid="request-hint"
-                disabled={busy || session.mode !== "练习"}
-                onClick={() => setSession((current) => useTrainingHint(current))}
-                type="button"
-              >
-                给我一点提示
-              </button>
-              <button
-                className="button button-secondary"
-                data-testid="finish-interview"
-                disabled={busy || (!strictExpired && session.messages.filter((message) => message.role === "user").length < 1)}
-                onClick={() => setSession((current) => moveToJudgment(current))}
-                type="button"
-              >
-                {strictExpired ? "时间到，提交我的判断" : "结束对话，提交我的判断"}
-              </button>
-              <button className="button button-primary" data-testid="send-reply" disabled={busy || strictExpired || !reply.trim()} onClick={() => { void sendReply(); }} type="button">发送追问</button>
-              {strictExpired ? <span className="composer-note">本局时间已结束</span> : !reply.trim() ? <span className="composer-note">写下你的问题后即可发送</span> : null}
-            </div>
-          </div>
+              {messageStream()}
+
+              {composerCard(true)}
+            </>
+          ) : (
+            <>
+              <section className="briefing chat-hero">
+                <div className="chat-hero-avatar"><ChatTeardropText aria-hidden="true" size={24} weight="fill" /></div>
+                <h2>{scenario.title}</h2>
+                <h3 className="chat-hero-role">AI 角色：{scenario.role}</h3>
+                <p className="chat-hero-sub" data-testid="briefing-context">{scenario.context}</p>
+                <details className="chat-hero-details">
+                  <summary><CaretRight aria-hidden="true" className="chat-hero-caret" size={12} weight="bold" />任务背景与要点</summary>
+                  <div className="chat-hero-details-body">
+                    {scenario.background?.length ? (
+                      <div className="background-block" data-testid="scenario-background">
+                        <span className="background-label">业务背景</span>
+                        <ul className="background-list">
+                          {scenario.background.map((item) => <li key={item}>{item}</li>)}
+                        </ul>
+                        {scenario.backgroundSource ? (
+                          <p className="background-source">背景原型：{scenario.backgroundSource}</p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    <div className="briefing-list">
+                      {scenario.briefing.map((item) => <div key={item}><CheckMark /> {item}</div>)}
+                    </div>
+                  </div>
+                </details>
+              </section>
+
+              {messageStream()}
+
+              {composerCard(false)}
+
+              <div className="chat-suggest">
+                <p className="chat-suggest-head"><Lightning aria-hidden="true" size={12} weight="fill" /> 建议</p>
+                {SUGGESTED_QUESTIONS.map((item) => (
+                  <button
+                    disabled={busy || strictExpired}
+                    key={item.question}
+                    onClick={() => { void sendReply(item.question); }}
+                    type="button"
+                  >
+                    <strong>{item.question}</strong>
+                    <small>{item.hint}</small>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </main>
 
         <button

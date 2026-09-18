@@ -601,17 +601,55 @@ button:disabled { cursor: not-allowed; }
 .training-chat-shell .message.ai > span::before { content: "AI"; background: var(--sage); color: var(--sage-strong); }
 .training-chat-shell .message.user > span::before { content: "你"; background: var(--navy); color: var(--on-dark-title); }
 .training-chat-shell .message.user > span { justify-content: flex-end; }
+/* 顶栏账户块的 .user 规则（左竖线 + 左内边距）会漏进气泡，这里显式归零。 */
+.training-chat-shell .message.user { padding: 0; border-left: 0; text-align: left; }
 .training-chat-shell .message p { padding: 12px 16px; border-radius: 4px 12px 12px 12px; }
 .training-chat-shell .message.ai p { background: var(--surface); border: 1px solid var(--line); }
 .training-chat-shell .message.user p { border-radius: 12px 4px 12px 12px; }
 .training-chat-shell .message-thinking p { border-radius: 4px 12px 12px 12px; }
 
-/* 输入区：建议 chips + 文本框 + 动作行 */
-.training-chat-shell .composer { margin-top: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 14px 16px; }
-.suggestion-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
-.suggestion-chip { padding: 6px 12px; font-size: var(--fs-aux-sm); border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink-2); transition: border-color var(--dur-2) var(--ease-standard), color var(--dur-2) var(--ease-standard); white-space: nowrap; }
-.suggestion-chip:hover { border-color: var(--sage-strong); color: var(--sage-strong); }
-.suggestion-chip:active { transform: scale(0.98); }
+/* 输入区：卡片式输入框 + 圆形发送键（对话态贴底，初始态静态居中） */
+.training-chat-shell .composer { border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); padding: 14px 16px; }
+.composer-docked { margin-top: auto; }
+.composer-static { margin: 0 auto; width: min(720px, 100%); }
+.send-round { width: 40px; height: 40px; margin-left: auto; flex: 0 0 auto; display: inline-grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: var(--navy); color: var(--on-dark-title); transition: background-color var(--dur-2) var(--ease-standard), transform var(--dur-1) var(--ease-standard); }
+.send-round:hover:not(:disabled) { background: #242e40; }
+.send-round:active:not(:disabled) { transform: scale(0.94); }
+.send-round:disabled { background: var(--surface-strong); color: var(--ink-3); }
+
+/* ── 批次12：初始态 = 居中 hero + 静态输入卡 + 建议清单 ───────────────────
+   hero 只承载「情境标题 / 角色 / 一句话背景」，业务背景与要点收进 details，
+   AI 开场白仍是消息流的第一条气泡（学员要回答的正是这句话）。 */
+.training-chat-container.is-empty { padding-top: clamp(6px, 3vh, 34px); }
+.training-chat-container.is-empty .message-list { flex: 0 0 auto; min-height: 0; width: min(720px, 100%); margin: 0 auto; padding: 0 0 18px; }
+.chat-topbar.is-empty .back-button { margin-right: auto; }
+.training-chat-shell .briefing.chat-hero { margin: 10px auto 22px; max-width: 640px; padding: 0; text-align: center; background: transparent; border: 0; }
+.chat-hero-avatar { width: 52px; height: 52px; margin: 0 auto 16px; display: grid; place-items: center; border-radius: 50%; background: var(--sage); color: var(--sage-strong); }
+.chat-hero h2 { margin: 0; }
+.chat-hero-role { margin: 8px 0 0; color: var(--ink-3); font-family: var(--font-mono); font-size: var(--fs-aux); font-weight: 500; letter-spacing: 0.02em; }
+.chat-hero-sub { margin: 12px auto 0; max-width: 52ch; color: var(--ink-2); font-family: var(--font-body); font-size: var(--fs-body); font-weight: 400; }
+.chat-hero-details { margin: 18px auto 0; max-width: 600px; text-align: left; }
+.chat-hero-details > summary { display: inline-flex; align-items: center; gap: 6px; padding: 6px 13px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink-2); font-size: var(--fs-aux-sm); cursor: pointer; list-style: none; transition: border-color var(--dur-2) var(--ease-standard), color var(--dur-2) var(--ease-standard); }
+.chat-hero-details > summary::-webkit-details-marker { display: none; }
+.chat-hero-details > summary:hover { border-color: var(--sage-strong); color: var(--sage-strong); }
+.chat-hero-caret { transition: transform var(--dur-3) var(--ease-out); }
+.chat-hero-details[open] .chat-hero-caret { transform: rotate(90deg); }
+/* 批次6 教训：后代自带 display 会绕过 UA 对闭合 details 的隐藏，必须显式兜底。 */
+.chat-hero-details:not([open]) > :not(summary) { display: none; }
+.chat-hero-details-body { margin-top: 12px; padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); }
+.chat-hero-details-body > .background-block { margin: 0; }
+.chat-hero-details-body > .briefing-list { margin: 0; }
+.chat-hero-details-body > .background-block + .briefing-list { margin-top: 16px; }
+
+/* 建议清单：标题 + 副标题的整行按钮，点击即发送 */
+.chat-suggest { margin: 20px auto 0; width: min(720px, 100%); display: grid; gap: 2px; }
+.chat-suggest-head { margin: 0 0 8px; display: flex; align-items: center; gap: 6px; color: var(--ink-3); font-size: var(--fs-aux-sm); font-weight: 600; letter-spacing: 0.04em; }
+.chat-suggest button { width: 100%; padding: 11px 14px; display: grid; gap: 2px; text-align: left; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; transition: background-color var(--dur-2) var(--ease-standard), border-color var(--dur-2) var(--ease-standard); }
+.chat-suggest button:hover:not(:disabled) { border-color: var(--line); background: var(--surface); }
+.chat-suggest button:active:not(:disabled) { background: var(--surface-strong); }
+.chat-suggest button:disabled { opacity: 0.55; }
+.chat-suggest button strong { color: var(--ink); font-size: var(--fs-body-sm); font-weight: 600; }
+.chat-suggest button small { color: var(--ink-3); font-size: var(--fs-aux-sm); }
 
 /* 覆盖度：右下角浮动按钮 + 按需浮层 */
 .coverage-toggle { position: fixed; right: 20px; bottom: 24px; z-index: 60; display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); box-shadow: var(--shadow); color: var(--ink-2); font-size: var(--fs-aux-sm); font-variant-numeric: tabular-nums; transition: border-color var(--dur-2) var(--ease-standard), color var(--dur-2) var(--ease-standard); }
