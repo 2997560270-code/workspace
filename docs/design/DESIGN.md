@@ -51,7 +51,7 @@ left-borders, no green-to-pink banner flips.
 - **Disabled state:** label at 40% Charcoal Ink on Hairline fill - still legible, never a dead
   grey slab - and ALWAYS paired with a one-line unlock hint beside it ("填写核心问题与建议行动后可提交").
 - **Cards:** radius 10px, 1px Hairline border, no shadow by default. Shadow only for overlays
-  (modals, FAB panel), tinted to the canvas hue. Replace cards with whitespace + a single
+  (modals, dialog panels), tinted to the canvas hue. Replace cards with whitespace + a single
   top hairline whenever elevation adds no hierarchy.
 - **Dark block:** reserved for exactly one purpose, the single recommended next action.
   One dark block per screen, maximum.

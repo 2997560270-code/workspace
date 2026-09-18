@@ -99,9 +99,40 @@ testid 语义后再做（另立提交）。
 下一个情境/还没开始/没练过/去开始第一次练习」；工作台白话横幅、模式切换在聊天头并带一句话解释、
 actor 统一「AI 角色」、覆盖度「0 / 5 个信息维度已问到」+ 解锁提示、「← 返回」不再与标签粘连。
 
-已知遗留（另立提交，不阻塞本链路）：
-1. 登录页仍留英文 eyebrow「PRODUCT DISCOVERY GYM」与重复 PD 标记（V9/V10）。
-2. 0 训练时右栏 week-bars 仍画 5 根空柱（D3 假数据可视化未移除）。
-3. 训练地图分组折叠 deferred（见批次 5 说明）。
-4. 反馈 FAB 在滚动中途仍可能悬浮于右栏文字之上（到底时已让位）。
-5. 登录页 hero H1 仍为三行超大字号（gpt-taste 两行铁律未达标）。
+已知遗留（批次 6 已全部关闭，逐项标注落点提交）：
+1. 登录页仍留英文 eyebrow「PRODUCT DISCOVERY GYM」与重复 PD 标记（V9/V10）。✅ `3c06d02`
+2. 0 训练时右栏 week-bars 仍画 5 根空柱（D3 假数据可视化未移除）。✅ `3c06d02`
+3. 训练地图分组折叠 deferred（见批次 5 说明）。✅ `1f01801`
+4. 反馈 FAB 在滚动中途仍可能悬浮于右栏文字之上（到底时已让位）。✅ `9015275`
+5. 登录页 hero H1 仍为三行超大字号（gpt-taste 两行铁律未达标）。✅ `3c06d02`
+
+## 批次 6 · 残留清理（tag `uiux/residual`）
+
+| hash | 提交 | 覆盖 | 回退 |
+|---|---|---|---|
+| `3c06d02` | 残留 1/2/5 | 登录面板去 PD 标记与英文 eyebrow、hero H1 收敛两行；week-bars 改真实进度条（role=progressbar，段数=周目标，完成段才点亮） | `git revert 3c06d02` |
+| `9015275` | 残留 4 | 反馈入口从悬浮 FAB 移入页头 `.topbar-actions`（testid `feedback-open`），弹层改居中模态 + 遮罩；全页零 fixed 定位元素 | `git revert 9015275` |
+| `1f01801` | 残留 3 | 训练地图按五个能力分组（原生 details/summary，组头含场景数与「还没练过/已练 n」）；状态标签只在真有状态时渲染；e2e 契约改 testid 语义并新增 2 条用例 | `git revert 1f01801` |
+| `a5f579c` | 批次6-fix | 分组折叠真隐藏（显式 `:not([open])` display:none）；`.scenario-topline` 两端对齐 | `git revert a5f579c` |
+
+契约变化（随 `1f01801` 落地）：
+- `scenario-library.spec.ts`：12 张卡计数改 `[data-testid^='scenario-card-']`；新增「分组折叠可逆」
+  与「状态标签只在真有状态时出现」两条用例；旧 `.scenario-card` 类名计数与入口 rect 契约作废。
+- `training-history.spec.ts`：「还没开始」文本断言改 `scenario-status-dashboard-request` 计数 0。
+- `DESIGN.md`：FAB 反模式措辞改为「modals, dialog panels」。
+
+事故记录（折叠假通过）：`1f01801` 的折叠用例在 Playwright 自带 Chromium 151 上通过，
+但真实 Chrome 153 里收起组时卡片仍可见——`.scenario-grid` 的作者层 `display:grid`
+盖掉了 UA 对未 open details 的隐藏，而 Chromium 151 的 `::details-content`
+`content-visibility:hidden` 恰好让 `toBeHidden()` 成立，掩盖了缺陷。
+`a5f579c` 显式声明 `.scenario-group:not([open]) > .scenario-group-desc/.scenario-grid { display:none }`，
+并在真实浏览器复测：收起 rect=0 / 展开 rect=263，强加回作者 display 即复现旧缺陷，确认修复为承重件；
+定向回归 `npx playwright test tests/scenario-library.spec.ts` 10/10 通过。
+
+浏览器实测（2026-09-18，1440×900，dev 模式）：登录页 H1 两行（48px/行高 57.6，盒高 115px）、
+面板无 PD 标记与英文 eyebrow；今日视图周进度为 5 段中性条且 `aria-valuenow=0`、无 `.feedback-fab`、
+页头出现「反馈」按钮、全页 `position:fixed` 元素为 0；反馈模态居中带遮罩、Esc 可关；
+训练地图 5 组（2/2/4/2/2）默认全开、无「还没开始」空标签、卡片标题行对齐、折叠/展开可逆。
+
+批次验证（tag `uiux/residual` 前）：typecheck ✅ · vitest 441/441（69 files）✅ · golden 31/31（VALID 30 cases）✅ · rls ✅ · e2e 60/60 ✅。
+批次回退：`git reset --hard uiux/structure` 或 `git revert uiux/structure..uiux/residual`。
