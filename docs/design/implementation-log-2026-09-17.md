@@ -178,3 +178,30 @@ thedaviddias/Front-End-Checklist、The A11Y Project Checklist。
 批次验证（tag `uiux/devtools` 前）：typecheck ✅ · vitest 441/441（69 files）✅ · e2e 63/63 ✅
 （配置级改动，不触及 golden/rls 覆盖范围）。
 批次回退：`git reset --hard uiux/polish` 或 `git revert uiux/polish..uiux/devtools`。
+
+## 批次 9 · 术语白话化：用户可见「世界」统一为「情境」（tag `uiux/copy-2`）
+
+用户验收反馈（2026-09-18）：「我的能力」页仍出现「世界判断证据」「世界工作台」「判断证据画像」
+「陌生世界」等内部术语。排查发现今日页既有白话词已是「情境 / 情境对话」（世界工作台入口按钮即
+「进入情境对话」），能力页与工作台是漏网 outlier；且工作台顶栏把英文枚举 `transfer_role`
+（calibration/intervention/transfer_test）直接渲染进了界面。
+
+术语映射（仅用户可见文案；代码内领域名 world_* 保持不变）：
+世界工作台→情境对话 · 世界 N→情境 N · 陌生世界→新情境 · 同世界→同情境 ·
+聊天角色「世界」→「对方」 · 判断证据画像→判断证据 · transfer_role→基线轮/修正轮/迁移轮。
+覆盖文件：judgment-profile-panel（空态/摘要/证据卡/历史面板）、world-workbench（顶栏/进度轨/
+错误闸门/揭示文案）、app-shell（页头标题与描述）、challenge-selector（选择理由）、
+judgment-profile-builder（置信度标签）、intervention-generator（干预文案）。
+
+| hash | 提交 | 覆盖 | 回退 |
+|---|---|---|---|
+| `485ec41` | 术语白话化 | 上述 6 个源文件 + 4 个测试契约同步（能力页例证、进度轨、页头 h1、选择理由） | `git revert 485ec41` |
+
+契约变化：e2e 断言文案同步更新——`世界决策记录`→`情境决策记录`、`世界 1/2/3`→`情境 1/2/3`、
+页头 h1 `世界工作台`→`情境对话`、能力页空态两条例证改为「例如「…」」句式、
+challenge-selection 单测 `校准世界`→`基线情境`。testid 均未变。
+
+批次验证（tag `uiux/copy-2` 前）：typecheck ✅ · vitest 441/441（69 files）✅ · e2e 63/63 ✅。
+浏览器实测：能力页空态 h2「还没有情境对话的判断证据」+ 四条白话例证；工作台 h1「情境对话」、
+顶栏「情境 1 / 3 · B2C / AI 工具产品 · 基线轮」、进度轨「情境 1/2/3」、聊天角色「对方」。
+批次回退：`git reset --hard uiux/devtools` 或 `git revert uiux/devtools..uiux/copy-2`。
