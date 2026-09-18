@@ -161,3 +161,20 @@ thedaviddias/Front-End-Checklist、The A11Y Project Checklist。
 
 批次验证（tag `uiux/polish` 前）：typecheck ✅ · vitest 441/441（69 files）✅ · golden 31/31（VALID 30 cases）✅ · rls ✅ · e2e 63/63 ✅。
 批次回退：`git reset --hard uiux/residual` 或 `git revert uiux/residual..uiux/polish`（2501238 与 1ec1419 成对）。
+
+## 批次 8 · 隐藏开发态框架浮窗（tag `uiux/devtools`）
+
+用户验收反馈（2026-09-18）：登录页左下角 Next.js 开发指示器（黑底 N 徽标）点击后展开全英文框架调试面板，
+与全中文演示界面冲突。该浮窗为 Next 内置 dev overlay（`nextjs-portal` shadow DOM），非应用 UI、无法本地化，
+且仅 dev 模式出现、生产构建不含。处理：`next.config.ts` 设 `devIndicators: false` 整体关闭；
+编译错误浮层不受影响（无错误时 shadow root 可见节点为 0）。
+
+| hash | 提交 | 覆盖 | 回退 |
+|---|---|---|---|
+| `61b354f` | 关闭开发指示器 | `devIndicators: false`；重启 dev server 实测 shadow root 无指示器标记、0 可见节点 | `git revert 61b354f` |
+
+契约变化：无（testid / 文案 / 存储结构均未动）。仅 dev 模式观感变化，e2e 跑生产构建故不受影响。
+
+批次验证（tag `uiux/devtools` 前）：typecheck ✅ · vitest 441/441（69 files）✅ · e2e 63/63 ✅
+（配置级改动，不触及 golden/rls 覆盖范围）。
+批次回退：`git reset --hard uiux/polish` 或 `git revert uiux/polish..uiux/devtools`。
