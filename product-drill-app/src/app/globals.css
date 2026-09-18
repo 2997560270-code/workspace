@@ -513,10 +513,6 @@ button:disabled { cursor: not-allowed; }
 .scenario-card .text-button { margin-top: auto; padding-top: 22px; text-align: left; }
 
 /* ══════════════════════════ TRAINING WORKSPACE ═════════════════════════ */
-/* 100% 缩放（1366–1440）下主区可用宽约 1000–1100px：中列必须 minmax(0,1fr)，
-   否则三列最小宽之和溢出，composer 按钮被压到 CJK 竖排断行。 */
-.training-shell { display: grid; grid-template-columns: clamp(280px, 23vw, 360px) minmax(0, 1fr) clamp(232px, 19vw, 280px); gap: 18px; align-items: stretch; }
-.briefing, .conversation, .training-progress { min-height: calc(100vh - 202px); }
 .briefing { padding: 26px; max-height: calc(100vh - 202px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: #cfccc4 transparent; }
 .back-button { margin-bottom: 40px; }
 .briefing h2 { font-size: var(--fs-title-lg); text-wrap: balance; }
@@ -530,14 +526,8 @@ button:disabled { cursor: not-allowed; }
 .check { flex: 0 0 auto; width: 17px; height: 17px; display: inline-grid; place-items: center; color: #b7b8b3; border: 1px solid #cfcdc6; border-radius: 50%; font-size: 9px; }
 .check.active { color: var(--white); border-color: var(--sage-strong); background: var(--sage-strong); }
 .mode-switch { padding: 4px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: #f2f0ea; }
-.conversation-head .mode-switch { width: 216px; flex: 0 0 auto; }
 .mode-switch button { padding: 8px 4px; color: var(--ink-2); border: 0; border-radius: var(--radius-sm); background: transparent; font-size: var(--fs-aux-sm); font-weight: 600; }
 .mode-switch button.active { color: var(--on-dark-title); background: var(--navy); }
-.conversation { display: flex; flex-direction: column; overflow: hidden; }
-.conversation-head { padding: 24px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px 16px; border-bottom: 1px solid var(--line); }
-.conversation-head .mode-hint { flex-basis: 100%; margin: 0; color: var(--ink-3); font-size: var(--fs-aux-sm); }
-.conversation-head > .quiet, .conversation-head > .strict-timer { margin-left: auto; }
-.conversation-head h2 { margin-bottom: 0; font-size: var(--fs-title); }
 .strict-timer { color: var(--coral); font-size: var(--fs-aux); font-variant-numeric: tabular-nums; font-weight: 700; }
 .strict-timer.expired { color: var(--ink-2); }
 .message-list { min-height: 300px; max-height: calc(100vh - 470px); padding: 28px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
@@ -568,7 +558,6 @@ button:disabled { cursor: not-allowed; }
 .composer-actions .voice-input-button, .composer-actions .text-button, .composer-actions .button { white-space: nowrap; flex: 0 0 auto; }
 .composer-actions .button-primary { margin-left: auto; }
 .composer-actions .composer-note { flex-basis: 100%; margin: 2px 0 0; }
-.training-progress { padding: 26px; }
 .coverage-number { margin: 28px 0 14px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
 .coverage-number strong { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 600; color: var(--ink-3); line-height: 1; font-variant-numeric: tabular-nums; }
 .coverage-item.hit { animation: coverage-hit 180ms cubic-bezier(0.16, 1, 0.3, 1); }
@@ -580,8 +569,66 @@ button:disabled { cursor: not-allowed; }
 .coverage-bar i { display: block; height: 100%; background: var(--sage-strong); }
 .coverage-list { margin: 30px 0; padding: 0; list-style: none; display: grid; gap: 14px; }
 .coverage-list > li { display: flex; align-items: center; gap: 10px; font-size: var(--fs-body-sm); }
-.training-progress > p { color: var(--ink-2); font-size: var(--fs-body-sm); line-height: 1.6; }
-.training-progress .button { width: 100%; margin-top: 18px; }
+
+/* ── 批次11：ChatGPT/Codex 式单列对话布局 ───────────────────────────────
+   契约保留：.message/.message.user p、.mode-switch、composer、coverage-*
+   与全部 testid 不变；只改布局容器与视觉层。 */
+.training-chat-shell { position: relative; }
+.training-chat-container { max-width: 780px; margin: 0 auto; display: flex; flex-direction: column; min-height: calc(100vh - 202px); }
+.chat-topbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.chat-topbar .back-button { margin-bottom: 0; }
+.chat-topbar-titles { min-width: 0; margin-right: auto; }
+.chat-title { margin: 0; font-size: var(--fs-title-lg); font-weight: 700; color: var(--ink); text-wrap: balance; }
+.chat-role { margin: 2px 0 0; color: var(--ink-3); font-size: var(--fs-aux); font-weight: 400; }
+.chat-topbar .mode-switch { width: 216px; flex: 0 0 auto; }
+.chat-topbar .mode-hint { flex-basis: 100%; margin: 0; color: var(--ink-3); font-size: var(--fs-aux-sm); }
+
+/* 场景简报作为 AI 的开场消息 */
+.training-chat-shell .briefing { padding: 18px 20px; max-height: none; overflow: visible; scrollbar-width: auto; }
+.chat-opening { margin: 18px 0; padding: 18px 20px; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--sage-strong); border-radius: var(--radius-sm); }
+.chat-opening h2 { margin: 0 0 10px; font-size: var(--fs-title-sm); }
+.chat-opening > p { margin: 0; color: var(--ink-2); }
+.chat-opening .background-block { margin-top: 14px; }
+.chat-opening .briefing-list { margin: 14px 0 0; }
+
+/* 消息气泡：保留 .message 结构，视觉升级为头像 + 气泡 */
+.training-chat-shell .message-list { flex: 1; max-height: none; min-height: 220px; padding: 8px 0 20px; }
+.training-chat-shell .message { max-width: 82%; animation: chat-msg-in var(--dur-3) var(--ease-out); }
+@keyframes chat-msg-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .training-chat-shell .message { animation: none; } }
+.training-chat-shell .message > span { display: flex; align-items: center; gap: 8px; color: var(--ink-3); font-size: var(--fs-aux-sm); }
+.training-chat-shell .message > span::before { width: 24px; height: 24px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 10px; font-weight: 700; }
+.training-chat-shell .message.ai > span::before { content: "AI"; background: var(--sage); color: var(--sage-strong); }
+.training-chat-shell .message.user > span::before { content: "你"; background: var(--navy); color: var(--on-dark-title); }
+.training-chat-shell .message.user > span { justify-content: flex-end; }
+.training-chat-shell .message p { padding: 12px 16px; border-radius: 4px 12px 12px 12px; }
+.training-chat-shell .message.ai p { background: var(--surface); border: 1px solid var(--line); }
+.training-chat-shell .message.user p { border-radius: 12px 4px 12px 12px; }
+.training-chat-shell .message-thinking p { border-radius: 4px 12px 12px 12px; }
+
+/* 输入区：建议 chips + 文本框 + 动作行 */
+.training-chat-shell .composer { margin-top: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 14px 16px; }
+.suggestion-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
+.suggestion-chip { padding: 6px 12px; font-size: var(--fs-aux-sm); border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink-2); transition: border-color var(--dur-2) var(--ease-standard), color var(--dur-2) var(--ease-standard); white-space: nowrap; }
+.suggestion-chip:hover { border-color: var(--sage-strong); color: var(--sage-strong); }
+.suggestion-chip:active { transform: scale(0.98); }
+
+/* 覆盖度：右下角浮动按钮 + 按需浮层 */
+.coverage-toggle { position: fixed; right: 20px; bottom: 24px; z-index: 60; display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); box-shadow: var(--shadow); color: var(--ink-2); font-size: var(--fs-aux-sm); font-variant-numeric: tabular-nums; transition: border-color var(--dur-2) var(--ease-standard), color var(--dur-2) var(--ease-standard); }
+.coverage-toggle:hover { border-color: var(--sage-strong); color: var(--sage-strong); }
+.coverage-toggle strong { font-family: var(--font-mono); font-weight: 600; }
+.coverage-float-panel { position: fixed; right: 20px; bottom: 76px; z-index: 60; width: min(320px, calc(100vw - 40px)); max-height: min(560px, calc(100vh - 160px)); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity var(--dur-4) var(--ease-out), transform var(--dur-4) var(--ease-out); }
+.coverage-float-panel.open { opacity: 1; transform: none; pointer-events: auto; }
+.coverage-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.coverage-panel-head h3 { margin: 0; font-size: var(--fs-title-sm); color: var(--ink); }
+.coverage-panel-close { width: 28px; height: 28px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink-3); font-size: 18px; line-height: 1; }
+.coverage-panel-close:hover { background: var(--surface-strong); color: var(--ink); }
+.coverage-panel-body { padding: 16px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #cfccc4 transparent; }
+.coverage-float-panel .coverage-number { margin: 0 0 10px; }
+.coverage-float-panel .coverage-list { margin: 16px 0 0; }
+.coverage-panel-foot { padding: 12px 16px; border-top: 1px solid var(--line); color: var(--ink-2); font-size: var(--fs-body-sm); line-height: 1.6; }
+.coverage-panel-foot .progress-note { display: block; margin-top: 6px; color: var(--ink-3); font-size: var(--fs-aux-sm); }
+.coverage-float-panel .button { width: 100%; margin-top: 14px; }
 
 /* ══════════════════════════ JUDGMENT CANVAS ════════════════════════════ */
 .judgment { padding: clamp(30px, 4vw, 50px); }
@@ -983,10 +1030,6 @@ button:disabled { cursor: not-allowed; }
   .hero-training { grid-template-columns: 1fr; }
   .hero-proof { align-self: auto; }
   .weekly, .focus-card, .map-preview { grid-column: 1; }
-  .training-shell { grid-template-columns: 260px minmax(0, 1fr); }
-  .training-progress { grid-column: 1 / -1; min-height: auto; }
-  .briefing, .conversation { min-height: 680px; }
-  .briefing { max-height: 680px; }
   .scenario-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
@@ -1004,9 +1047,7 @@ button:disabled { cursor: not-allowed; }
   .experiment-entry, .experiment-grid, .custom-scenario-entry, .course-entry { grid-template-columns: 1fr; flex-direction: column; align-items: flex-start; }
   .experiment-grid label.wide { grid-column: 1; }
   .scenario-grid { grid-template-columns: 1fr; }
-  .training-shell { grid-template-columns: 1fr; }
-  .briefing, .conversation, .training-progress { min-height: auto; }
-  .briefing { max-height: none; }
+  .training-chat-container { min-height: auto; }
   .message-list { max-height: 520px; }
   .judgment-grid { grid-template-columns: 1fr; }
   .judgment-grid label.wide { grid-column: 1; }

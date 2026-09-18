@@ -40,3 +40,11 @@ export const MODE_HINTS: Record<TrainingSession["mode"], string> = {
   "严格": "严格：限时作答，检验独立判断。",
   "练习": "练习：可用提示，结果只作练习反馈。",
 };
+
+/** 对话输入框上方的建议追问（对应五个信息维度中的高频起点）。 */
+export const SUGGESTED_QUESTIONS: readonly string[] = [
+  "谁每天在用这个功能？",
+  "现在流程哪一步最耗时？",
+  "有没有现成的替代方案？",
+  "这件事的成功指标怎么定？",
+];

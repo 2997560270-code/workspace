@@ -56,7 +56,8 @@ import {
   MASTERY_LABEL,
   MODE_HINTS,
   SCENARIO_STATUS_CLASS,
-  SCENARIO_STATUS_LABEL
+  SCENARIO_STATUS_LABEL,
+  SUGGESTED_QUESTIONS
 } from "../lib/ui-labels";
 import { draftJudgmentFromTranscript, mergeJudgmentDraft, type JudgmentFieldKey } from "../lib/judgment-draft";
 import {
@@ -650,6 +651,7 @@ function TrainingWorkspace({
     return Date.now() + (scenarioDefinition?.duration ?? getScenario(scenarioId).duration) * 60 * 1000;
   });
   const [clockMs, setClockMs] = useState(() => Date.now());
+  const [showCoveragePanel, setShowCoveragePanel] = useState(false);
   // 设置严格模式截止时间时必须同步刷新 clockMs：
   // 非严格模式下时钟不会走动，若沿用旧的 clockMs 计算，
   // 每次切换模式都会把停摆的时间差叠加进剩余时间（计时漂移）。
@@ -935,38 +937,18 @@ function TrainingWorkspace({
   return (
     <>
       {notice}
-      <div className="training-shell">
-        <section className="briefing surface">
-          <button className="back-button" onClick={onClose} type="button">← 返回</button>
-          <h2>{scenario.title}</h2>
-          <p data-testid="briefing-context">{scenario.context}</p>
-          {scenario.background?.length ? (
-            <div className="background-block" data-testid="scenario-background">
-              <span className="background-label">业务背景</span>
-              <ul className="background-list">
-                {scenario.background.map((item) => <li key={item}>{item}</li>)}
-              </ul>
-              {scenario.backgroundSource ? (
-                <p className="background-source">背景原型：{scenario.backgroundSource}</p>
-              ) : null}
-            </div>
-          ) : null}
-          <div className="briefing-list">
-            {scenario.briefing.map((item) => <div key={item}><CheckMark /> {item}</div>)}
-          </div>
-        </section>
-
-        <section className="conversation surface">
-          <div className="conversation-head">
-            <div>
-              <span className="section-kicker">AI 角色</span>
-              <h2>{scenario.role}</h2>
+      <div className="training-chat-shell">
+        <main className="training-chat-container">
+          <div className="chat-topbar">
+            <button className="back-button" onClick={onClose} type="button">← 返回</button>
+            <div className="chat-topbar-titles">
+              <h2 className="chat-title">{scenario.title}</h2>
+              <h3 className="chat-role">AI 角色：{scenario.role}</h3>
             </div>
             <div className="mode-switch" aria-label="模式选择" data-testid="mode-switch">
               {TRAINING_MODE_OPTIONS.map((mode) => (
                 <button
                   aria-pressed={session.mode === mode}
-                  aria-describedby="mode-hint"
                   className={session.mode === mode ? "active" : ""}
                   disabled={busy}
                   key={mode}
@@ -984,6 +966,26 @@ function TrainingWorkspace({
             ) : <span className="quiet">{busy ? "处理中…" : `${session.mode}模式`}</span>}
             <p className="mode-hint" data-testid="mode-hint" id="mode-hint">{MODE_HINTS[session.mode]}</p>
           </div>
+
+          <section className="briefing chat-opening">
+            <h2>场景简报</h2>
+            <p data-testid="briefing-context">{scenario.context}</p>
+            {scenario.background?.length ? (
+              <div className="background-block" data-testid="scenario-background">
+                <span className="background-label">业务背景</span>
+                <ul className="background-list">
+                  {scenario.background.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+                {scenario.backgroundSource ? (
+                  <p className="background-source">背景原型：{scenario.backgroundSource}</p>
+                ) : null}
+              </div>
+            ) : null}
+            <div className="briefing-list">
+              {scenario.briefing.map((item) => <div key={item}><CheckMark /> {item}</div>)}
+            </div>
+          </section>
+
           <div className="message-list" data-testid="message-list" ref={messageListRef}>
             {session.messages.map((message) => (
               <article className={`message ${message.role}`} key={message.id}>
@@ -1004,7 +1006,21 @@ function TrainingWorkspace({
               </>
             ) : null}
           </div>
+
           <div className="composer">
+            <div className="suggestion-chips">
+              {SUGGESTED_QUESTIONS.map((question) => (
+                <button
+                  className="suggestion-chip"
+                  disabled={busy || strictExpired}
+                  key={question}
+                  onClick={() => setReply(question)}
+                  type="button"
+                >
+                  {question}
+                </button>
+              ))}
+            </div>
             <textarea
               aria-label="你的追问"
               data-testid="reply-input"
@@ -1026,35 +1042,51 @@ function TrainingWorkspace({
               >
                 给我一点提示
               </button>
+              <button
+                className="button button-secondary"
+                data-testid="finish-interview"
+                disabled={busy || (!strictExpired && session.messages.filter((message) => message.role === "user").length < 1)}
+                onClick={() => setSession((current) => moveToJudgment(current))}
+                type="button"
+              >
+                {strictExpired ? "时间到，提交我的判断" : "结束对话，提交我的判断"}
+              </button>
               <button className="button button-primary" data-testid="send-reply" disabled={busy || strictExpired || !reply.trim()} onClick={() => { void sendReply(); }} type="button">发送追问</button>
               {strictExpired ? <span className="composer-note">本局时间已结束</span> : !reply.trim() ? <span className="composer-note">写下你的问题后即可发送</span> : null}
             </div>
           </div>
-        </section>
+        </main>
 
-        <aside className="training-progress surface">
-          
-          <div className="coverage-number" data-testid="coverage-summary"><strong>{session.coveredSkills.length} / {SKILLS.length}</strong><span data-testid="coverage-unit">个信息维度已问到</span></div>
-          <div className="coverage-bar"><i style={{ width: `${coverage}%` }} /></div>
-          <ul className="coverage-list">
-            {SKILLS.map((skill) => (
-              <li className={session.coveredSkills.includes(skill.id) ? "coverage-item hit" : "coverage-item"} data-testid={`coverage-item-${skill.id}`} key={skill.id}>
-                <CheckMark active={session.coveredSkills.includes(skill.id)} />
-                <span>{skill.name}</span>
-              </li>
-            ))}
-          </ul>
-          <p data-testid="coverage-note">覆盖度只表示你是否问到了相关信息，不代表问题质量。</p>
-          {(!strictExpired && session.messages.filter((message) => message.role === "user").length < 1) ? <span className="progress-note">至少发送一个追问后，即可提交判断</span> : null}
-          <button
-            className="button button-secondary"
-            data-testid="finish-interview"
-            disabled={busy || (!strictExpired && session.messages.filter((message) => message.role === "user").length < 1)}
-            onClick={() => setSession((current) => moveToJudgment(current))}
-            type="button"
-          >
-            {strictExpired ? "时间到，提交我的判断" : "结束对话，提交我的判断"}
-          </button>
+        <button
+          aria-expanded={showCoveragePanel}
+          className="coverage-toggle"
+          onClick={() => setShowCoveragePanel((current) => !current)}
+          type="button"
+        >
+          覆盖度 <strong data-testid="coverage-summary">{session.coveredSkills.length} / {SKILLS.length}</strong>
+        </button>
+
+        <aside aria-label="信息维度覆盖" className={`coverage-float-panel${showCoveragePanel ? " open" : ""}`}>
+          <div className="coverage-panel-head">
+            <h3>信息维度覆盖</h3>
+            <button aria-label="关闭覆盖度面板" className="coverage-panel-close" onClick={() => setShowCoveragePanel(false)} type="button">×</button>
+          </div>
+          <div className="coverage-panel-body">
+            <div className="coverage-number"><strong>{session.coveredSkills.length} / {SKILLS.length}</strong><span data-testid="coverage-unit">个信息维度已问到</span></div>
+            <div className="coverage-bar"><i style={{ width: `${coverage}%` }} /></div>
+            <ul className="coverage-list">
+              {SKILLS.map((skill) => (
+                <li className={session.coveredSkills.includes(skill.id) ? "coverage-item hit" : "coverage-item"} data-testid={`coverage-item-${skill.id}`} key={skill.id}>
+                  <CheckMark active={session.coveredSkills.includes(skill.id)} />
+                  <span>{skill.name}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="coverage-panel-foot">
+            <p data-testid="coverage-note">覆盖度只表示你是否问到了相关信息，不代表问题质量。</p>
+            {(!strictExpired && session.messages.filter((message) => message.role === "user").length < 1) ? <span className="progress-note">至少发送一个追问后，即可提交判断</span> : null}
+          </div>
         </aside>
       </div>
     </>
